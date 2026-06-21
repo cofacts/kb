@@ -5,9 +5,9 @@
 ```
 src/meetings/YYYY/YYYYMMDD.md   # Layer 1: raw meeting notes (read-only for wiki agents)
 wiki/                            # Layer 2: curated knowledge (agent-maintained)
-  decisions/
-  projects/
   people/
+  projects/
+  activities/
   index.md
 ```
 
@@ -27,21 +27,21 @@ Skills that write here: `/post-meeting-summarize`
 
 ## Layer 2: wiki/
 
-Agent-maintained concept pages. OKF frontmatter:
+Agent-maintained concept pages. Follows [OKF spec](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md). Frontmatter:
 
 ```yaml
-type: Decision | Project | Person   # pick one
+type: Person | Project | Event   # pick one
 title: "..."
-description: "..."                  # one sentence
+description: "..."               # one sentence
 tags: [cofacts, ...]
-timestamp: "YYYY-MM-DDT..."         # update when editing
+timestamp: "YYYY-MM-DDT..."      # update when editing
 ```
 
-| Type | Use for |
-|------|---------|
-| `Decision` | Key decisions: what, when, why, current status |
-| `Project` | Long-running initiatives: scope, progress, outcome |
-| `Person` | Contributors: role, focus areas, active period |
+| Type | Directory | Use for |
+|------|-----------|---------|
+| `Person` | `people/` | Contributors: role, focus areas, active period |
+| `Project` | `projects/` | Thematic initiatives (e.g. CCPRIP, 主機搬遷) — NOT GitHub repos |
+| `Event` | `activities/` | Recurring events (小聚, 大松): venue info, setup layouts, insights from 檢討 |
 
 **Conventions:**
 - Cite raw sources as links: `[20210120](../src/meetings/2021/20210120.md)`
