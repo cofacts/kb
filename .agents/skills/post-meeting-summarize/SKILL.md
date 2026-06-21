@@ -47,7 +47,7 @@ curl -s -H "Authorization: Bearer $HACKMD_API_TOKEN" \
 <i>0317</i> API bug修復、影片轉錄實驗、CCPRIP自動下架功能、Langfuse設定、MyGoPen連結問題、小聚籌備
 ```
 
-產出標題後，**呈現給使用者**並說明：「請手動將此標題貼入 HackMD 的 [所有會議記錄](https://g0v.hackmd.io/@cofacts/meetings/x232chPbTfGgNL_Q0f47rQ) 索引。」
+產出標題後呈現給使用者確認，確認後用於步驟 4 更新 `src/meetings/index.md`。
 
 ### 步驟 3：整理 Action Items 並建 GitHub Issues
 
@@ -88,6 +88,12 @@ timestamp: "YYYY-MM-DDT20:00:00+08:00"
 ```
 
 其中 `NOTE_ID` 用 `$MEETING_NOTE_ID`。
+
+存檔後，同步在 `src/meetings/index.md` 的當年度區塊（`## YYYY`）頂端新增一行：
+
+```
+- [MMDD Title1、Title2、...](./YYYY/YYYYMMDD.md)
+```
 
 ### 步驟 5：以下週模板更新 HackMD 會議記錄
 
@@ -130,10 +136,7 @@ curl -s -X PATCH \
 
 ### 最後輸出
 
-完成後輸出一行供使用者貼入會議索引：
-
-```
-- [YYYYMMDD 會議記錄](/MEETING_NOTE_ID)
-```
-
-並提醒使用者手動將此行貼入 [所有會議記錄](https://g0v.hackmd.io/@cofacts/meetings/x232chPbTfGgNL_Q0f47rQ) 索引。
+完成後列出本次執行的摘要：
+- 步驟 4 存入的檔案路徑
+- `src/meetings/index.md` 更新後的條目
+- HackMD 已更新為下週（YYYYMMDD）模板

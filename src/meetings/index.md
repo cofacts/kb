@@ -1,7 +1,7 @@
 # Cofacts 會議記錄
 
 ## 2026
-- [20260616 會議記錄](./2026/20260616.md)
+- [0616 GCP CUD方案、封鎖SEO爬蟲、AI週報、Cofacts知識庫](./2026/20260616.md)
 - [0609 GCE Migration, Kaggle, url-resolver 優化, COSCUP 籌備, 小聚檢討, AI 影音處理與 sourcing 優化, Production 環境週報](./2026/20260609.md)
 - [0602 GCE 搬遷觀察、cofacts.ai 週會回顧、url-resolver 測試、逐字稿修復、小聚籌辦、系統狀態報告。](./2026/20260602.md)
 - [Cofacts Hackath73n 協作頁面](./2026/g0v-hackath73n.md)
