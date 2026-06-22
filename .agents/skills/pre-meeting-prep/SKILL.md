@@ -1,6 +1,6 @@
 ---
 name: pre-meeting-prep
-description: 準備 Cofacts 每週開會前的摘要：從本地 wiki 找到上次開會日期，抓取 Discord 三個頻道的訊息與 GitHub 活動， 整理成 Markdown 摘要供貼入會議記錄。Use whenever the user says "幫我準備會議"、"prepare for meeting"、 "整理上週發生的事"，或在會議開始前要彙整近況時請務必使用此 skill。
+description: 準備 Cofacts 每週開會前的摘要：從本地 wiki 找到上次開會日期，抓取 Discord 四個頻道的訊息與 GitHub 活動， 整理成 Markdown 摘要供貼入會議記錄。Use whenever the user says "幫我準備會議"、"prepare for meeting"、 "整理上週發生的事"，或在會議開始前要彙整近況時請務必使用此 skill。
 ---
 
 # Pre-Meeting Prep
@@ -52,7 +52,7 @@ curl -s -H "Authorization: Bot $DISCORD_TOKEN" \
 **解析訊息時，兩類都要處理：**
 
 1. **人類訊息**（`author.bot != true`）：取 `content` 欄位，略過純表情符號或空白訊息
-2. **GitHub bot embed**（`author.username == "GitHub"`）：取 `embeds[].title` + `embeds[].url`，保留關鍵事件（PR opened/closed/merged、release published），略過純 review comment（`discussion_r` 開頭的 URL）及 gemini-code-assist bot 訊息
+2. **GitHub bot embed**（`author.username == "GitHub"`）：取 `embeds[].title` + `embeds[].url`，保留關鍵事件（PR opened/closed/merged、release published），略過純 review comment（URL 包含 `discussion_r`）及 gemini-code-assist bot 訊息
 
 ### 3. GitHub 補充（選用）
 
@@ -87,6 +87,12 @@ mcp__github__search_pull_requests: org:cofacts is:pr merged:>=YYYY-MM-DD
 > @作者名：訊息內容（僅保留有資訊量的部分）
 
 **alerts**
+> @作者名：訊息內容
+
+**程式開發**
+> @作者名：訊息內容
+
+**dev**
 > @作者名：訊息內容
 ```
 ````
