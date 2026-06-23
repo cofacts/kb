@@ -1,17 +1,17 @@
 # Cofacts Knowledge Base
 
-[Cofacts](https://cofacts.tw) 是台灣的開放原始碼事實查核平台，由公民志工社群共同維護。本 repo 是 Cofacts 的機構記憶庫，保存自 2017 年至今的週會記錄，以及從中提煉的結構化知識。
+[Cofacts](https://cofacts.tw) is a Taiwan-based open-source fact-checking platform run by a civic volunteer community. This repository is Cofacts' institutional memory — weekly meeting notes dating back to 2017, plus a structured wiki distilled from them.
 
-## 我想了解 Cofacts 是什麼
+## I want to learn about Cofacts
 
-- [Cofacts 網站](https://cofacts.tw) — 查核資料庫與 LINE Bot 入口
-- [wiki/projects/](wiki/projects/) — 各項計畫的背景、目標與演進脈絡
-- [wiki/people/](wiki/people/) — 核心貢獻者的角色與專注領域
-- [wiki/activities/](wiki/activities/) — 定期活動（小聚、大松）的辦理方式
+- [Cofacts website](https://cofacts.tw) — the fact-checking database and LINE Bot
+- [wiki/projects/](wiki/projects/) — background, goals, and evolution of key initiatives
+- [wiki/people/](wiki/people/) — core contributors, their roles and focus areas
+- [wiki/activities/](wiki/activities/) — how recurring events (小聚 meetups, 大松 hackathons) are run
 
-## 我要查找過往記錄
+## I want to look up past records
 
-週會記錄從 2017 年起，依年份存放於 `src/meetings/`：
+Meeting notes from 2017 onwards are stored by year under `src/meetings/`:
 
 ```
 src/meetings/
@@ -21,33 +21,33 @@ src/meetings/
   2026/YYYYMMDD.md
 ```
 
-每份記錄都有 `resource` 欄位，連回 HackMD 原始文件。也可以直接在 GitHub 介面搜尋關鍵字，或用 `git grep`：
+Each file has a `resource` field linking back to the original HackMD document. You can search across all notes on GitHub, or locally with:
 
 ```bash
-git grep "關鍵字" src/meetings/
+git grep "keyword" src/meetings/
 ```
 
-若某個主題跨越多次會議，`wiki/` 下會有對應的彙整頁面，並列出原始會議記錄的連結。
+When a topic recurs across multiple meetings, `wiki/` will have a summary page that links back to the relevant meeting notes.
 
-## 目錄結構
+## Repository structure
 
 ```
-src/meetings/YYYY/YYYYMMDD.md   # 原始週會記錄（2017 – 今）
+src/meetings/YYYY/YYYYMMDD.md   # raw weekly meeting notes (2017 – present)
 wiki/
-  people/                        # 貢獻者
-  projects/                      # 計畫與專題
-  activities/                    # 定期活動
+  people/                        # contributors
+  projects/                      # initiatives and workstreams
+  activities/                    # recurring events
   index.md
 ```
 
-`wiki/` 的內容由 AI agent 從會議記錄中提煉，經人工審閱後合入。
+`wiki/` content is distilled from meeting notes by an AI agent and merged after human review.
 
-## 相關連結
+## Related links
 
-- [Cofacts 網站](https://cofacts.tw)
-- [HackMD 歷史會議記錄](https://g0v.hackmd.io/@cofacts/meetings)
+- [Cofacts website](https://cofacts.tw)
+- [Meeting notes on HackMD](https://g0v.hackmd.io/@cofacts/meetings)
 - [Cofacts GitHub org](https://github.com/cofacts)
 
 ---
 
-> 本 repo 的維護流程與 AI agent 規格：見 [AGENTS.md](AGENTS.md)、[CLAUDE.md](CLAUDE.md)
+> Maintenance workflow and AI agent conventions: see [AGENTS.md](AGENTS.md) and [CLAUDE.md](CLAUDE.md)
