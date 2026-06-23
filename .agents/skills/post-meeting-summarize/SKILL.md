@@ -80,11 +80,11 @@ curl -s -H "Authorization: Bearer $HACKMD_API_TOKEN" \
 type: Meeting
 title: "YYYYMMDD 會議記錄"
 resource: "https://g0v.hackmd.io/@mrorz/NOTE_ID"
-tags: [cofacts, meeting]
+tags: [cofacts, meeting, "meeting note"]
 timestamp: "YYYY-MM-DDT20:00:00+08:00"
 ---
 
-（此處貼上 HackMD 的完整 Markdown 內容）
+（此處貼上 HackMD 的完整 Markdown 內容，**去掉** HackMD 原本的 `---\ntags: cofacts, meeting note\n---` 區塊，避免重複 frontmatter）
 ```
 
 其中 `NOTE_ID` 用 `$MEETING_NOTE_ID`。
@@ -94,6 +94,16 @@ timestamp: "YYYY-MM-DDT20:00:00+08:00"
 ```
 - [MMDD Title1、Title2、...](./YYYY/YYYYMMDD.md)
 ```
+
+完成後執行 git commit、push，並用 GitHub MCP 工具建立 draft PR（base: `main`）：
+
+```bash
+git add src/meetings/YYYY/YYYYMMDD.md src/meetings/index.md
+git commit -m "doc: add YYYYMMDD meeting notes"
+git push -u origin <branch>
+```
+
+然後呼叫 `mcp__github__create_pull_request`（owner: cofacts, repo: kb, draft: true）。
 
 ### 步驟 5：以下週模板更新 HackMD 會議記錄
 
