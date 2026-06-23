@@ -1,6 +1,7 @@
 # Cofacts 會議記錄
 
 ## 2026
+- [0623 kb知識庫檢討、Cofacts.ai附件上傳、url-resolver升級、GCP CUD觀察、GCE/Cloud Run週報](./2026/20260623.md)
 - [0616 GCP CUD方案、封鎖SEO爬蟲、AI週報、Cofacts知識庫](./2026/20260616.md)
 - [0609 GCE Migration, Kaggle, url-resolver 優化, COSCUP 籌備, 小聚檢討, AI 影音處理與 sourcing 優化, Production 環境週報](./2026/20260609.md)
 - [0602 GCE 搬遷觀察、cofacts.ai 週會回顧、url-resolver 測試、逐字稿修復、小聚籌辦、系統狀態報告。](./2026/20260602.md)
