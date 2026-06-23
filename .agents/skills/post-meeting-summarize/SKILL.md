@@ -95,7 +95,7 @@ timestamp: "YYYY-MM-DDT20:00:00+08:00"
 - [MMDD Title1、Title2、...](./YYYY/YYYYMMDD.md)
 ```
 
-完成後執行 git commit、push，並用 GitHub MCP 工具建立 draft PR（base: `main`）：
+完成後執行 git commit、push，並用 GitHub MCP 工具建立 PR（base: `main`）：
 
 ```bash
 git add src/meetings/YYYY/YYYYMMDD.md src/meetings/index.md
@@ -103,7 +103,7 @@ git commit -m "doc: add YYYYMMDD meeting notes"
 git push -u origin <branch>
 ```
 
-然後呼叫 `mcp__github__create_pull_request`（owner: cofacts, repo: kb, draft: true）。
+然後呼叫 `mcp__github__create_pull_request`（owner: cofacts, repo: kb, draft: false）。
 
 ### 步驟 5：以下週模板更新 HackMD 會議記錄
 
