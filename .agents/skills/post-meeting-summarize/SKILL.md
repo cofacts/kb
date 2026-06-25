@@ -47,7 +47,7 @@ curl -s -H "Authorization: Bearer $HACKMD_API_TOKEN" \
 <i>0317</i> API bug修復、影片轉錄實驗、CCPRIP自動下架功能、Langfuse設定、MyGoPen連結問題、小聚籌備
 ```
 
-產出標題後呈現給使用者確認，確認後用於步驟 4 更新 `src/meetings/index.md`。
+產出標題後呈現給使用者確認，確認後用於步驟 4 更新 `src/meetings/README.md`。
 
 ### 步驟 3：整理 Action Items 並建 GitHub Issues
 
@@ -89,7 +89,7 @@ timestamp: "YYYY-MM-DDT20:00:00+08:00"
 
 其中 `NOTE_ID` 用 `$MEETING_NOTE_ID`。
 
-存檔後，同步在 `src/meetings/index.md` 的當年度區塊（`## YYYY`）頂端新增一行：
+存檔後，同步在 `src/meetings/README.md` 的當年度區塊（`## YYYY`）頂端新增一行：
 
 ```
 - [MMDD Title1、Title2、...](./YYYY/YYYYMMDD.md)
@@ -98,7 +98,7 @@ timestamp: "YYYY-MM-DDT20:00:00+08:00"
 完成後執行 git commit、push，並用 GitHub MCP 工具建立 PR（base: `main`）：
 
 ```bash
-git add src/meetings/YYYY/YYYYMMDD.md src/meetings/index.md
+git add src/meetings/YYYY/YYYYMMDD.md src/meetings/README.md
 git commit -m "doc: add YYYYMMDD meeting notes"
 git push -u origin <branch>
 ```
@@ -148,5 +148,5 @@ curl -s -X PATCH \
 
 完成後列出本次執行的摘要：
 - 步驟 4 存入的檔案路徑
-- `src/meetings/index.md` 更新後的條目
+- `src/meetings/README.md` 更新後的條目
 - HackMD 已更新為下週（YYYYMMDD）模板
