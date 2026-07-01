@@ -1,30 +1,23 @@
 ---
 type: ResearchDoc
-title: "Youtube scrapping alternatives"
+title: "Youtube scraping alternatives"
 resource: "https://g0v.hackmd.io/@mrorz/H1T2PIQoU"
 tags: [cofacts, research]
 timestamp: "2020-05-26T13:01:41+08:00"
 ---
 
----
-tags: cofacts
-GA: UA-98468513-3
----
-
-Youtube scrapping alternatives
+Youtube scraping alternatives
 =====
 
-:::info
-相關討論
-- [20200511 Slack](https://g0v-tw.slack.com/archives/C2PPMRQGP/p1589175218421000)
-- [20200513 會議記錄](https://g0v.hackmd.io/@mrorz/BJ2GzyK9L#Youtube-API-audit)
-- [20200520 會議記錄](https://g0v.hackmd.io/TfMlpKYhS3-boaLTgiriYg?view#Youtube-API-audit)
-:::
+> [!NOTE]
+> 相關討論
+> - [20200511 Slack](https://g0v-tw.slack.com/archives/C2PPMRQGP/p1589175218421000)
+> - [20200513 會議記錄](https://g0v.hackmd.io/@mrorz/BJ2GzyK9L#Youtube-API-audit)
+> - [20200520 會議記錄](https://g0v.hackmd.io/TfMlpKYhS3-boaLTgiriYg?view#Youtube-API-audit)
 
-:::danger
-到期時間：2020/5/29 
-（Youtube 通知時間為 2020/5/8，並給 15 工作天改善）
-:::
+> [!CAUTION]
+> 到期時間：2020/5/29 
+> （Youtube 通知時間為 2020/5/8，並給 15 工作天改善）
 
 ## 需求
 

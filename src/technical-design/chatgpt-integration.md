@@ -6,19 +6,14 @@ tags: [cofacts, design-docs, technical-design]
 timestamp: "2023-04-12T20:33:00+08:00"
 ---
 
----
-tags: cofacts, chatgpt
----
-
 # ChatGPT integration
 
 Large language models can be helpful to human beings when  they encounter internet hoax.
 
-:::info
-This document now only contains implementation detail.
-
-Original use cases and related research has been moved to https://g0v.hackmd.io/@cofacts/rd/%2FmU8qi721RZeAQ9PDfj7XRA
-:::
+> [!NOTE]
+> This document now only contains implementation detail.
+>
+> Original use cases and related research has been moved to https://g0v.hackmd.io/@cofacts/rd/%2FmU8qi721RZeAQ9PDfj7XRA
 
 ## Scenario #1: point out suspicious points
 
@@ -43,7 +38,7 @@ Can implement a `getOrCreateAiReply(articleId)` helper function for the followin
     - ✅ 「這篇文章尚待查核，請先不要相信這篇文章。機器人初步分析此篇文章有下列幾點需要特別留意：」[name=cai]
 - surrounding text
     - 「請先不要相信這篇文章唷」will show for images / videos, because they don't have AI response
-- More call to actions on the quality of this AI generated content?
+- More calls to action on the quality of this AI-generated content?
     - Thumbs-up / thumbs-down feedback?
 
 #### After submitting a new message to database
@@ -73,12 +68,11 @@ Discussion
 - Should we still show the section if there are replies?
   - Should we show them in collapsed state, like the collapsible contribution graph in user profile page?
 
-:::success
-2023/3/22 meeting:
-- Pick left design (differentiate user reply & AI reply)
-- Always show ChatGPT section
-  - Collapse when have human reply
-:::
+> [!TIP]
+> 2023/3/22 meeting:
+> - Pick left design (differentiate user reply & AI reply)
+> - Always show ChatGPT section
+>   - Collapse when have human reply
 
 ### Elasticsearch
 
@@ -192,11 +186,10 @@ Outputs
 
 ## Scenario #1 extended: Provide search keywords
 
-:::warning
-Priority:
-As discussed on 2023/4/12, we will implement keyword first, then feedbacks for AI reply.
-- Evaluation can come later, get BETA version of keywords first [name=bil]
-:::
+> [!WARNING]
+> Priority:
+> As discussed on 2023/4/12, we will implement keyword first, then feedbacks for AI reply.
+> - Evaluation can come later, get BETA version of keywords first [name=bil]
 
 chatbot: https://www.figma.com/proto/1tiXCGut4kNCEkDG9FTza7/LINE-Chat-UI-Template-(Community)?node-id=302-1236&scaling=scale-down&page-id=208%3A844
 website: https://www.figma.com/file/DvmAQjMJCncuPORWKnljM1/Cofacts-LIFF-and-new-designs?node-id=5163-546&t=nHTu1xJbgYP5rEao-4

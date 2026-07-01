@@ -6,11 +6,6 @@ tags: [cofacts, research]
 timestamp: "2021-01-27T13:59:23+08:00"
 ---
 
----
-tags: cofacts
-GA: UA-98468513-3
----
-
 # User Profile Page Pilot Study
 
 ## 實驗進行方式

@@ -6,11 +6,6 @@ tags: [cofacts, design-docs, technical-design]
 timestamp: "2023-06-27T14:38:59+08:00"
 ---
 
----
-tags: cofacts, google analytics, GA, GA4, universal analytics, UA
-GA: UA-98468513-3
----
-
 # Cofacts GA4 Migration design doc
 
 ## :globe_with_meridians: Site
@@ -100,7 +95,9 @@ This gives us:
 2. Ability to calculate reply view count under each article views
 
 
-:::spoiler Previous attempt
+<details>
+<summary>Previous attempt</summary>
+
 #### SQL
 ```sql
 SELECT
@@ -117,7 +114,8 @@ FROM `..._intraday_...`, UNNEST(items) AS items WHERE event_name = "view_item" L
 
 #### Result
 ![](https://s3-ap-northeast-1.amazonaws.com/g0v-hackmd-images/uploads/upload_8a4f257d924bd34db864a3f626f20753.png)
-:::
+
+</details>
 
 #### `webVisit`, `webUser`
 
@@ -376,9 +374,8 @@ zh, en log stream: 261 records (BQ result)
 zh, en, ja log stream: 401 records (UA result)
 ![](https://s3-ap-northeast-1.amazonaws.com/g0v-hackmd-images/uploads/upload_14b5cce9413871986826a8c60277d3bc.png)
 
-:::success
-#### Conclusion
-The number difference of UA and BQ is due to JA bots not updated to latest version.
-- Users of EN & JA bot users almost do not use 1-1; groups are used instead
-- We do remember to update EN bot to latest, but not JA bots. JA bots are not connected to BQ at all, hence the difference.
-:::
+> [!TIP]
+> #### Conclusion
+> The number difference of UA and BQ is due to JA bots not updated to latest version.
+> - Users of EN & JA bot users almost do not use 1-1; groups are used instead
+> - We do remember to update EN bot to latest, but not JA bots. JA bots are not connected to BQ at all, hence the difference.

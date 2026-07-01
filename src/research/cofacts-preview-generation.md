@@ -6,11 +6,6 @@ tags: [cofacts, research]
 timestamp: "2023-04-07T10:24:21+08:00"
 ---
 
----
-tags: cofacts
-GA: UA-98468513-3
----
-
 # Cofacts preview generation
 
 - Rumors-site: OG image for articles & replies

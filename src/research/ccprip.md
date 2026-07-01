@@ -6,10 +6,6 @@ tags: [cofacts, research]
 timestamp: "2025-12-23T19:52:05+08:00"
 ---
 
----
-tags: cofacts, security, resilience, 資安, CCPRIP
----
-
 # Cofacts Chatbot Platform Resilience Improvement Plan
 
 整理 Cofacts 在不同層級上可用於提升穩定性、安全性與 scalability 的方式，以應對可能到來的威脅。
@@ -66,7 +62,7 @@ tags: cofacts, security, resilience, 資安, CCPRIP
 - Manage access on cloud
 - Ensure horizontal scalability by leveraging public cloud
 - Move servers to behind Cloudflare
-- Elasticsrarch > 8
+- Elasticsearch > 8
   - current 6 does not run on Apple Silicon https://stackoverflow.com/questions/68877644/how-to-run-elasticsearch-6-on-an-apple-silicon-mac
   - enables vector search
 - [Ditigal asset management](https://docs.google.com/document/d/17teNyv46rml0bTLOkEjB20r7jLJbUl-xHukL14eZ57k/edit)
@@ -94,7 +90,9 @@ Benefits of Cloud Run:
   4. Production tw chatbot
   5. Production tw site  :heavy_check_mark:  (2025/10/14)
 
-:::spoiler 原始計畫（before 2024/11）
+<details>
+<summary>原始計畫（before 2024/11）</summary>
+
 #### Phase 2: move API sub-services into Cloud Run
 
 Steps include:
@@ -129,10 +127,10 @@ Note: GCP 發票
     - 但 Google cloud 銷售團隊也有直接寄信來聯繫這樣
 - 田中 https://tscloud.com.tw/product/gcp-billing
 - 宏庭 https://www.microfusion.cloud/news/google-cloud-billing/
-    :::info
-    Update: Cofacts 的 GCP 現在由 Cofacts 在 OCF 的捐款專戶支出，發票問題已經解決。
-    :::
-:::
+    > [!NOTE]
+    > Update: Cofacts 的 GCP 現在由 Cofacts 在 OCF 的捐款專戶支出，發票問題已經解決。
+
+</details>
 
 
 #### Phase 2: Move the rest of services to GCE

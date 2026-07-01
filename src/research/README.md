@@ -26,6 +26,6 @@ timestamp: "2026-06-24T00:00:00+08:00"
 - [Rumors-api userId & appId management proposal](rumors-api-userid-appid-management-proposal.md)
 - [API access management](api-access-management.md)
 - [Cofacts 標籤定義](cofacts-標籤定義.md)
-- [Youtube scrapping alternatives](youtube-scrapping-alternatives.md)
+- [Youtube scraping alternatives](youtube-scrapping-alternatives.md)
 - [Twitter Birdwatch 研究](twitter-birdwatch-研究.md)
 - [【真的假的】回應登入討論紀錄](login-method.md)

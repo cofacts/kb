@@ -6,11 +6,6 @@ tags: [cofacts, design-docs, technical-design]
 timestamp: "2022-01-31T17:21:46+08:00"
 ---
 
----
-tags: cofacts
-GA: UA-98468513-3
----
-
 Cofacts user blocking mechanism
 ======
 
@@ -101,9 +96,8 @@ Not yet
 
 ### M5: Report content mechanism :heavy_check_mark: 
 
-:::info
-Discussion: https://g0v.hackmd.io/Syl8le5xS22nLo8Vc56gmw?view#Block-user-%E5%BB%B6%E4%BC%B8%E4%BA%8B%E9%A0%85
-:::
+> [!NOTE]
+> Discussion: https://g0v.hackmd.io/Syl8le5xS22nLo8Vc56gmw?view#Block-user-%E5%BB%B6%E4%BC%B8%E4%BA%8B%E9%A0%85
 
 - Google form collecting spam
     - Implementation testing & improvement https://g0v.hackmd.io/tBEc2MajQkS-s-lGaG91Gg#%E6%AA%A2%E8%88%89%E9%81%95%E8%A6%8F%E8%99%95%E7%90%86%E6%B5%81%E7%A8%8B

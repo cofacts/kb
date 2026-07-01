@@ -6,10 +6,6 @@ tags: [cofacts, research]
 timestamp: "2025-10-20T02:03:00+08:00"
 ---
 
----
-tags: cofacts
----
-
 # API & Database enhancements
 
 ## API
@@ -89,7 +85,7 @@ If we only use semantic search using embeddings:
     - Supports TF-IDF
     - Supports highlighting
     
-Both solution has no GCP support.
+Both solutions have no GCP support.
 
 #### MongoDB Atlas
 

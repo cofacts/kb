@@ -6,11 +6,6 @@ tags: [cofacts, design-docs, technical-design]
 timestamp: "2023-02-15T14:35:09+08:00"
 ---
 
----
-tags: cofacts
-GA: UA-98468513-3
----
-
 Cofacts anti SEO-spam mechanism
 ======
 
@@ -52,7 +47,7 @@ https://github.com/cofacts/rumors-api/pull/295
 
 ### Website
 - [x] Show "Login to see text" for blocked articles if the user is not authenticated
-  - Page title would be just "Suspecious message"
+  - Page title would be just "Suspicious message"
   - This should stop server from rendering text, thus no SEO for the spammer
   - Show blocked reason ? (Optional)
     - 先不用 [name=bil]

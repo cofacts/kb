@@ -6,11 +6,6 @@ tags: [cofacts, design-docs, technical-design]
 timestamp: "2025-01-20T20:02:44+08:00"
 ---
 
----
-tags: cofacts
-GA: UA-98468513-3
----
-
 Badge System
 ======
 
@@ -25,7 +20,7 @@ https://docs.google.com/presentation/d/1YkJ76WEANq-SopKfgY8KQfLuNBVYKJp_/edit#sl
 - [x] add `badges` table for badges information (cofacts maintain)
 - [x] add `badges` in `users` table
 https://github.com/cofacts/rumors-db/pull/74
-- use `bordaerImage` instead of `color`
+- use `borderImage` instead of `color`
 
 
 #### Release

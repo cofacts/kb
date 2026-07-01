@@ -48,7 +48,7 @@ We should move it to HTTP header. Although it is not protected by signature, it 
 Currently
 - schema stitching will cause lots of HTTP requests in parallel
   - All of which are query, not mutations
-  - The automatic account creation logic causes Elasticsearch error when multiple queries whating to create the very first 
+  - The automatic account creation logic causes Elasticsearch error when multiple queries wanting to create the very first 
 
 ## Progress
 

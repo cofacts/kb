@@ -6,10 +6,6 @@ tags: [cofacts, research]
 timestamp: "2020-08-31T13:42:56+08:00"
 ---
 
----
-tags: cofacts
----
-
 [Rumors-api](https://github.com/cofacts/rumors-api) `userId` & `appId` management proposal
 =====
 
@@ -34,22 +30,21 @@ When different apps invoke mutative rumors-api APIs to create object entities (a
 | [Specifying user](https://github.com/cofacts/rumors-api/blob/master/src/index.js#L86-L88) | Login cookie in `cofacts-api.g0v.tw` domain, managed by rumors-api | `?userId=xxx` query param |
 | Forgery protection | CORS origin & appId mapping | Shared secret between the app and rumors-api |
 
-:::info
-Lucien:
-直接用 domain 就好，這樣應該就不用 x-app-id
-
-orz
-對耶
-
-Lucien
-啊你是 for CSRF 嗎
-
-orz
-喔對齁。對對。
-
-Lucien
-了解，這樣確實要 HTTP header。
-:::
+> [!NOTE]
+> Lucien:
+> 直接用 domain 就好，這樣應該就不用 x-app-id
+>
+> orz
+> 對耶
+>
+> Lucien
+> 啊你是 for CSRF 嗎
+>
+> orz
+> 喔對齁。對對。
+>
+> Lucien
+> 了解，這樣確實要 HTTP header。
 
 #### For Backend Apps
 
@@ -137,11 +132,10 @@ User IDs from backend app 的性質是：
 - 若 user ID from backend app 需要放進 Elasticsearch key 時應該要使用 `sha256(userId)` 而不能直接使用 `userId`，同時考慮到 sensitive、not-safe 與 long 這三個特性。
 - 因為 sensitive 的關係，user Id from backend app 不應被其他 app 直接存取；但進行 query 的 app 可以存取自己寫入的 entity 的 userId (i.e. query 的 app id 若與 entity app Id 相同，才能拿出 user id)，這樣此 app 才有機會將 rumors-api 的 entity 與自己的 user id 對在一起。
 
-:::danger
-雖說 backend app user ID 因為 *sensitive* 所以不該露出、因為 *not-safe* 且 *long* 所以不該用來拼接 entity ID，但事實上現在 production API 的某些欄位，並沒有遵循上面的原則，應當修正：
-
-![](https://s3-ap-northeast-1.amazonaws.com/g0v-hackmd-images/uploads/upload_b0d42f7d823c5023e08e993e615b3bea.png)
-:::
+> [!CAUTION]
+> 雖說 backend app user ID 因為 *sensitive* 所以不該露出、因為 *not-safe* 且 *long* 所以不該用來拼接 entity ID，但事實上現在 production API 的某些欄位，並沒有遵循上面的原則，應當修正：
+>
+> ![](https://s3-ap-northeast-1.amazonaws.com/g0v-hackmd-images/uploads/upload_b0d42f7d823c5023e08e993e615b3bea.png)
 
 ---
 
@@ -168,20 +162,18 @@ User IDs from backend app 的性質是：
 此實作的重點是在「`userId` 保密、又沒有相對應的 user entity」的限制下滿足「指稱 user」的需求。上述需求可以這樣實作：
 
 - **fetch entities related to the user**: query 時，用 `authorOf: {entityId, entityType}` 避開 userId，而是用「什麼東西的作者」來在 query 中指稱該使用者。API 會先在 resolver 中從資料庫找出相對應的 `userId` & `appId`，再使用 `userId` & `appId` 去撈相關 entity。
-  :::info
-  其實現在 `ListArticleFilter` 中的 [`fromUserOfArticleId`](https://github.com/cofacts/rumors-api/blob/master/src/graphql/queries/ListArticles.js#L98-L104) 就是一種「用別的 entity 指稱某個 LINE 使用者」的設計。
-  
-  上面的 `authorOf` 就是將 `fromUserOfArticleId` 從指稱「單一 article 的 author」推廣到指稱「任何 entity 的 author」。
-  :::
+  > [!NOTE]
+  > 其實現在 `ListArticleFilter` 中的 [`fromUserOfArticleId`](https://github.com/cofacts/rumors-api/blob/master/src/graphql/queries/ListArticles.js#L98-L104) 就是一種「用別的 entity 指稱某個 LINE 使用者」的設計。
+  >
+  > 上面的 `authorOf` 就是將 `fromUserOfArticleId` 從指稱「單一 article 的 author」推廣到指稱「任何 entity 的 author」。
 - **user page**: 同理，URL 中放 `entityId`, `entityType`，在 API 中找出相對的 userId & appId
 - **display author of an entity**: user resolver 讀取 entity (如 replyrequests) 的 `appId` 與 `userId`，取得該 index 中儲存的 random name & avatar
 - **ensure entity uniqueness**: 將 `sha(appId + userId)` 放入 entity ID 以確保同一個使用者的限制。
 
-:::warning
-**需要 migration script**
-
-- 重新生成 _id 裡有原始 app `userId` 的 entity：所有 `replyrequest`、`articlereplyfeedback` 的 `_id` 裡，`appId` + `userId` 的部分都要改用 `sha(appId + userId)` 重新生成。
-:::
+> [!WARNING]
+> **需要 migration script**
+>
+> - 重新生成 _id 裡有原始 app `userId` 的 entity：所有 `replyrequest`、`articlereplyfeedback` 的 `_id` 裡，`appId` + `userId` 的部分都要改用 `sha(appId + userId)` 重新生成。
 
 #### 方向 #2: 針對每個 backend user 都產生一個 user document
 
@@ -193,27 +185,25 @@ User IDs from backend app 的性質是：
   - `_id`： `sha256(appId + userId)` 確保 (appId, userId) 對應到唯一一個 user。（browser app user 的 `_id` 則維持由 Elasticsearch 自動生成）
   - 新增 `appUserId` 欄位，存放 backend app 送給 rumors-api 的原始 user Id。 `appUserId` 欄位，只有原 app 可存取（request 時 `x-app-secret` 須符合該 app）。
     - 至此，有 *sensitive*、*long*、*not safe* 特性的東西被收進 `appUserId`，`users._id` 則是公開也沒關係的 `sha(appId + userId)`，因此可以與 browser app 的 user id 一樣外顯在 URL 裡，也可以編進 replyrequest、articlereplyfeedback 等 entity 的 `_id` 裡確保 uniqueness。
-    :::info
-    `User` object type 要 expose `appUserId` 的話，需要檢查 `appId`
-    可以先不做，畢竟目前沒有 client 要讀
-    :::
+    > [!NOTE]
+    > `User` object type 要 expose `appUserId` 的話，需要檢查 `appId`
+    > 可以先不做，畢竟目前沒有 client 要讀
   - `name`, `avatarUrl`：[隨機產生](https://g0v.hackmd.io/7ERem43XREWJPOjjdE28SQ)
   - 新增 `appId` 欄位，存放是哪一個 backend app。（browser app 則無，畢竟所有 browser app 都共用由 rumors-api 統一管理的 user）
 - 新增 backend user 時機：[graphql server 取用 user 時](https://github.com/cofacts/rumors-api/blob/master/src/index.js#L79-L90)。流程如下：
   1. 取 GraphQL call URL 中的 `userId` 與 `checkHeader` middleware 解出的 appId，~~產出 `sha(appId, userId)` 去 users index 撈出 user instance~~ term query 去撈該 (appId, appUserId) 的使用者
   2. 若撈不到該 user，則就地產生一個 backend app user，插入 `users` DB （check collision）
 
-:::warning
-**需要 migration script**
-
-- 把現在所有 entity (`articles`, `replyrequests`, `articlereplyfeedbacks` 等等) 裡的 user 都蓋出 user instance
-- 把所有 entity 的 `userId` 都從 backend app 給的原始 `userId`，更新成新的 ID （從資料庫撈）
-- 重新生成 `_id` 裡有原始 app `userId` 的 entity：所有 `replyrequest`、`articlereplyfeedback` 的 `_id` 裡，`appId` + `userId` 的部分都要改用 `sha(appId + userId)` 重新生成。
-
-**需要變更 DB schema**
-- `users` 新增上面提到的欄位
-- ~~各 `entity` 移除 `appId` 欄位。~~ Lucien: 還是保留 appId 紀錄這個 entity 是哪個 app 做的，方便用來做 filter。
-:::
+> [!WARNING]
+> **需要 migration script**
+>
+> - 把現在所有 entity (`articles`, `replyrequests`, `articlereplyfeedbacks` 等等) 裡的 user 都蓋出 user instance
+> - 把所有 entity 的 `userId` 都從 backend app 給的原始 `userId`，更新成新的 ID （從資料庫撈）
+> - 重新生成 `_id` 裡有原始 app `userId` 的 entity：所有 `replyrequest`、`articlereplyfeedback` 的 `_id` 裡，`appId` + `userId` 的部分都要改用 `sha(appId + userId)` 重新生成。
+>
+> **需要變更 DB schema**
+> - `users` 新增上面提到的欄位
+> - ~~各 `entity` 移除 `appId` 欄位。~~ Lucien: 還是保留 appId 紀錄這個 entity 是哪個 app 做的，方便用來做 filter。
 
 如此一來，上面列出的需求的實作就會變得非常單純，且與指涉 browser app user 的邏輯一致：
 

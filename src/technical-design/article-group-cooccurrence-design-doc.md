@@ -6,10 +6,6 @@ tags: [cofacts, design-docs, technical-design]
 timestamp: "2023-12-03T01:13:23+08:00"
 ---
 
----
-tags: cofacts, 搭配圖文, 圖文搭配, article group, design doc
----
-
 # Cofacts article group design doc
 
 > Previous discussion https://g0v.hackmd.io/3_jgVd9vQreCsgADOdF25w#%E6%96%87%E5%AD%97%E9%85%8D%E5%9C%96%E9%85%8D%E5%BD%B1%E7%89%87%E5%95%8F%E9%A1%8C-article-group
@@ -27,7 +23,9 @@ Principle
 
 https://www.figma.com/file/1tiXCGut4kNCEkDG9FTza7/LINE-Chat-UI-Template-(Community)?node-id=371-2003&t=8OtcQW1yH6BUP59K-4
 
-:::spoiler Old draft
+<details>
+<summary>Old draft</summary>
+
 ### 送出單一訊息流程
 
 - 提供更多資訊：增加「提供搭配圖文」
@@ -46,7 +44,8 @@ https://www.figma.com/file/1tiXCGut4kNCEkDG9FTza7/LINE-Chat-UI-Template-(Communi
   - quick reply 不是 -- 請一則一則分開傳送
   - quick reply 什麼意思 --》 同前解釋
 - 是搭配圖文：同上「轉傳後」
-:::
+
+</details>
 
 ## Technical detail
 
@@ -248,9 +247,8 @@ Return type: `Cooccurrence`
 Arguments
 - `articleIds`
 
-:::info
-Why delete? I forgot QQ
-:::
+> [!NOTE]
+> Why delete? I forgot QQ
 
 #### New API `ListCooccurrences`
 

@@ -6,10 +6,6 @@ tags: [cofacts, research]
 timestamp: "2023-02-14T20:39:10+08:00"
 ---
 
----
-tags: cofacts
----
-
 # Cofacts chatbot error analysis 2023/01/21 ~
 
 ## Operation / code changes

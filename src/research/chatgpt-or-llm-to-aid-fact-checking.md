@@ -6,22 +6,18 @@ tags: [cofacts, research]
 timestamp: "2026-01-30T19:28:34+08:00"
 ---
 
----
-tags: cofacts, chatgpt
----
-
 # ChatGPT or LLM to aid fact-checking
 
 Large language models can be helpful to human beings when they encounter internet hoax.
 
-:::info
-- Assistive fact-checking is part of [Community Layer in CCPRIP](https://g0v.hackmd.io/@cofacts/rd/https%3A%2F%2Fg0v.hackmd.io%2FBRsJOevWSbyUMBSZEVVWrA).
-- Engineering design doc for implementation: https://g0v.hackmd.io/@cofacts/rd/%2F%40cofacts%2FrknFrmdk3
-:::
+> [!NOTE]
+> - Assistive fact-checking is part of [Community Layer in CCPRIP](https://g0v.hackmd.io/@cofacts/rd/https%3A%2F%2Fg0v.hackmd.io%2FBRsJOevWSbyUMBSZEVVWrA).
+> - Engineering design doc for implementation: https://g0v.hackmd.io/@cofacts/rd/%2F%40cofacts%2FrknFrmdk3
 
 ## Use cases and usage
 
-:::spoiler Previous brain storm result: Scenario #1~#7
+<details>
+<summary>Previous brain storm result: Scenario #1~#7</summary>
 
 ### Scenario #1: point out suspicious points for messages not debunked yet
 
@@ -81,7 +77,7 @@ Aid fact-checkers with review and rewrites
   - factual claims can be looked up on the Internet for groundness check
     - https://ai.googleblog.com/2022/01/lamda-towards-safe-grounded-and-high.html#:~:text=of%20the%20dialog.-,Factual%20Grounding,-While%20people%20are
     - https://arxiv.org/pdf/2201.08239.pdf
-    - We can also index fact checker's fact check reports (in IR index and text embedding vectors) so tha-/t they are ready for retrieval
+    - We can also index fact checker's fact check reports (in IR index and text embedding vectors) so that they are ready for retrieval
   - for opinions, look up text in similar category but different opinion in replies
     - We can also collect opinions and index them (in IR index and text embedding vectors)
     - Possible source: FB post of professional, 公視有話好說 transcript, 公視我們的島 transcript, 報導者文章 etc
@@ -133,13 +129,13 @@ We can provide ChatGPT with the following information:
 Human fact checkers can act as editors checking AutoGPT's response:
 - AutoGPT's "fact-checking" process and ther critique on the results are public, hopefully these can ==inspire human fact checkers== and avoid directions that AutoGPT has proven not working.
 - [Optional] Allow human fact checkers to give instruction to AutoGPT, provides new directions of investigation
-:::
+
+</details>
 
 ### Cofacts.ai
 
-:::info
-- 2025 initialtive
-:::
+> [!NOTE]
+> - 2025 initialtive
 
 People now are getting used to UIs like `chatgpt.com` or `gemini.google.com`, which allows users to focus on talking to LLM to focus on 1 task.
 
@@ -297,10 +293,9 @@ The 2024 initialtive (AI assisted reply authoring) relies heavily on UI integrat
 - Cofacts WG 在自己能努力的範圍內盡力讓 AI 有用，但並不對 AI 的錯誤負責。
 
 ### AI assisted reply authoring
-:::info
-- 2024 initialtive
-- Combines idea from Scenario #1 + #5, #6 + #2.
-:::
+> [!NOTE]
+> - 2024 initialtive
+> - Combines idea from Scenario #1 + #5, #6 + #2.
 
 When a new message comes in DB, we create a "conversation thread" that puts together:
 - Surrounding information: cooccurred messages, previous reply to similar messages, search results, comments, etc
@@ -411,13 +406,16 @@ We would spend `25000*1*2.5*0.002=125` USD per year (~10 USD per month) on creat
 
 To further cut costs, we can also consider only generating AI replies to articles that have >=2 reply requests.
 
-:::spoiler Token count estimation
+<details>
+<summary>Token count estimation</summary>
+
 ![](https://s3-ap-northeast-1.amazonaws.com/g0v-hackmd-images/uploads/upload_24869c95ba0be91913f95157d31b3eff.png)
 
 Total request = 8
 Total tokens = 17,243
 Around 2.5K tokens per request
-:::
+
+</details>
 
 ## Prompt design
 

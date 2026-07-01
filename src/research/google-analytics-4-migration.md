@@ -6,11 +6,6 @@ tags: [cofacts, research]
 timestamp: "2023-02-26T12:18:43+08:00"
 ---
 
----
-tags: cofacts, google analytics, GA, GA4, universal analytics, UA
-GA: UA-98468513-3
----
-
 Cofacts Google Analytics 4 migration research
 =====
 
@@ -39,9 +34,8 @@ On July 1, 2023, standard Universal Analytics properties will [stop processing n
 
 ### Account structure
 
-:::info
-[[GA4] Structure your Analytics account](https://support.google.com/analytics/answer/9679158)
-:::
+> [!NOTE]
+> [[GA4] Structure your Analytics account](https://support.google.com/analytics/answer/9679158)
 
 - 1 Account
 - 1 Property (shares same user base in `rumors-api`) for chatbot & website?
@@ -122,7 +116,7 @@ Page view from RSS - manual utm tagging still works https://support.google.com/a
 - Free data retention: 90 days
 - No ready-made datastudio connector
 - No filtering param in reporting APIs
-    - Filter are done using UI in reports; reporting API gets data of a specific report ID
+    - Filtering is done using UI in reports; reporting API gets data of a specific report ID
 
 # Alternative: Google BigQuery
 

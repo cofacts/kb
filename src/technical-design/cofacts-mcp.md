@@ -6,10 +6,6 @@ tags: [cofacts, design-docs, technical-design]
 timestamp: "2026-05-22T12:05:25+08:00"
 ---
 
----
-tags: cofacts
----
-
 # Cofacts MCP Server — Technical Design Doc
 
 ## 1. Overview

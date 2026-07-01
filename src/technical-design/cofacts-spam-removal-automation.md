@@ -6,10 +6,6 @@ tags: [cofacts, design-docs, technical-design]
 timestamp: "2025-04-07T18:58:53+08:00"
 ---
 
----
-tags: cofacts
----
-
 # Cofacts spam removal automation
 
 > Initially proposed:
@@ -35,7 +31,8 @@ It is easier if we implement "backwards" -- start with command automation first,
 
 ### Phase 1: Script execution automation
 
-:::spoiler Legacy design: Google Pub/sub
+<details>
+<summary>Legacy design: Google Pub/sub</summary>
 
 > This design is abandoned in favor of Cloudflare Zero Trust managed APIs.
 > See https://g0v.hackmd.io/_e0nyj04SoCzxdM38CzuYQ#Op-%E5%A4%96%E9%83%A8%E6%95%B4%E5%90%88%EF%BC%9AAdmin-API for reason
@@ -56,7 +53,8 @@ The UI that submits message
 - Design message schema
   - Include script name to execute + arguments
 - Executes script on google cloud console
-:::
+
+</details>
 
 
 A new OpenAPI server is spinned up to host admin APIs.
@@ -135,12 +133,14 @@ Email logins are included in the policy so that they work in Swagger UI.
 ### Phase 3: Automatic detection
 
 #### GitHub action
-- Use GitHub app to create a takedown pull request, if LLM recognize a reply as second scam(二次詐騙) or sexual content
+- Use GitHub app to create a takedown pull request if the LLM recognizes a reply as a secondary scam (二次詐騙) or sexual content
 - Schduled query reply after `LAST_SCANNED_AT` 
 - Filtered out known users that existed in pervious pr by parsing the pr title
 - List the 10 more replies written by the suspicious user for the moderator to review and determine if they are a spammer.
 
-:::spoiler Outdated design
+<details>
+<summary>Outdated design</summary>
+
 #### Google Pubsub
 - Create a new Pubsub topic for Cofacts' object creation
 - Define schema: object type + inserted doc
@@ -152,4 +152,5 @@ Email logins are included in the policy so that they work in Swagger UI.
 #### Google cloudrun/cloud function (?)
 - Subscribe to the topic & calls cloudrun / cloud function.
 - Consume pubsub topics, detect spam and make Github pull requests when necessary.
-:::
+
+</details>

@@ -6,16 +6,10 @@ tags: [cofacts, research]
 timestamp: "2025-05-09T21:37:38+08:00"
 ---
 
----
-tags: cofacts
-GA: UA-98468513-3
----
-
 # Cofacts API access management
 
-:::info
-Related doc: [userId & appId management proposal](https://g0v.hackmd.io/ZcoUOX_-RQSkJyl5xz4_Zg)
-:::
+> [!NOTE]
+> Related doc: [userId & appId management proposal](https://g0v.hackmd.io/ZcoUOX_-RQSkJyl5xz4_Zg)
 
 In order to ensure the capacity of Cofacts API server is provided to known services (including Cofacts' own websites, chatbots, and 3rd party services), we should limit the access of anonymous requests to the API server.
 
@@ -85,7 +79,8 @@ We can still allow direct browser access to GraphQL (GraphiQL) after then "login
 - We can refer to https://github.com/cofacts/rumors-api/blob/master/src/adm/util.ts for service JWT decode logic.
 - On staging environment where we allow requests with no service tokens, we map the activity to the same special appId `DEVELOPMENT_BACKEND`
 
-:::spoiler Old proposal
+<details>
+<summary>Old proposal</summary>
 
 (圖：backend apps <> rumors-api)
 
@@ -184,7 +179,8 @@ Example: [LINE messaging API's signature](https://developers.line.biz/en/docs/me
     - Token duration: min 1 year, max non-expiring
 - Access without service token: ![](https://s3-ap-northeast-1.amazonaws.com/g0v-hackmd-images/uploads/upload_d36a8362a98c2fc155e2632e744342e8.png =x300)
 - Protected application (rumors-api) gets an [application token](https://developers.cloudflare.com/cloudflare-one/identity/authorization-cookie/application-token/#service-token-authentication) with `common_name` being the access client ID.
-:::
+
+</details>
 
 ## Browser <> API
 
@@ -196,7 +192,8 @@ Example: [LINE messaging API's signature](https://developers.line.biz/en/docs/me
     - 用 bot 爬網站之類的違反使用者條款 [name=orz]
 - 可以看 query? 因為網站只會做某些 query [name=orz]
 
-:::spoiler Previous proposals
+<details>
+<summary>Previous proposals</summary>
 
 ### Limiting exposed API
 
@@ -228,7 +225,7 @@ Cofacts website can limit the access of exposed API with React server components
     - set-cookie from API server will be proxied to the browser
 - change redirect URI from api.cofacts.tw to `cofacts.tw/api/`
 
-:::
+</details>
 
 ### No more "browser apps"
 
@@ -251,7 +248,9 @@ For community builder:
 - Directly apply auth policy that allows anyone (it takes up Cloudflare zero trust user seats, but seats expire in 1 month) to access
   - rumors-api can allow authenticated people
 
-:::spoiler Auth service choice
+<details>
+<summary>Auth service choice</summary>
+
 - rumors-site
     - Nextauth
     - Ory kratos endpoints for login session (cookie) and social logins
@@ -294,7 +293,8 @@ For community builder:
 - rumors-api
     - remove passport.js and social login
     - remove app-id related logic
-:::
+
+</details>
 
 ## Rollout plan
 

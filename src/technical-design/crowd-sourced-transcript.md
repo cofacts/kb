@@ -6,10 +6,6 @@ tags: [cofacts, design-docs, technical-design]
 timestamp: "2024-03-11T20:31:24+08:00"
 ---
 
----
-tags: cofacts
----
-
 # Cofacts crowd-sourced transcript design doc
 
 ## Requirements
@@ -17,7 +13,7 @@ tags: cofacts
     - Searching by keyword / full text search
     - Similar articles
 - Supports versioning, recording contributors
-- ~~Supports crowed-sourced review~~ No review needed if we have history -- just rollback when vandalized, like our meeting notes on hackmd. [name=mrorz]
+- ~~Supports crowd-sourced review~~ No review needed if we have history -- just rollback when vandalized, like our meeting notes on hackmd. [name=mrorz]
     ~~- We see "review" as positive feedback~~
     ~~- if the user is not satiefied with the latest transcript, they can submit new versions~~
 - Supports [reverting to specific version](https://zh.wikipedia.org/zh-tw/Wikipedia:%E5%9B%9E%E9%80%80%E5%8A%9F%E8%83%BD) (Not implemented yet)
@@ -57,7 +53,9 @@ rumors-site provides the following functionalities
     - Also instaniates prosemirror editor, but with `ychange` [marks](https://prosemirror.net/docs/ref/version/0.11.0.html) this time
     - Loads snapshots from `versions` field of `GetYdocs` API
 
-:::spoiler Outdated design
+<details>
+<summary>Outdated design</summary>
+
 Transcript UI design
 
 ![](https://s3-ap-northeast-1.amazonaws.com/g0v-hackmd-images/uploads/upload_f62a325508175c0e9843f2496c0eb91b.png =x400)
@@ -72,7 +70,8 @@ Transcript UI design
   - Can view transcription history
     - Can see "revert" option and "report" option
 
-:::
+</details>
+
 ## DB
 
 > https://github.com/cofacts/rumors-db
@@ -122,7 +121,8 @@ When storing the AI transcript, [API server](https://github.com/cofacts/rumors-a
 
 - Can filter by contributors
 
-:::spoiler Outdated design
+<details>
+<summary>Outdated design</summary>
 
 ### `UpdateArticleTranscript`
 
@@ -142,7 +142,7 @@ Type: `TranscriptionError`
 
 - `TranscriptionError`: New object type that returns the latest transcript in a field
 
-::: 
+</details>
 
 ## Collab-server
 

@@ -6,10 +6,6 @@ tags: [cofacts, design-docs, technical-design]
 timestamp: "2020-04-11T02:04:06+08:00"
 ---
 
----
-tags: cofacts
----
-
 # Cofacts LIFF redesign
 
 ## Implementation
@@ -19,7 +15,7 @@ LIFF 實作為一 SPA：
 - Hosting: line bot server `/liff` 
   - [Proxies to svelte dev server](https://github.com/vagusX/koa-proxies) on dev; use [koa-static](https://github.com/koajs/static) to serve built file.
   - change package.json to include [build](https://devcenter.heroku.com/articles/nodejs-support#customizing-the-build-process) script that runs both LIFF build scripts and server-side babel script.
-- (optional) 使用 cloudflare CDN cache deliver JS & CSS assets
+- (optional) 使用 Cloudflare CDN cache deliver JS & CSS assets
 
 ## LIFF <> Chatbot server communication
 
@@ -30,12 +26,11 @@ LIFF 實作為一 SPA：
 2. LIFF invokes GraphQL APIs with `userId` in `liff.init()` response and the `nonce` in AJAX headers and get required data / perform mutation
 3. When user perform action that brings themselves back to chatbot, LIFF will invoke `liff.sendMessage` with special pattern (Readable prefix, or flex message ([???](https://developers.line.biz/en/reference/liff/#send-messages))) --> 因為要有 text message 才能 reply
 
-:::danger
-nonce 打算用 JWT 取代掉。JWT 每次產生 LIFF 按鈕時會蓋一個新的，裡面有：
-- `exp`: 每次產生 LIFF 按鈕的時候產生，擋住太久以前的 LIFF，控制 JWT leak 的 impact
-- `sessionId`: server 可跟當下 redis `context.data.sessionId` 比對是否屬於同一個 session
-- `sub`: user Id，API 將以此判斷是哪一位使用者。LIFF 會拿 `sub` 與 `liff.getProfile()` 結果比對。
-:::
+> [!CAUTION]
+> nonce 打算用 JWT 取代掉。JWT 每次產生 LIFF 按鈕時會蓋一個新的，裡面有：
+> - `exp`: 每次產生 LIFF 按鈕的時候產生，擋住太久以前的 LIFF，控制 JWT leak 的 impact
+> - `sessionId`: server 可跟當下 redis `context.data.sessionId` 比對是否屬於同一個 session
+> - `sub`: user Id，API 將以此判斷是哪一位使用者。LIFF 會拿 `sub` 與 `liff.getProfile()` 結果比對。
 
 ## LIFF UI
 
@@ -69,9 +64,8 @@ https://g0v.hackmd.io/6f12uznTQjCDRAKRyPOSxw?both#LINE-bot-%E4%BA%92%E5%8B%95%E4
 - Endpoint: `/graphql`
 - Requires `Authorization` header with `basic <base64 of "user id:nonce">`; returns 401 if not nonce not match
 
-:::danger
-想改成 `Authorization: bearer <JWT>`
-:::
+> [!CAUTION]
+> 想改成 `Authorization: bearer <JWT>`
 
 ```graphql=
 type Query {

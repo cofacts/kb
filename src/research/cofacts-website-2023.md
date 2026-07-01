@@ -19,7 +19,7 @@ https://g0v.hackmd.io/@NFi0czulSemxCM8RNSlz8Q/HJ8xT3QVU/%2FahtI6xsFRQyxktrIlc1Vc
   - Server-side CSS-in-JS + Populating Apollo cache then pass to FE, multiple renders on server side
   - Memory leak; need to restart server every hour. Even staging server have RAM exceeded restarts ![](https://s3-ap-northeast-1.amazonaws.com/g0v-hackmd-images/uploads/upload_d5e9b948841dd104c25644ada6b03d43.png)
 - Lack of tutorial
-- Font size is too small for elder citizens
+- Font size is too small for elderly citizens
   - Landing page & impact page is OK
 - Exposes full GraphQL API that cannot be guarded by secret tokens
 

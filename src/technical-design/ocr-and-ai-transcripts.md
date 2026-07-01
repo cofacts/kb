@@ -6,18 +6,13 @@ tags: [cofacts, design-docs, technical-design]
 timestamp: "2025-02-10T19:16:15+08:00"
 ---
 
----
-tags: cofacts
----
-
 # OCR and AI transcripts
 
-:::info
-- Related research: https://g0v.hackmd.io/aJqHn8f5QGuBDLSMH_EinA#OCR
-- Crowd-sourced transcript: https://g0v.hackmd.io/@cofacts/rd/%2FOhGIQzoxR5eF6audQuS_FQ
-- Media manager: https://g0v.hackmd.io/@cofacts/rd/%2FC8dW2cFiR1-N5Z0wcOefuA
-- AI response introduced in: https://g0v.hackmd.io/@cofacts/rd/%2F%40cofacts%2FrknFrmdk3
-:::
+> [!NOTE]
+> - Related research: https://g0v.hackmd.io/aJqHn8f5QGuBDLSMH_EinA#OCR
+> - Crowd-sourced transcript: https://g0v.hackmd.io/@cofacts/rd/%2FOhGIQzoxR5eF6audQuS_FQ
+> - Media manager: https://g0v.hackmd.io/@cofacts/rd/%2FC8dW2cFiR1-N5Z0wcOefuA
+> - AI response introduced in: https://g0v.hackmd.io/@cofacts/rd/%2F%40cofacts%2FrknFrmdk3
 
 ## Algorithm
 
@@ -25,9 +20,8 @@ We will use `airesponses` index to store the mapping between media entry ID and 
 - AI transcripts of messages not submitted to the database can also be cached and replayed when a media with identical hash is queried
 - When article is created, the AI response content will be used to populate article text and crowd transcript.
 
-:::info
-We basically selected "After ID is extracted by media manager" in [Metadata extraction](https://g0v.hackmd.io/aJqHn8f5QGuBDLSMH_EinA#When-to-extract)
-:::
+> [!NOTE]
+> We basically selected "After ID is extracted by media manager" in [Metadata extraction](https://g0v.hackmd.io/aJqHn8f5QGuBDLSMH_EinA#When-to-extract)
 
 ### Applied tech
 
@@ -109,9 +103,8 @@ In our case, 1 unit = 1 image. Thus:
 - Monthly billable units = all - free tier = `3,200 - 1,000 = 2,200` units
 - Total price = `2200 * 1.5 / 1000 = 3.3`.
 
-:::success
-3.3 USD / mo
-:::
+> [!TIP]
+> 3.3 USD / mo
 
 #### Tesseract
 Free of charge, but can be limited in our previous experience
@@ -132,9 +125,8 @@ Free of charge, but can be limited in our previous experience
 - Total amount of minutes = `3800 * 5 = 19,000`
 - Total price = `19,000 * 0.006 = 114`
 
-:::success
-114 USD / mo
-:::
+> [!TIP]
+> 114 USD / mo
 
 #### 自架 Whisper
 GPU machine cost 遠大於 Whisper API
@@ -151,9 +143,8 @@ https://cloud.google.com/compute/gpus-pricing#tpus
 - Billable minutes = `19,000 - 60 = 18,940`
 - Total price = `18,940 * 0.016 = 303.04`
 
-:::success
-300 USD / mo
-:::
+> [!TIP]
+> 300 USD / mo
 
 ##### V2 API
 ![](https://s3-ap-northeast-1.amazonaws.com/g0v-hackmd-images/uploads/upload_346a2e209275acfa3ef24e7af802c2fa.png)
@@ -192,9 +183,8 @@ Pricing: https://ai.google.dev/pricing
   - Prompt input: 5 min = 300 seconds = 77,400 tokens < 128K token using USD 0.35/million token rate
   - Each 5-min content costs 77400*0.35/1M = 0.02709 USD; 3800 of them = 102.942 USD / month
 
-:::success
-103 USD / mo
-:::
+> [!TIP]
+> 103 USD / mo
 
 #### Gemini Flash 1.5 (Vertex AI)
 
@@ -207,9 +197,8 @@ Pricing: https://ai.google.dev/pricing
   - 3800 of 5-min content = 1140000 seconds = 149.91 USD / month
 - Occasionally occur [recitation error](https://github.com/google/generative-ai-docs/issues/257)
 
-:::success
-150 USD / mo
-:::
+> [!TIP]
+> 150 USD / mo
 
 ## Tech detail
 

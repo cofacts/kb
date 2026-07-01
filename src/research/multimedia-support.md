@@ -6,10 +6,6 @@ tags: [cofacts, research]
 timestamp: "2024-03-11T19:12:33+08:00"
 ---
 
----
-tags: cofacts
----
-
 # Cofacts multimedia support research
 
 ## Retrieving file data
@@ -100,7 +96,7 @@ https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8321359/
 Text embeddings
 - [OpenAI text embedding](https://platform.openai.com/docs/guides/embeddings/limitations-risks)
     - Dimension = 1536
-    - normalized to 1 (dot product for cosign similarity)
+    - normalized to 1 (dot product for cosine similarity)
     - pgvector cosine similarity example https://github.com/mckaywrigley/wait-but-why-gpt
 - [tf.js Multilingual Universal Sentense Encoder](https://tfhub.dev/google/universal-sentence-encoder-multilingual/3)
     - Input: Variable length text in Chinese, Chinese (Taiwan), English, etc
@@ -155,9 +151,8 @@ Considerations:
 - Store surrounding text?
 - Store text content of the image / video / voice message for full-text search
 
-:::success
-Prefer "In separate `articles`" - [discussion](https://g0v.hackmd.io/1WADYBY0TH27ZqOaVMjqUg?both#Overall-discussion)
-:::
+> [!TIP]
+> Prefer "In separate `articles`" - [discussion](https://g0v.hackmd.io/1WADYBY0TH27ZqOaVMjqUg?both#Overall-discussion)
 
 ### Use `articles`
 
@@ -248,9 +243,8 @@ OpenDream's approach: search logic, hashing is done on line bot
 
 ### ✅ Dedicated multimedia processor
 
-:::success
-Design doc: [Cofacts media manager implementation](/C8dW2cFiR1-N5Z0wcOefuA?both)
-:::
+> [!TIP]
+> Design doc: [Cofacts media manager implementation](/C8dW2cFiR1-N5Z0wcOefuA?both)
 
 - Add-on of current API server
     - API server can serve multiple clients
@@ -407,7 +401,9 @@ Video summarization / abstraction / skimming
     - 缺點
         - 沒有辦法拿影片長度之類的 metadata，但這可以另外呼叫 ffprobe 搞定
 - [Cloudflare Stream](https://developers.cloudflare.com/stream/)
-    :::spoiler
+    <details>
+    <summary>Details</summary>
+    
     - 儲存費用每月付 ![](https://s3-ap-northeast-1.amazonaws.com/g0v-hackmd-images/uploads/upload_7f2a3f0cbc63b4d3c7200e0893262431.png)
         - 假設每個影片 1min，Cofacts 已經有 9214 video / audio --> 9000 min，$50/mo 的範圍
         - 播放費用另計，但如果只有查核協作者可以播放的話就會很省
@@ -429,7 +425,8 @@ Video summarization / abstraction / skimming
     - 附加好處
         - 可以透過 cloudflare retrieve video detail API 拿到影片時長
         - 因為有 on-the-fly 的 thumbnail URL 可以用，因此未來如果接了 google video intelligence API 偵測 shot changes，甚至可以做到列出影片分段截圖的功能，對查核影片會超級方便——點擊截圖跳到那個分段、對截圖右鍵來用瀏覽器內建功能以圖找圖等等。
-    :::
+    
+    </details>
 - Problem [Discussion source](https://g0v.hackmd.io/ucUXvnqbRBmsD6YGkmdYvg?both#Comm-Thumbnails-for-video-and-audio)
   - 目前沒登入就無法看影片。上傳色情影片，沒登入就看不到，預覽圖下 google 抓到的機率更大 [name=nonumpa]
   - 可能就是要上 video intelligence API [name=mrorz]
@@ -452,12 +449,11 @@ Video summarization / abstraction / skimming
 
 #### schema.org microdata
 
-:::success
-Should implement this!
-- Store parsed schema.org metadata in hyperlinks as-is
-- Find a way to properly display the metadata
-- Drop oembed if all data is in Microdata?
-:::
+> [!TIP]
+> Should implement this!
+> - Store parsed schema.org metadata in hyperlinks as-is
+> - Find a way to properly display the metadata
+> - Drop oembed if all data is in Microdata?
 
 - Youtube implements [VideoObject](https://schema.org/VideoObject)
 - [Contains property](https://validator.schema.org/#url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DlSKd3yyhzw0)
