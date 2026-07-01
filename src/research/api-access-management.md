@@ -53,7 +53,7 @@ Redirect all traffic from `cofacts-api.g0v.tw` to `api.cofacts.tw`; and `cofacts
 
 ### Service token
 
-Cloudflare has a upper limit of 50 service tokens.
+Cloudflare has an upper limit of 50 service tokens.
 
 Dispatch Cloudflare Service tokens to:
 - Cofacts automation (takedown) --> already there
