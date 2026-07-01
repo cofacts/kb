@@ -14,6 +14,15 @@ timestamp: "2026-06-24T00:00:00+08:00"
 > [!TIP]
 > Latest research docs first
 
+- [Authentication Comparison](cofacts.ai/Authentication%20Comparison.md)
+- [Cofacts Elasticsearch 9 升級與架構評估報告](cofacts.ai/Cofacts%20Elasticsearch%209%20升級與架構評估報告.md)
+- [Cofacts.ai website](cofacts.ai/Cofacts.ai%20website.md)
+- [Gemini Embedding 2 與 Elasticsearch 9 混合搜尋架構](cofacts.ai/Gemini%20Embedding%202%20與%20Elasticsearch%209%20混合搜尋架構.md)
+- [Source Mapper：改善 Investigator 出處精確度](cofacts.ai/Source%20Mapper：改善%20Investigator%20出處精確度.md)
+- [UI & Agent interaction](cofacts.ai/UI%20%26%20Agent%20interaciton.md)
+- [境外敵對勢力與公民查核平台之防禦機制](cofacts.ai/境外敵對勢力與公民查核平台之防禦機制.md)
+- [多代理人 AI 協作與非同步審議架構研究](cofacts.ai/多代理人%20AI%20協作與非同步審議架構研究.md)
+- [從身份保護認知到雙重歷程：政治極化之實證研究](cofacts.ai/從身份保護認知到雙重歷程：政治極化之實證研究.md)
 - [API & Database enhancements](api-database-enhancements.md)
 - [Cofacts website 2023](cofacts-website-2023.md)
 - [ChatGPT or LLM to aid fact-checking](chatgpt-or-llm-to-aid-fact-checking.md)
