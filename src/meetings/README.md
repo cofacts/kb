@@ -1,6 +1,7 @@
 # Cofacts 會議記錄
 
 ## 2026
+- [0707 Vision API以圖搜圖、Session自動命名、Discord邀請連結安全、資料小組招募、八月小聚規劃、GCE/Cloud Run週報](./2026/20260707.md)
 - [0630 Cofacts.ai開發進度、url-resolver升級、AI Eval與LLM Judge建置、Knowledge Base整理、GCE CPU飆升分析、LINE OA統計中斷事件](./2026/20260630.md)
 - [0623 kb知識庫檢討、Cofacts.ai附件上傳、url-resolver升級、GCP CUD觀察、GCE/Cloud Run週報](./2026/20260623.md)
 - [0616 GCP CUD方案、封鎖SEO爬蟲、AI週報、Cofacts知識庫](./2026/20260616.md)
