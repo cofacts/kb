@@ -77,7 +77,7 @@ ADK 的 `AgentTool` 是靜態包裝，參數化最乾淨的作法是一個 `cons
 
 **4. 500K token 巨型 prompt — 不建議（本研究唯一明確反對的部分）。**
 
-- 成本／延遲：proofreader 近 2.5 個月被呼叫 852 次，每次載入 500K 則 input token 為每月數億級，且現有 12 秒 latency 會大幅惡化。
+- 成本／延遲：proofreader 近 2.5 個月被呼叫 852 次，每次載入 500K 個 input token 為每月數億級，且現有 12 秒 latency 會大幅惡化。
 - 品質：flash-lite 級模型在超長上下文有 lost-in-the-middle 問題，persona 一致性反而下降。
 - 實證：proofreader 的價值在「具體、當下」（deepfake 辨識建議、食安圖時間戳查證），不在深遠記憶。
 
