@@ -140,9 +140,11 @@ tags: cofacts,
 curl -s -X PATCH \
   -H "Authorization: Bearer $HACKMD_API_TOKEN" \
   -H "Content-Type: application/json" \
-  "$HACKMD_API_URL/notes/$MEETING_NOTE_ID" \
+  "$HACKMD_API_URL/teams/cofacts/notes/$MEETING_NOTE_ID" \
   -d "$(jq -n --arg content "$NEXT_WEEK_CONTENT" '{content: $content}')"
 ```
+
+注意：這份會議記錄屬於 cofacts team note（非個人 note），一般的 `/notes/$MEETING_NOTE_ID` PATCH 端點會回傳 403；必須改用 `/teams/cofacts/notes/$MEETING_NOTE_ID` 才能更新成功（GET 讀取則兩種端點皆可）。
 
 ### 最後輸出
 
