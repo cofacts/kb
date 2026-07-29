@@ -1,6 +1,7 @@
 # Cofacts 會議記錄
 
 ## 2026
+- [0727 Langfuse環境與v4 observation、cofacts/ai ADR文件化、url-resolver Cloudflare backend、AI幻覺與proofreader修正、COSCUP籌備、八月小聚場地與宣傳、site-tw配額頂格週報](./2026/20260727.md)
 - [0721 url-resolver benchmark、cofacts.ai出處幻覺與markdown回應、AI影音幻覺修正、COSCUP籌備、八月小聚籌備、accessibility設計報價、GCE CPU尖峰週報](./2026/20260721.md)
 - [0716 url-resolver benchmark、AI幻覺與proofreader追蹤、cofacts/ai CI/CD完成、COSCUP talk 籌備、小聚場地確認、GCE/Cloud Run週報](./2026/20260716.md)
 - [0707 Vision API以圖搜圖、Session自動命名、Discord邀請連結安全、資料小組招募、八月小聚規劃、GCE/Cloud Run週報](./2026/20260707.md)
