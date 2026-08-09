@@ -149,13 +149,62 @@ Receptionist 的職責，恰好對應使用者的三種來意：
   這是 `ai/docs/index.md` 明列的 invariant：前端的 tool-name → args/response 對照表要跟
   `tools.py` / `agent.py` 嚴格一致。新增 `propose_article_submission` 等工具就要同步改。
 - **前端要認得新的 agent name。** 訊息是依 author 渲染的（`AgentMessage.tsx`），新 agent 要有對應的顯示名稱。
-- **`transfer` 的回彈要管好。** 建議 `ai_writer` 設 `disallow_transfer_to_parent=True`，
-  避免 writer 在查核中途把使用者丟回櫃檯，造成 ping-pong。同一 session 的定位是「一則訊息一個 session」。
+- **`transfer` 要能雙向。** 見 §4.4：**不要**設 `disallow_transfer_to_parent=True`。
+  （`disallow_transfer_to_peers` 目前無所謂，root 底下只有 writer 一個 sub_agent；日後加第二個要重想。）
 - **待驗證（ADK 版本相依）**：ADK Runner 是依「最後一個發話的 agent」決定下一輪由誰接手，
   所以 transfer 之後的後續 turn 應該直接由 writer 處理，不會每輪都先過櫃檯。
   這點請在實作時用一個最小 spike 先確認，因為它直接決定 §4.2 的成本估算是否成立。
 - **成本**：receptionist 建議用 `gemini-3.1-flash-lite`（proofreader 已在用）+ 低 thinking level。
   它的工作是分類與收件，不需要 HIGH thinking。
+
+### 4.4 Session 是「工作區」，不是「一則訊息」
+
+一個 session 通常從一則訊息開始，但**使用者查完一則之後，很可能接著送進另一則相關的（常常是變種）訊息**。
+這不是要防的行為，是要支援的行為 —— 而且在現有架構下它是真的省事：
+
+`writer_citations.py` 的 `resolve_citations` 是從 **writer 自己的 event history** 撈 `cite_as` 對應的內容
+（不是從 state）。所以第一則查出來的 verifier 報告、investigator findings，
+在同一個 session 裡查第二則時可以直接引用，不必重跑。變種訊息通常共用大半事實，這個省法很實在。
+
+前端也已經是 per-tool-call 而非 per-session-article 的：路由是 `/session/$sessionId/tool/$toolCallId`，
+`RightDrawer` 用 `get_single_cofacts_article` 的 `article_id` 決定顯示哪一則訊息。多則共存沒有結構性問題。
+
+**但有一處會壞：`draft_factcheck_response` 沒有 `article_id` 參數。**
+它今天能運作，靠的正是「一個 session 一則訊息」這個隱含假設 —— 草稿對應哪一篇只存在於對話脈絡裡。
+等 `submit_cofacts_reply`（`tools.py` 目前還是 stub）要實作時，多則共存的 session 會不知道要送去哪一篇。
+
+- **行動**：`draft_factcheck_response` 補上 `article_id`，並驗證它確實出現在本 session 先前的
+  `get_single_cofacts_article` 結果中。記得同步 `src/lib/adk.ts` 的 `AllTools`。
+
+次要影響（可接受，但要知道）：`generate_session_title` 會停在最初那則；session 太長會讓 writer 的
+context 一直長大。prompt 上引導「相關 / 變種留在同一 session，無關的另開」即可。
+
+### 4.5 什麼時候 writer 要把球轉回櫃檯
+
+承 §4.4：使用者在同一個 session 送進來的「下一則」，未必已經在資料庫裡。
+若它是一則**還沒回報過**的訊息，writer 既沒有回報工具、prompt 也不會收件 ——
+這正是不能設 `disallow_transfer_to_parent=True` 的原因：否則只能請使用者另開對話，
+而那恰好毀掉 §4.4 想要的脈絡重用。
+
+**真正的風險不是 ping-pong，是誤判佐證連結。**
+查核過程中使用者很常貼非 cofacts.tw 的 URL 當**佐證來源**（新聞、原始出處）。
+若 writer 的規則寫成「非 cofacts 連結 → 轉回櫃檯」，這些佐證會被整批誤送進回報流程 —— 比 ping-pong 常見得多。
+
+所以觸發條件要寫成**意圖**，不是 URL pattern：
+
+| 使用者的意思 | 動作 |
+| --- | --- |
+| 「這是我又收到的另一則可疑訊息」 | transfer 回 receptionist |
+| 「這是我找到的資料 / 出處，幫我看」 | 留在 writer，照常查證 |
+| 判斷不出來 | **問一句**，不要猜 |
+
+ping-pong 的防護則靠：兩邊觸發條件互斥且具體、櫃檯的規則是「拿到 article URL 就交棒，不要多話」，
+必要時再加一個便宜的保險（同一 invocation 內 transfer 次數超過 2 就停下來問使用者）。
+
+> **備案**：若 spike 顯示雙向 transfer 不穩，退路是**不轉回去**，改把兩個收件工具
+> （`propose_article_submission`、+1）也掛到 writer 上 —— writer 本來就有 `search_cofacts_database`，
+> 所以只多 2 個工具、prompt 約多 10 行，驗證規則都在工具裡。
+> 比整套 transfer 機制便宜，代價是工具面重複。
 
 ## 5. 回報流程的工具與寫入設計
 
@@ -372,6 +421,8 @@ stats(dateRange: { GTE: "now-90d/d" }) {
 | --- | --- | --- | --- |
 | 1 | **純網址文章難以搜尋與去重** | `text` 只有一個 URL 時，ES 的 `moreLikeThis` 幾乎無從比對；LINE bot 的 `stringSimilarity` 門檻（0.95）也不適用。同一則 Threads 貼文用不同 tracking param 就會變成兩篇 | 用 `hyperlinks.title/summary` 參與比對；permalink 正規化（去 utm_*、fbclid）後做精確比對。可能需要 rumors-api 支援「以 normalizedUrl 查文章」 |
 | 2 | **ADK transfer 的續接行為** | §4.3 已標記待驗證，直接影響成本與體感延遲 | 實作前先做最小 spike |
+| 2b | **佐證連結被誤判成新回報** | 查核中使用者常貼非 cofacts.tw 的 URL 當來源；若 writer 用 URL pattern 判斷是否轉回櫃檯，會把佐證整批誤送進回報流程 | §4.5：觸發條件寫成意圖而非 pattern，不確定就問 |
+| 2c | **多則訊息共存的 session 中，草稿對不到文章** | `draft_factcheck_response` 沒有 `article_id`，靠「一 session 一則」的隱含假設。`submit_cofacts_reply` 實作時會爆 | §4.4：補 `article_id` 並驗證來源，同步 `AllTools` |
 | 3 | **reference enum 不夠用** | §6.3 | 短期將就，中期提 schema 變更討論 |
 | 4 | **回報者的後續通知** | LINE bot 有通知機制，cofacts.ai 沒有。回報完就斷線，回頭率會很差 | 需要 email 或串回 LINE notify；**尚未有結論** |
 | 5 | **Threads 上 Meta AI 已就地解惑** | Cofacts 會變成 alternative，不一定拿得到熱度（[20260804](../../meetings/2026/20260804.md#cofactsai) 已提出這個疑慮） | 差異化打「留下傳播記錄 + 開放資料」，不打「回答得比較快」 |
@@ -386,6 +437,8 @@ stats(dateRange: { GTE: "now-90d/d" }) {
 - [ ] **修正登入 redirect 保留 query string**（§7.1，一行等級的改動，先做）
 - [ ] 新增 root agent `ai_receptionist`，`ai_writer` 變 sub_agent；搬移 `after_agent_callback`
 - [ ] receptionist 能分辨「查核 / 回報 / 客服」三種來意，並在拿到 article URL 時 transfer 給 writer
+- [ ] writer 能在「使用者送進另一則未回報的可疑訊息」時 transfer 回 receptionist，
+      且**不會**把佐證用的連結誤判成新回報（§4.5）
 - [ ] 命中分支：有回應 → 導讀；無回應 → `CreateOrUpdateReplyRequest` +1
 - **驗收**：貼一個 Threads 連結進去，不會被要求「請提供 cofacts.tw 文章連結」
 
@@ -394,8 +447,10 @@ stats(dateRange: { GTE: "now-90d/d" }) {
 - [ ] 申請並接上新的 `appId`
 - [ ] `propose_article_submission` 工具 + 前端確認卡片 + BFF `submitArticle`
 - [ ] 送出後自動把 article URL 回送 session，接到 writer
+- [ ] `draft_factcheck_response` 補上 `article_id`（§4.4），同步 `src/lib/adk.ts` 的 `AllTools`
 - [ ] rate limit / 同 URL 冷卻
-- **驗收**：查無 → 確認 → 資料庫出現新文章，`appId` 正確，且對話無縫接到查核
+- **驗收**：查無 → 確認 → 資料庫出現新文章，`appId` 正確，且對話無縫接到查核；
+  同一 session 內接著送第二則變種訊息，能引用第一則的 verifier 報告而不重跑
 
 ### M3 — 入口與導流
 
