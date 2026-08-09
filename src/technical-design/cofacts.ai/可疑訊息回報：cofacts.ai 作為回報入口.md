@@ -468,6 +468,23 @@ stats(dateRange: { GTE: "now-90d/d" }) {
 
 ## 12. 相關文件與程式碼
 
+> [!NOTE]
+> **這份文件為什麼放在 kb 而不是 `cofacts/ai/docs/decisions/`**
+>
+> 因為它跨 repo（ai + rumors-api + rumors-line-bot + 策略），而且目前還是「方案比較 + 待驗證」的階段，
+> 掛不上 MADR 的 `status`。這與 Authentication 那題的處理方式一致 ——
+> kb 放完整設計與方案比較，ai repo 放一頁 ADR 記錄最後採用什麼、為什麼
+> （見 `ai/docs/decisions/20260509-bff-auth-httponly-cookie.md`，它自己就寫明方案比較
+> 「stays in `cofacts/kb`」）。
+>
+> **落地時要在 `cofacts/ai` 補的東西**（`ai/AGENTS.md` 的「changes the agent contract or
+> orchestration」正好命中）：
+>
+> 1. ADR：agent topology —— receptionist 成為 root、writer 降為 sub_agent、雙向 transfer 的觸發條件、
+>    `after_agent_callback` 搬家、`draft_factcheck_response` 加 `article_id`。
+> 2. ADR：回報寫入的 human-in-the-loop 路徑 —— 提案在 agent、寫入在 BFF。
+> 3. 更新 `ai/docs/index.md`：該頁現在寫「The root agent is `ai_writer`」，topology 一改就過期。
+
 **設計文件**
 
 - [Cofacts.ai website](../../research/cofacts.ai/Cofacts.ai%20website.md)（BFF / Strangler Fig / 三階段）
