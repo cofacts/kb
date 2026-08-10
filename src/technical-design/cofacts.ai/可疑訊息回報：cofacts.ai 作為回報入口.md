@@ -271,7 +271,63 @@ propose_article_submission(
 > 不建議：LLM 誤判同意、重複送出、送出被自己改寫過的內容，三種都會直接污染資料庫。
 > 若真要走這條，至少要做 idempotency（session state 記已送出的 articleId + 送出前重搜一次）。
 
-### 5.4 媒體回報（第二階段）
+**已知缺口**：使用者按「取消」時，agent 不會知道 —— 對話就停在那裡，它沒有機會接一句
+「好，那要不要改成別的？」。§5.4 的 alternative 沒有這個問題。
+
+### 5.4 Design alternative：long-running tool call
+
+ADK 有為 human-in-the-loop 設計的原語 `LongRunningFunctionTool`：
+工具立刻回傳一個 `{status: "pending"}` 的暫時結果告訴 LLM「提案已經顯示給使用者了」，
+該 function call 被標記為 long-running；之後前端補送一個 **同 id 的 `functionResponse`**，
+agent 的這一輪就從那裡續跑。
+
+**傳輸層已經完全就緒，不需要改 BFF：**
+
+- ADK Event 上的 `longRunningToolIds` 已存在於產生的型別（`src/lib/adk-types.d.ts`），前端認得出哪個 call 在等人。
+- `Part` 的 `functionResponse` 兩個方向都有型別；`src/routes/api/run-sse.ts` 是透明 proxy
+  （`{...input}` 原樣轉發），所以 `newMessage.parts[].functionResponse` 直接送得出去。
+- `chatCache.ts` 的 reducer 本來就用 `functionCall.id` 當 key、用 `functionResponse.id` 去對，
+  「還沒有 resp 的 invocation」天生就是 pending 狀態的表示法。
+
+**兩種變體：**
+
+| | (a) 前端寫入，結果放進 functionResponse | (b) 使用者同意後，agent 再呼叫第二個 tool 送出 |
+| --- | --- | --- |
+| 誰執行 `CreateArticle` | BFF（同 §5.3） | agent |
+| tool 數量 | 1 | 2 |
+| 順序紀律 | 不需要 | 需要 prompt 保證「先 propose 再 submit」 |
+| articleId 怎麼進 agent | 夾在 `functionResponse.response` 裡 | 第二個 tool 的回傳值 |
+
+變體 (b) 就是原始想法，但 (a) 更好：**寫入仍在 BFF，只是把結果用 functionResponse 而不是假的
+user message 送回去**，因此不需要第二個 tool，也不需要那條順序紀律。
+
+**Pros（相對於 §5.3）**
+
+- **對話紀錄乾淨。** §5.3 把 article URL 當成「使用者說的話」送回 session，但使用者其實沒打那句話；
+  日後回頭看 history 或 Langfuse trace 會看到一句人沒說過的話。這裡沒有這個問題。
+- **agent 知道結果。** 同意、取消、送出失敗都能用同一個 functionResponse 表達，補掉 §5.3 的已知缺口。
+- **trace 語意正確。** pending → resolved 是同一個 tool call 的兩個階段，在 Langfuse 上是一則完整的呼叫，
+  而不是「一則提案」加「一句莫名其妙的使用者訊息」。
+- **這就是 ADK 為這件事準備的原語**，不是繞路。
+
+**Cons**
+
+- **多一個狀態機，而且有懸空風險。** pending 的 function call 掛在 session 裡，
+  如果使用者不按按鈕、直接打字，就會出現沒有對應 `functionResponse` 的 `functionCall`。
+  前端得決定怎麼辦（擋住輸入框？自動補一個 `{status:"dismissed"}`？），否則後續請求的 content 可能有問題。
+- **前端 plumbing 變多。** 要從 SSE 認出 `longRunningToolIds`、保存 function call id、組 functionResponse part，
+  `chatCache.ts` 的 reducer 也要新增「等待中」這個顯示狀態。§5.3 只要一個 server function + 一次 `sendChatMessage`。
+- **重連要能還原。** 使用者關掉分頁再回來，`getSession` → `convertAdkSessionToChatState` 必須把 pending 狀態還原出來；
+  目前 reducer 沒有這個概念。
+- **ADK 版本相依。** `LongRunningFunctionTool` 的行為與 `longRunningToolIds` 的實際 surface 要驗證。
+- 變體 (b) 另外還要付「多一個 tool + 順序紀律」的成本 —— 而這個 codebase 已經在 writer prompt 裡
+  跟順序紀律纏鬥過好幾輪（`draft_factcheck_response` 必須自成一個 turn、citation 只能引用已回來的結果）。
+
+**結論**：M2 先走 §5.3，因為它用最少的新機制達到「人在迴路上」這個硬需求。
+但 §5.3 的兩個缺點（假的 user message、取消時 agent 不知情）是真的，
+如果之後覺得刺眼，**升級路徑是變體 (a)** —— 寫入不動，只換結果的回傳方式，改動集中在前端。
+
+### 5.5 媒體回報（第二階段）
 
 `CreateMediaArticle(mediaUrl:)` 要求一個 **rumors-api / media-manager 抓得到的 URL**
 （LINE bot 傳的是自己架的 `getLineContentProxyURL(messageId)`）。
