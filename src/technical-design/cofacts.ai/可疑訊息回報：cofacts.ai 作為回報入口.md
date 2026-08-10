@@ -25,8 +25,9 @@ LINE bot 的 **request（查詢）數量長期下滑，但 new article（新回�
 - 「想知道這是真的假的」這個需求，正在被各家生成式 AI（Meta AI、ChatGPT、LINE 內的 AI）就地滿足 —— 使用者不再需要把訊息轉給第三方 bot 等資料庫比對。
 - 「我看到一則怪訊息，想讓別人知道它正在傳」這個需求，AI 沒有取代，也取代不了。
 
-Cofacts 資料庫的**熱度（heat）訊號幾乎全部來自 LINE 的 request 數**。當 request 萎縮、且傳播主戰場外溢到
-Threads / FB / X 時，資料庫記錄的熱度會逐漸脫離真實的網路資訊樣貌。
+Cofacts 的主要熱度依據是 **`replyRequestCount`**，而它幾乎全部來自 LINE ——
+使用者查詢一則還沒有回應的訊息，或回報一則新訊息，都會產生一筆 reply request（機制見 §10.1）。
+當 LINE 的 request 萎縮、且傳播主戰場外溢到 Threads / FB / X 時，這個數字會逐漸脫離真實的網路資訊樣貌。
 
 ### 1.2 定位轉換
 
@@ -42,7 +43,7 @@ cofacts.ai 是目前唯一還在長期投入開發的前台，而且**已經有�
 
 | 問題 | 這個設計如何處理 |
 | --- | --- |
-| 傳播訊號單一（只有 LINE） | 新增 cofacts.ai 這個來源，並讓 `reference` 正確記錄訊息在哪個平台流傳（§6.3）。**不改動熱度公式**，見 §10 |
+| 熱度來源單一（`replyRequestCount` 幾乎只來自 LINE） | cofacts.ai 的「回報」與「+1」都會產生 reply request，直接餵同一個既有指標（§10.2）；並讓 `reference` 正確記錄訊息在哪個平台流傳（§6.3） |
 | cofacts.tw 註冊數 | 回報需登入 → 每個回報者都是註冊使用者 |
 | 回報品質 | 對話式回報可以順便問出「為什麼覺得可疑」，寫進 `CreateArticle(reason:)`；LINE bot 這格幾乎都是空的 |
 
@@ -61,9 +62,9 @@ cofacts.ai 是目前唯一還在長期投入開發的前台，而且**已經有�
 - **瀏覽器擴充套件**。研究報告有建議，但安裝門檻高、維護成本高；等回報流程本身被驗證有人用再談。
 - **原生 App / 包殼上架**（iOS Share Extension 的唯一正解，但成本遠高於捷徑）。
 - **LINE bot 內建 AI 對話**。LINE 端維持現狀，只加「導流到 cofacts.ai」的出口（§9）。
-- **改動熱度的定義。** 上游研究報告提的「Heat Index 2.0」多源加權公式不採用，
-  也**不打算把 `replyRequestCount` 當成主要熱度依據**。這裡只做一件事：讓 cofacts.ai
-  進來的訊息與流量落進既有的量測管道（§10）。
+- **改動熱度的定義。** `replyRequestCount` 現在就是主要熱度依據，**繼續是**；
+  上游研究報告提的「Heat Index 2.0」多源加權公式不採用。這裡只做一件事：
+  確保 cofacts.ai 進來的動作確實會餵到那個既有指標上（§10）。
 
 ## 3. 使用者旅程
 
@@ -93,7 +94,7 @@ flowchart TD
 
 - **有回應**：目的是「讓使用者讀懂」，不是叫他再查一次。順便可以請他對回應評價（`CreateOrUpdateArticleReplyFeedback`）。
 - **有文章但沒回應**：目的是「登記需求」。一鍵 +1（`CreateOrUpdateReplyRequest`），順便問一句「為什麼想知道」寫進 `reason` ——
-  這個 reason 對後續查核的志工非常有用。
+  這個 reason 對後續查核的志工非常有用。**這一鍵同時就是在餵主要熱度指標**（§10.2）。
 - **查無**：目的是「收進資料庫」。這是唯一會寫入新文章的分支。
 
 ## 4. Agent 架構：在 writer 前面墊一層
@@ -569,28 +570,50 @@ LINE bot 端**不做 AI 對話**，只加出口，把「讀者」轉成「查核
 - 這些按鈕會佔用 carousel 的位置，要跟現有 bubble 排優先序（別把「開啟通知」擠掉）。
 - 導流的成效要能量測 —— 帶 UTM 或自訂 query param，對得起 GA。
 
-## 10. 訊號：用既有的量測，不要重新定義熱度
+## 10. 訊號：餵既有的熱度指標，不要重新定義它
 
 > [!IMPORTANT]
-> **這份設計不改動熱度的定義。** 上游研究報告提的「Heat Index 2.0」多源加權公式，
-> 以及把 `replyRequestCount` 當成主要熱度依據 —— **都不採用**。
-> 這裡要做的只是：讓 cofacts.ai 進來的訊息與流量，落進**既有**的量測管道裡。
+> **熱度的定義不改。`replyRequestCount` 現在就是主要熱度依據，繼續是。**
+> 上游研究報告提的「Heat Index 2.0」多源加權公式**不採用**。
+> 這一節要確定的只有一件事：cofacts.ai 進來的動作，**確實會餵到那個既有指標上**。
 
-先把兩件常被混在一起的東西分開：
+### 10.1 為什麼 `replyRequestCount` 會失真
 
-| | 是什麼 | 既有欄位 |
+因果鏈是這樣的（全部可在程式碼與 schema 裡驗證）：
+
+- LINE bot 查到一則**已存在但還沒有查核回應**的訊息 → 呼叫 `CreateOrUpdateReplyRequest`
+  （`choosingArticle.ts` 的 no-reply 分支）。
+- LINE bot 回報一則**新訊息** → 呼叫 `CreateArticle`，
+  而 rumors-api 的 schema 註解就寫著 **`Create an article and/or a replyRequest`** ——
+  `reason` 參數正是那第一個 reply request 的理由。
+- 兩條路都落到 `replyRequestCount`（cofacts.ai 的 GraphQL 別名叫 `communityDemandCount`）。
+
+所以 §1.1 的「LINE request 下滑」和「熱度失真」不是兩件事，是同一件事的兩面：
+**request 少了，reply request 就少了，主要熱度指標就跟著失真。**
+
+### 10.2 cofacts.ai 的兩個分支都直接餵這個指標
+
+這讓 §3 的流程分支從「附屬功能」變成**這份設計對熱度失真最直接的修復**：
+
+| cofacts.ai 的分支 | 呼叫 | 對熱度指標的效果 |
 | --- | --- | --- |
-| **熱度／傳播** | 有多少人在傳、在看這則訊息 | `Article.stats` 的 `lineUser` / `lineVisit` / `webUser` / `webVisit` / `liffUser` / `liffVisit` |
-| **需求** | 有多少人想知道真偽 | `replyRequestCount`（cofacts.ai 裡叫 `communityDemandCount`） |
+| 查無 → 確認後回報 | `CreateArticle`（帶 `reason`） | 建立文章**並**產生第一個 reply request |
+| 有文章但沒回應 → +1 | `CreateOrUpdateReplyRequest`（帶 `reason`） | 直接 +1 |
+| 有文章且有回應 → 導讀 | 不寫入 | 只影響曝光數（§10.3） |
 
-研究報告的公式把兩者加權成一個數字。本設計不這樣做 ——
-`CreateOrUpdateReplyRequest` 的 +1 **只是需求訊號**（給志工排優先序、通知發起人用），
-不會被拿去當熱度。混用會讓「有人問」被誤讀成「有人在傳」，而這兩件事在 AI 時代正在脫鉤，
-正是 §1.1 那個矛盾的核心。
+兩點附帶好處：
 
-### 10.1 讓 cofacts.ai 的文章曝光算進 `webVisit`
+- **`reason` 的品質**。LINE bot 這格幾乎都是空的；對話式回報可以順口問出「為什麼覺得可疑」，
+  兩條路都能填。這對排優先序的志工是實質資訊。
+- **`CreateOrUpdateReplyRequest` 是 create **or update***，同一個使用者重複 +1 不會把數字灌大 ——
+  計數是以人為單位。配合 cofacts.ai 全站登入（§6.1），每個 +1 都對得上一個註冊使用者。
 
-`Article.stats` 的資料是從 **GA4 的 `view_item` event** 來的：
+### 10.3 讓 cofacts.ai 的文章曝光算進 `webVisit`
+
+`Article.stats`（`lineUser` / `lineVisit` / `webUser` / `webVisit` / `liffUser` / `liffVisit`）
+是另一組數據 —— 它算的是**曝光與流量**，不是熱度指標本身，但仍然值得對齊。
+
+資料是從 **GA4 的 `view_item` event** 來的：
 rumors-site 在文章頁載入時觸發 `view_item`，帶 `item_id` = article id、`item_category`，
 event 進 BigQuery，rumors-api 再從 GA4 dataset 聚合出 `stats`
 （見 [GA4 migration design doc](../ga4-migration-design-doc.md)）。
@@ -607,7 +630,7 @@ event 進 BigQuery，rumors-api 再從 GA4 dataset 聚合出 `stats`
 過渡期的量級不用擔心：cofacts.ai 現在的流量幾乎只有測試的人，
 就算漏掉也不影響任何既有數字；掛上同一個 GA 之後就沒有這個問題了。
 
-### 10.2 `reference` 要能表達真實來源
+### 10.4 `reference` 要能表達真實來源
 
 這是唯一真正卡住的前置條件（§6.3）：若 IG／Discord／簡訊來的訊息只能標 `LINE`，
 「LINE 以外的傳播」這件事從一開始就記錯了。這不是為了算公式，是為了**回答「這則訊息在哪裡傳」**
@@ -671,7 +694,7 @@ event 進 BigQuery，rumors-api 再從 GA4 dataset 聚合出 `stats`
 ### M4 — 媒體與量測
 
 - [ ] 圖片/影音回報（BFF media proxy + `CreateMediaArticle`）
-- [ ] **掛上同一個 GA4 property，並在文章曝光時觸發 `view_item`**（§10.1）——
+- [ ] **掛上同一個 GA4 property，並在文章曝光時觸發 `view_item`**（§10.3）——
       cofacts.ai 目前完全沒有 GA，這一步做完文章曝光才會算進 `webUser` / `webVisit`
 - [ ] 回報者通知機制（風險 #4）
 - **驗收**：在 cofacts.ai 開啟一則文章，該 article id 出現在 GA4 的 `view_item` 事件裡
@@ -701,7 +724,7 @@ event 進 BigQuery，rumors-api 再從 GA4 dataset 聚合出 `stats`
 - [Authentication](Authentication.md)、[Authentication Comparison](../../research/cofacts.ai/Authentication%20Comparison.md)
 - [Cofacts ListArticles 混合搜尋架構設計](Cofacts%20ListArticles%20混合搜尋架構設計.md)（去重與召回率）
 - [API client management](../api-client-management.md)、[Rumors-api userId & appId management proposal](../../research/rumors-api-userid-appid-management-proposal.md)
-- [GA4 migration design doc](../ga4-migration-design-doc.md)（`view_item` → BigQuery → `Article.stats` 的管道，§10.1 靠它）
+- [GA4 migration design doc](../ga4-migration-design-doc.md)（`view_item` → BigQuery → `Article.stats` 的管道，§10.3 靠它）
 - [Anti SEO-spam mechanism](../anti-seo-spam-mechanism.md)、[User blocking mechanism](../user-blocking-mechanism.md)
 - [Twitter Birdwatch 研究](../../research/twitter-birdwatch-研究.md)（Request a Note 的點播機制）
 
