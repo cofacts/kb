@@ -42,7 +42,7 @@ cofacts.ai 是目前唯一還在長期投入開發的前台，而且**已經有�
 
 | 問題 | 這個設計如何處理 |
 | --- | --- |
-| 熱度訊號單一（只有 LINE） | 新增 cofacts.ai 這個來源，並讓 `reference` 正確記錄訊息在哪個平台流傳（§6.3），之後才有辦法談 Heat Index 2.0 加權 |
+| 傳播訊號單一（只有 LINE） | 新增 cofacts.ai 這個來源，並讓 `reference` 正確記錄訊息在哪個平台流傳（§6.3）。**不改動熱度公式**，見 §10 |
 | cofacts.tw 註冊數 | 回報需登入 → 每個回報者都是註冊使用者 |
 | 回報品質 | 對話式回報可以順便問出「為什麼覺得可疑」，寫進 `CreateArticle(reason:)`；LINE bot 這格幾乎都是空的 |
 
@@ -61,7 +61,9 @@ cofacts.ai 是目前唯一還在長期投入開發的前台，而且**已經有�
 - **瀏覽器擴充套件**。研究報告有建議，但安裝門檻高、維護成本高；等回報流程本身被驗證有人用再談。
 - **原生 App / 包殼上架**（iOS Share Extension 的唯一正解，但成本遠高於捷徑）。
 - **LINE bot 內建 AI 對話**。LINE 端維持現狀，只加「導流到 cofacts.ai」的出口（§9）。
-- **Heat Index 2.0 的加權公式**。先把 signal 收乾淨、可區分來源，公式是之後的事。
+- **改動熱度的定義。** 上游研究報告提的「Heat Index 2.0」多源加權公式不採用，
+  也**不打算把 `replyRequestCount` 當成主要熱度依據**。這裡只做一件事：讓 cofacts.ai
+  進來的訊息與流量落進既有的量測管道（§10）。
 
 ## 3. 使用者旅程
 
@@ -389,7 +391,7 @@ cofacts.ai 已經是**全站登入才能用**（`src/routes/_app.tsx`：`!user` 
 第三列是真的痛：cofacts.ai 存在的理由之一就是捕捉 LINE 以外的傳播，結果卻只能把它標成 LINE。
 
 **行動**：在 rumors-api 為 `ArticleReferenceTypeEnum` 加一個較通用的值（如 `WEB` 或 `OTHER`）。
-這是 schema 變更、會影響所有 consumer，需要另開討論 —— 但它現在是熱度校準的前置條件，
+這是 schema 變更、會影響所有 consumer，需要另開討論 —— 但它現在是「這則訊息在哪裡流傳」這個問題的前置條件，
 不再是「中期再說」的等級。短期上線可以先用上表將就，並記得這批資料日後可能要回頭修 reference。
 
 ### 6.4 防濫用
@@ -567,33 +569,49 @@ LINE bot 端**不做 AI 對話**，只加出口，把「讀者」轉成「查核
 - 這些按鈕會佔用 carousel 的位置，要跟現有 bubble 排優先序（別把「開啟通知」擠掉）。
 - 導流的成效要能量測 —— 帶 UTM 或自訂 query param，對得起 GA。
 
-## 10. 熱度訊號（為 Heat Index 2.0 鋪路）
+## 10. 訊號：用既有的量測，不要重新定義熱度
 
-現況：`Article.stats` 已經有分平台的欄位（見 `tools.py` 的 `COMMON_ARTICLE_FIELDS`）：
+> [!IMPORTANT]
+> **這份設計不改動熱度的定義。** 上游研究報告提的「Heat Index 2.0」多源加權公式，
+> 以及把 `replyRequestCount` 當成主要熱度依據 —— **都不採用**。
+> 這裡要做的只是：讓 cofacts.ai 進來的訊息與流量，落進**既有**的量測管道裡。
 
-```
-stats(dateRange: { GTE: "now-90d/d" }) {
-  date, lineUser, lineVisit, webUser, webVisit,
-  downstreamBotUsers: liffUser, downstreamBotVisits: liffVisit
-}
-```
+先把兩件常被混在一起的東西分開：
 
-以及 `replyRequestCount`（在 cofacts.ai 裡叫 `communityDemandCount`）——
-這正是「有多少人想知道真偽」的既有訊號，`CreateOrUpdateReplyRequest` 直接餵它。
+| | 是什麼 | 既有欄位 |
+| --- | --- | --- |
+| **熱度／傳播** | 有多少人在傳、在看這則訊息 | `Article.stats` 的 `lineUser` / `lineVisit` / `webUser` / `webVisit` / `liffUser` / `liffVisit` |
+| **需求** | 有多少人想知道真偽 | `replyRequestCount`（cofacts.ai 裡叫 `communityDemandCount`） |
 
-**這一階段要做的只有兩件事**（公式先不要碰）：
+研究報告的公式把兩者加權成一個數字。本設計不這樣做 ——
+`CreateOrUpdateReplyRequest` 的 +1 **只是需求訊號**（給志工排優先序、通知發起人用），
+不會被拿去當熱度。混用會讓「有人問」被誤讀成「有人在傳」，而這兩件事在 AI 時代正在脫鉤，
+正是 §1.1 那個矛盾的核心。
 
-1. **`reference` 要能表達真實來源**（§6.3）。這是唯一真正卡住的前置條件：
-   若 IG／Discord／簡訊來的訊息只能標 `LINE`，「LINE 以外的傳播訊號」這個核心指標從一開始就是髒的。
-2. **確認 `stats` 的資料來源與 channel 定義。** cofacts.ai 的流量本來就是 web 流量，
-   落在 `webUser` / `webVisit` 即可 —— 而且等它取代 rumors-site 之後，這個歸類就直接是對的，
-   不需要新 channel。要確認的只是資料怎麼進到 `stats`（GA / BigQuery pipeline？），
-   以及新網域的流量會不會被漏掉。
+### 10.1 讓 cofacts.ai 的文章曝光算進 `webVisit`
 
-（原先這裡列的第三件事「用新 appId 標記來源」已依 §6.2 移除 —— cofacts.ai 就是未來的 rumors-site，
-不分 appId。）
+`Article.stats` 的資料是從 **GA4 的 `view_item` event** 來的：
+rumors-site 在文章頁載入時觸發 `view_item`，帶 `item_id` = article id、`item_category`，
+event 進 BigQuery，rumors-api 再從 GA4 dataset 聚合出 `stats`
+（見 [GA4 migration design doc](../ga4-migration-design-doc.md)）。
 
-把訊號收乾淨、可歸因，之後研究報告提的加權模型才有東西可以加權。
+**`cofacts.ai` 目前完全沒有掛 GA**（repo 內找不到任何 gtag / GA4 程式碼）。所以要做的是：
+
+- 掛**同一個 GA4 property**（同一個 dataset），不要開新的。
+- 在 cofacts.ai 顯示 Cofacts 文章時（`RightDrawer` 呈現 `get_single_cofacts_article` 結果的時機）
+  觸發同樣的 `view_item`，帶同樣的 `item_id` / `item_category`。
+
+這樣 cofacts.ai 上的文章曝光就會自動計入 `webUser` / `webVisit`，
+**而且等 cofacts.ai 取代 rumors-site 之後，這個歸類直接就是對的** —— 不需要新 channel，也不需要遷移。
+
+過渡期的量級不用擔心：cofacts.ai 現在的流量幾乎只有測試的人，
+就算漏掉也不影響任何既有數字；掛上同一個 GA 之後就沒有這個問題了。
+
+### 10.2 `reference` 要能表達真實來源
+
+這是唯一真正卡住的前置條件（§6.3）：若 IG／Discord／簡訊來的訊息只能標 `LINE`，
+「LINE 以外的傳播」這件事從一開始就記錯了。這不是為了算公式，是為了**回答「這則訊息在哪裡傳」**
+—— 一個描述性的問題，不需要加權也有意義。
 
 ## 11. 風險與未解問題
 
@@ -603,7 +621,7 @@ stats(dateRange: { GTE: "now-90d/d" }) {
 | 2 | **ADK transfer 的續接行為** | §4.3 已標記待驗證，直接影響成本與體感延遲 | 實作前先做最小 spike |
 | 2b | **佐證連結被誤判成新回報** | 查核中使用者常貼非 cofacts.tw 的 URL 當來源；若 writer 用 URL pattern 判斷是否轉回櫃檯，會把佐證整批誤送進回報流程 | §4.5：觸發條件寫成意圖而非 pattern，不確定就問 |
 | 2c | **多則訊息共存的 session 中，草稿對不到文章** | `draft_factcheck_response` 沒有 `article_id`，靠「一 session 一則」的隱含假設。`submit_cofacts_reply` 實作時會爆 | §4.4：補 `article_id` 並驗證來源，同步 `AllTools` |
-| 3 | **reference enum 不夠用** | 只有 `LINE \| URL`；IG／Discord／簡訊來的文字只能標 `LINE`，直接污染「LINE 以外的傳播訊號」這個核心指標。因為不用 appId 區分來源（§6.2），這是唯一的耐久來源訊號 | §6.3：需要在 rumors-api 加 `WEB`／`OTHER`。**熱度校準的前置條件**，短期先將就但日後可能要回頭修資料 |
+| 3 | **reference enum 不夠用** | 只有 `LINE \| URL`；IG／Discord／簡訊來的文字只能標 `LINE`，直接污染「LINE 以外的傳播訊號」這個核心指標。因為不用 appId 區分來源（§6.2），這是唯一的耐久來源訊號 | §6.3：需要在 rumors-api 加 `WEB`／`OTHER`。**來源記錄正確性的前置條件**，短期先將就但日後可能要回頭修資料 |
 | 4 | **回報者的後續通知** | LINE bot 有通知機制，cofacts.ai 沒有。回報完就斷線，回頭率會很差 | 需要 email 或串回 LINE notify；**尚未有結論** |
 | 5 | **Threads 上 Meta AI 已就地解惑** | Cofacts 會變成 alternative，不一定拿得到熱度（[20260804](../../meetings/2026/20260804.md#cofactsai) 已提出這個疑慮） | 差異化打「留下傳播記錄 + 開放資料」，不打「回答得比較快」 |
 | 6 | **回報品質下降** | 門檻降低必然帶進雜訊、廣告、個人恩怨 | 去重 + rate limit + 既有 spam 機制；必要時回報先進暫存區 |
@@ -650,11 +668,13 @@ stats(dateRange: { GTE: "now-90d/d" }) {
 - **驗收**：能從手機分享選單完成一次回報；LINE 導流有可量測的點擊；
   下架請求能一次收齊四項資訊，不需要人工追問
 
-### M4 — 媒體與熱度
+### M4 — 媒體與量測
 
 - [ ] 圖片/影音回報（BFF media proxy + `CreateMediaArticle`）
-- [ ] 釐清 `stats` channel，讓 cofacts.ai 的回報與流量可歸因
+- [ ] **掛上同一個 GA4 property，並在文章曝光時觸發 `view_item`**（§10.1）——
+      cofacts.ai 目前完全沒有 GA，這一步做完文章曝光才會算進 `webUser` / `webVisit`
 - [ ] 回報者通知機制（風險 #4）
+- **驗收**：在 cofacts.ai 開啟一則文章，該 article id 出現在 GA4 的 `view_item` 事件裡
 
 ## 13. 相關文件與程式碼
 
@@ -681,6 +701,7 @@ stats(dateRange: { GTE: "now-90d/d" }) {
 - [Authentication](Authentication.md)、[Authentication Comparison](../../research/cofacts.ai/Authentication%20Comparison.md)
 - [Cofacts ListArticles 混合搜尋架構設計](Cofacts%20ListArticles%20混合搜尋架構設計.md)（去重與召回率）
 - [API client management](../api-client-management.md)、[Rumors-api userId & appId management proposal](../../research/rumors-api-userid-appid-management-proposal.md)
+- [GA4 migration design doc](../ga4-migration-design-doc.md)（`view_item` → BigQuery → `Article.stats` 的管道，§10.1 靠它）
 - [Anti SEO-spam mechanism](../anti-seo-spam-mechanism.md)、[User blocking mechanism](../user-blocking-mechanism.md)
 - [Twitter Birdwatch 研究](../../research/twitter-birdwatch-研究.md)（Request a Note 的點播機制）
 
