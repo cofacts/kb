@@ -42,7 +42,7 @@ cofacts.ai 是目前唯一還在長期投入開發的前台，而且**已經有�
 
 | 問題 | 這個設計如何處理 |
 | --- | --- |
-| 熱度訊號單一（只有 LINE） | 新增 cofacts.ai 這個來源，並用 `appId` 區分，之後才有辦法談 Heat Index 2.0 加權 |
+| 熱度訊號單一（只有 LINE） | 新增 cofacts.ai 這個來源，並讓 `reference` 正確記錄訊息在哪個平台流傳（§6.3），之後才有辦法談 Heat Index 2.0 加權 |
 | cofacts.tw 註冊數 | 回報需登入 → 每個回報者都是註冊使用者 |
 | 回報品質 | 對話式回報可以順便問出「為什麼覺得可疑」，寫進 `CreateArticle(reason:)`；LINE bot 這格幾乎都是空的 |
 
@@ -349,29 +349,48 @@ cofacts.ai 目前的上傳路徑是 `File → base64 inline data → SaveFilesAs
 cofacts.ai 已經是**全站登入才能用**（`src/routes/_app.tsx`：`!user` → `LoggedOutLanding`），
 所以「回報要登入」天然成立，不需額外開發。
 
-### 6.2 appId：**這件事一定要先處理**
+### 6.2 appId：沿用 `RUMORS_SITE`，不要另開
 
 `adk/cofacts_ai/tools.py` 的 `_execute_cofacts_graphql()` 目前固定送 `x-app-id: RUMORS_SITE`。
-如果 cofacts.ai 的回報全部掛在 `RUMORS_SITE` 名下：
+**維持原樣就好，不需要申請新的 appId。** 理由：
 
-- 無法在資料上區分「網站編輯建立的」與「cofacts.ai 回報的」
-- 無法評估這個功能有沒有用
-- 之後的 Heat Index 加權沒有依據
+1. **cofacts.ai 就是未來的 rumors-site。** 依 Strangler Fig 規劃，它最終會完全取代舊站並整併回
+   cofacts.tw（見 [Cofacts.ai website](../../research/cofacts.ai/Cofacts.ai%20website.md)）。
+   現在鑄一個 `COFACTS_AI`，等它變成主站之後就得再遷移一次，或永久背著一個名字是歷史遺跡的 appId。
+2. **現在的 rumors-site 幾乎產不出新文章**（除非摸到隱藏頁面），所以 `RUMORS_SITE` 名下的新文章
+   本來就幾乎等於 cofacts.ai 的回報，沒有要拆開的兩堆資料。
+3. 加 appId 有實際成本：rumors-api 的 appId 清單、CORS / origin 對應，以及所有按 appId 分群的下游都要跟著改。
 
-**行動**：向 rumors-api 申請新的 appId（例如 `COFACTS_AI`），並在 rumors-api 的 appId / CORS 白名單註冊。
+**那歸因怎麼做？** 需求是真的（要能評估這個功能、要餵熱度計算），但不需要新 appId：
+
+- **LINE bot 有自己的 appId** —— 真正重要的「bot vs web」本來就分得出來。
+- **`reference`** 記的是訊息在哪裡流傳（`{type: URL, permalink}` vs `{type: LINE}`），
+  這才是熱度來源分析要的欄位（見 §6.3）。
+- **`createdAt`** —— 功能上線日前後對照。
+- **`userId`** —— 回報者是登入使用者，可以算「多少不同的人回報同一則」。
+
 參考 [API client management](../api-client-management.md)、
 [Rumors-api userId & appId management proposal](../../research/rumors-api-userid-appid-management-proposal.md)。
 
-### 6.3 reference type 的缺口
+### 6.3 reference type 的缺口（優先度因 §6.2 而升高）
 
-| 使用者貼的東西 | 建議 reference |
-| --- | --- |
-| Threads / FB / X / 新聞連結 | `{ type: URL, permalink: <該連結> }` |
-| 從 LINE 複製來的整段文字 | `{ type: LINE }`（可由 receptionist 問一句確認來源） |
-| 其他 App 複製來的文字（IG 私訊、Discord…） | **沒有合適的 enum** |
+`ArticleReferenceTypeEnum` 目前只有 `LINE | URL`，語意是「這則訊息是從哪裡蒐集到的」——
+`LINE` 指在 LINE 對話中流傳，`URL` 指在網路上流傳且有連結可指。
 
-短期先用上表將就。中期建議在 rumors-api 加一個較通用的值（如 `WEB` 或 `OTHER`）——
-注意這是 schema 變更，會影響所有 consumer，需要另開討論。
+**因為我們決定不用 appId 區分來源（§6.2），`reference` 就成了「訊息在哪個管道流傳」唯一的耐久訊號。**
+它從一個小缺口變成承重結構：
+
+| 使用者貼的東西 | 建議 reference | 問題 |
+| --- | --- | --- |
+| Threads / FB / X / 新聞連結 | `{ type: URL, permalink: <該連結> }` | 沒問題 |
+| 從 LINE 複製來的整段文字 | `{ type: LINE }`（receptionist 問一句確認來源） | 沒問題 |
+| 其他 App 複製來的文字（IG 私訊、Discord、簡訊…） | 只能勉強標 `LINE` | **會污染「LINE vs 其他平台」的分析** —— 而那正是這份文件想收的訊號 |
+
+第三列是真的痛：cofacts.ai 存在的理由之一就是捕捉 LINE 以外的傳播，結果卻只能把它標成 LINE。
+
+**行動**：在 rumors-api 為 `ArticleReferenceTypeEnum` 加一個較通用的值（如 `WEB` 或 `OTHER`）。
+這是 schema 變更、會影響所有 consumer，需要另開討論 —— 但它現在是熱度校準的前置條件，
+不再是「中期再說」的等級。短期上線可以先用上表將就，並記得這批資料日後可能要回頭修 reference。
 
 ### 6.4 防濫用
 
@@ -564,8 +583,15 @@ stats(dateRange: { GTE: "now-90d/d" }) {
 
 **這一階段要做的只有兩件事**（公式先不要碰）：
 
-1. 確認 `stats` 的資料來源與 channel 列舉方式，決定 cofacts.ai 的流量與回報要落在哪個 channel（可能要新增）。
-2. 用 §6.2 的新 appId，讓「哪些文章是從 cofacts.ai 進來的」在資料上查得到。
+1. **`reference` 要能表達真實來源**（§6.3）。這是唯一真正卡住的前置條件：
+   若 IG／Discord／簡訊來的訊息只能標 `LINE`，「LINE 以外的傳播訊號」這個核心指標從一開始就是髒的。
+2. **確認 `stats` 的資料來源與 channel 定義。** cofacts.ai 的流量本來就是 web 流量，
+   落在 `webUser` / `webVisit` 即可 —— 而且等它取代 rumors-site 之後，這個歸類就直接是對的，
+   不需要新 channel。要確認的只是資料怎麼進到 `stats`（GA / BigQuery pipeline？），
+   以及新網域的流量會不會被漏掉。
+
+（原先這裡列的第三件事「用新 appId 標記來源」已依 §6.2 移除 —— cofacts.ai 就是未來的 rumors-site，
+不分 appId。）
 
 把訊號收乾淨、可歸因，之後研究報告提的加權模型才有東西可以加權。
 
@@ -577,7 +603,7 @@ stats(dateRange: { GTE: "now-90d/d" }) {
 | 2 | **ADK transfer 的續接行為** | §4.3 已標記待驗證，直接影響成本與體感延遲 | 實作前先做最小 spike |
 | 2b | **佐證連結被誤判成新回報** | 查核中使用者常貼非 cofacts.tw 的 URL 當來源；若 writer 用 URL pattern 判斷是否轉回櫃檯，會把佐證整批誤送進回報流程 | §4.5：觸發條件寫成意圖而非 pattern，不確定就問 |
 | 2c | **多則訊息共存的 session 中，草稿對不到文章** | `draft_factcheck_response` 沒有 `article_id`，靠「一 session 一則」的隱含假設。`submit_cofacts_reply` 實作時會爆 | §4.4：補 `article_id` 並驗證來源，同步 `AllTools` |
-| 3 | **reference enum 不夠用** | §6.3 | 短期將就，中期提 schema 變更討論 |
+| 3 | **reference enum 不夠用** | 只有 `LINE \| URL`；IG／Discord／簡訊來的文字只能標 `LINE`，直接污染「LINE 以外的傳播訊號」這個核心指標。因為不用 appId 區分來源（§6.2），這是唯一的耐久來源訊號 | §6.3：需要在 rumors-api 加 `WEB`／`OTHER`。**熱度校準的前置條件**，短期先將就但日後可能要回頭修資料 |
 | 4 | **回報者的後續通知** | LINE bot 有通知機制，cofacts.ai 沒有。回報完就斷線，回頭率會很差 | 需要 email 或串回 LINE notify；**尚未有結論** |
 | 5 | **Threads 上 Meta AI 已就地解惑** | Cofacts 會變成 alternative，不一定拿得到熱度（[20260804](../../meetings/2026/20260804.md#cofactsai) 已提出這個疑慮） | 差異化打「留下傳播記錄 + 開放資料」，不打「回答得比較快」 |
 | 6 | **回報品質下降** | 門檻降低必然帶進雜訊、廣告、個人恩怨 | 去重 + rate limit + 既有 spam 機制；必要時回報先進暫存區 |
@@ -605,12 +631,13 @@ stats(dateRange: { GTE: "now-90d/d" }) {
 
 ### M2 — 真的能寫進資料庫
 
-- [ ] 申請並接上新的 `appId`
 - [ ] `propose_article_submission` 工具 + 前端確認卡片 + BFF `submitArticle`
+- [ ] `reference` 依 §6.3 正確帶入（有連結 → `{URL, permalink}`；LINE 來的 → `{LINE}`），
+      並把「其他來源只能標 LINE」這件事記成待修資料
 - [ ] 送出後自動把 article URL 回送 session，接到 writer
 - [ ] `draft_factcheck_response` 補上 `article_id`（§4.4），同步 `src/lib/adk.ts` 的 `AllTools`
 - [ ] rate limit / 同 URL 冷卻
-- **驗收**：查無 → 確認 → 資料庫出現新文章，`appId` 正確，且對話無縫接到查核；
+- **驗收**：查無 → 確認 → 資料庫出現新文章，`reference` 與 `userId` 都正確，且對話無縫接到查核；
   同一 session 內接著送第二則變種訊息，能引用第一則的 verifier 報告而不重跑
 
 ### M3 — 入口與導流
