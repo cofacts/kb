@@ -44,7 +44,7 @@ Cofacts 從平台早期就持續有博弈廣告、詐騙集團等組織化帳號
 
 - **[cofacts/takedowns#310](https://github.com/cofacts/takedowns/issues/310)**（2026-08-01 開票，見 [20260804](../../src/meetings/2026/20260804.md)）：「**廣告帳號透過『假故事包裝＋工具/遊戲連結』洗版查核回應**」——用虛構故事包裝、夾帶工具或遊戲連結（含博弈站）大量洗版回應，是目前仍開著的觀察 issue。
 - 同期持續有個別下架 PR（如 [#309](https://github.com/cofacts/takedowns/pull/309)、[#311](https://github.com/cofacts/takedowns/pull/311)），由 nonumpa review、merge。
-- 2026-08：Johnson 整理博弈廣告集團與另一詐騙集團的資料（Google Drive），與此 issue 觀察到的模式相符，尚待比對是否為同一批帳號的延伸、並補開對應 takedown PR。
+- 2026-08：nonumpa 整理博弈廣告集團與另一詐騙集團的資料（Google Drive），與此 issue 觀察到的模式相符，尚待比對是否為同一批帳號的延伸、並補開對應 takedown PR。
 
 ## 處理建議（沿用既有流程）
 
