@@ -1,6 +1,7 @@
 # Cofacts 會議記錄
 
 ## 2026
+- [0818 Cofacts搜尋回應優化、Log保留政策討論、cofacts.ai開發與公開session提案、AI爬蟲政策追蹤、小聚檢討、Production週報](./2026/20260818.md)
 - [0811 url-resolver與AI爬蟲開放討論、COSCUP完成、AI幻覺修正追蹤、cofacts.ai出處與markdown問題、AI eval pipeline設計、cofactsAi回報體驗討論、八月小聚籌備與rundown、Production週報](./2026/20260811.md)
 - [0804 Langfuse與url-resolver驗證收尾、7月GCP cost與AI爬蟲開放決議、cofacts.ai LINE使用推廣、COSCUP與AI修正進度、八月小聚(08/16)籌備、Production週報](./2026/20260804.md)
 - [0727 Langfuse環境與v4 observation、cofacts/ai ADR文件化、url-resolver Cloudflare backend、AI幻覺與proofreader修正、COSCUP籌備、八月小聚場地與宣傳、site-tw配額頂格週報](./2026/20260727.md)

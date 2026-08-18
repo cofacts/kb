@@ -13,13 +13,26 @@ description: >-
 
 ## 環境設定
 
-先從 wiki 根目錄 source .env：
+需要的變數：`HACKMD_API_TOKEN`、`HACKMD_API_URL`、`MEETING_NOTE_ID`（本週開會用的 HackMD note ID）。
+
+這些變數可能已經以環境變數形式存在（例如遠端 session 環境設定），也可能要從 wiki 根目錄的 `.env` 檔讀取。偵測順序：
 
 ```bash
-source .env
+# 1. 檢查是否已在環境變數中
+if [ -z "$HACKMD_API_TOKEN" ] || [ -z "$HACKMD_API_URL" ] || [ -z "$MEETING_NOTE_ID" ]; then
+  # 2. 環境變數不存在時才 source .env
+  if [ -f .env ]; then
+    source .env
+  fi
+fi
+
+# 3. 再次確認三個變數都有值，缺任何一個就停止並告知使用者缺什麼
+: "${HACKMD_API_TOKEN:?缺少 HACKMD_API_TOKEN：請確認環境變數或 .env}"
+: "${HACKMD_API_URL:?缺少 HACKMD_API_URL：請確認環境變數或 .env}"
+: "${MEETING_NOTE_ID:?缺少 MEETING_NOTE_ID：請確認環境變數或 .env}"
 ```
 
-需要的變數：`HACKMD_API_TOKEN`、`HACKMD_API_URL`、`MEETING_NOTE_ID`（本週開會用的 HackMD note ID）。
+也就是說：**環境變數優先**，`.env` 只是 fallback；兩者都沒有才需要向使用者詢問（例如：直接提供變數值、或補上 `.env` 檔）。不要一看到沒有 `.env` 檔就判定「無法執行」。
 
 ## 步驟
 
