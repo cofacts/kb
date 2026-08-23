@@ -3,7 +3,7 @@ type: DesignDoc
 title: "可疑訊息回報：cofacts.ai 作為回報入口"
 resource: "https://docs.google.com/document/d/1N7224PVdAqGXeQAXUawIfZVF0MkWu-ANyw9W-9Q0OkA/edit"
 tags: [cofacts, design-docs, technical-design, cofacts.ai]
-timestamp: "2026-08-09T00:00:00+08:00"
+timestamp: "2026-08-23T00:00:00+08:00"
 ---
 
 # 可疑訊息回報：cofacts.ai 作為回報入口
@@ -55,7 +55,7 @@ cofacts.ai 是目前唯一還在長期投入開發的前台，而且**已經有�
 2. 先查資料庫，避免重複回報；查得到就導向既有查核回應或「+1 請求查核」。
 3. 查不到 → 以**結構化確認卡片**讓使用者確認要送進資料庫的內容，確認後才真的寫入。
 4. 回報完成後拿到 `cofacts.tw/article/<id>`，**在同一個對話裡**無縫接到現有的查核（writer）流程。
-5. 提供 prefill URL（`/report?url=&text=`），讓 Android PWA Share Target 與 iOS 捷徑都能把系統分享的內容送進來。
+5. 提供 prefill URL（`/?url=&text=`），讓 Android PWA Share Target 與 iOS 捷徑都能把系統分享的內容送進來。
 
 ### Non-goals（本階段不做）
 
@@ -144,19 +144,44 @@ Receptionist 的職責，恰好對應使用者的三種來意：
 
 這些不是設計偏好，是不處理就會壞掉的東西：
 
-- **`after_agent_callback` 要搬家。**
+- **`after_agent_callback` 要重新安排，但「都搬到 root」是錯的。**
   `update_last_event_time`（寫 `lastEventTime`，sidebar 排序與未讀點靠它）和 `generate_session_title`
-  目前掛在 `ai_writer` 上。receptionist 單獨回話的 turn（例如客服、或使用者還在確認卡片階段）不會經過 writer，
-  session 就不會浮上 sidebar、也不會有標題。**兩個 callback 都要移到 root agent。**
+  目前掛在 `ai_writer` 上。receptionist 單獨回話的 turn（例如客服、或使用者還在挑選訊息）不會經過 writer，
+  session 就不會浮上 sidebar、也不會有標題 —— 這個問題是真的。
+  但**反過來把兩個都移到 root 也會壞**：ADK 只在 agent 真的跑過時才呼叫它的 `after_agent_callback`
+  （`BaseAgent.run_async`），而 transfer 之後的 turn 由 writer 直接接手、root 完全不跑，
+  `lastEventTime` 會從此不再更新。正解是兩者不對稱：
+  - `update_last_event_time` → **兩個 agent 都掛**（每個 turn 都要更新）。
+  - `generate_session_title` → **只掛 root**。它只在第一個 turn 動作，而第一個 turn 一定跑在 root
+    （session 還沒有事件可讓 `_find_agent_to_run` 續接）。若 writer 也掛，transfer 的那個 turn 會 fire 兩次
+    —— writer 是在 root 的 `_run_async_impl` 裡巢狀執行的，兩邊的 callback 都會為同一則使用者訊息觸發 ——
+    白花第二次 LLM 呼叫覆蓋同一個標題。
+  - 順帶一提：**不能拿 `state["title"]` 當「已經產生過」的旗標**，前端在建立 session 時就先把使用者訊息
+    截斷後寫進去了，它永遠是 truthy。
 - **`src/lib/adk.ts` 的 `AllTools` 必須同步。**
   這是 `ai/docs/index.md` 明列的 invariant：前端的 tool-name → args/response 對照表要跟
   `tools.py` / `agent.py` 嚴格一致。新增 `propose_article_submission` 等工具就要同步改。
 - **前端要認得新的 agent name。** 訊息是依 author 渲染的（`AgentMessage.tsx`），新 agent 要有對應的顯示名稱。
 - **`transfer` 要能雙向。** 見 §4.4：**不要**設 `disallow_transfer_to_parent=True`。
   （`disallow_transfer_to_peers` 目前無所謂，root 底下只有 writer 一個 sub_agent；日後加第二個要重想。）
-- **待驗證（ADK 版本相依）**：ADK Runner 是依「最後一個發話的 agent」決定下一輪由誰接手，
-  所以 transfer 之後的後續 turn 應該直接由 writer 處理，不會每輪都先過櫃檯。
-  這點請在實作時用一個最小 spike 先確認，因為它直接決定 §4.2 的成本估算是否成立。
+- **已驗證（ADK 1.26.0）**：`Runner._find_agent_to_run` 反向掃 session events，遇到 root 就回 root，
+  遇到 sub_agent 則要 `_is_transferable_across_agent_tree` 為真才回傳它 —— 而那個函式是從該 agent 一路往上
+  檢查 `disallow_transfer_to_parent`。所以**只要兩邊都保持預設（False），transfer 之後的後續 turn
+  就由 writer 直接接手，不會每輪先過櫃檯**，§4.2 的成本估算成立。
+  這跟下一點是同一個開關：**`disallow_transfer_to_parent=False` 同時買到「writer 能把球轉回櫃檯」與
+  「不必每輪重進櫃檯」兩件事**，設成 True 會一次失去兩者。
+  （可執行的驗收：`Runner._is_transferable_across_agent_tree(ai_writer)` 必須是 `True`。）
+- **transfer 之後，writer 看到的櫃檯工具結果是「攤平成純文字的」。**
+  這是實作時才發現、但會影響設計的一點：`contents._present_other_agent_message` 把其他 agent 的事件
+  改寫成 `role='user'` 的文字，形如 ``[receptionist] `get_single_cofacts_article` tool returned result: {...}``。
+  兩個後果都要處理：
+  1. writer 的 `inject_article_attachment` 抓不到它（該 callback 比對的是 `function_response` part），
+     所以櫃檯抓過的 IMAGE 文章，**媒體不會注入 writer 的 context**，也沒有 `cite_as` 可以引用。
+     ⇒ writer prompt 要有硬規則：**接手後自己再呼叫一次 `get_single_cofacts_article`**。
+  2. 櫃檯工具的回傳值會**整包**變成 writer 的 context。`search_cofacts_database` 用的是
+     `COMMON_ARTICLE_FIELDS`（含 `stats`、`relatedArticles`、每則的既有回應）× 10 則，攤平進去不可接受。
+     ⇒ 櫃檯不要共用它，另給一個精簡搜尋工具（只回 id／截斷後的 text／articleType／createdAt／
+     查核數／回報數）—— 而「讓使用者從清單挑一則」本來也只需要這些欄位。
 - **成本**：receptionist 建議用 `gemini-3.1-flash-lite`（proofreader 已在用）+ 低 thinking level。
   它的工作是分類與收件，不需要 HIGH thinking。
 
@@ -203,6 +228,10 @@ context 一直長大。prompt 上引導「相關 / 變種留在同一 session，
 
 ping-pong 的防護則靠：兩邊觸發條件互斥且具體、櫃檯的規則是「拿到 article URL 就交棒，不要多話」，
 必要時再加一個便宜的保險（同一 invocation 內 transfer 次數超過 2 就停下來問使用者）。
+
+承 §4.3 的攤平行為：**writer 接手後的第一個動作一定是自己呼叫 `get_single_cofacts_article`**，
+即使櫃檯剛剛才查過。櫃檯的查詢結果只以純文字轉述給 writer，媒體不會注入、也沒有 `cite_as` 可引用，
+自己抓一次才拿得到真正可用的東西。
 
 > **備案**：若 spike 顯示雙向 transfer 不穩，退路是**不轉回去**，改把兩個收件工具
 > （`propose_article_submission`、+1）也掛到 writer 上 —— writer 本來就有 `search_cofacts_database`，
@@ -408,12 +437,12 @@ cofacts.ai 已經是**全站登入才能用**（`src/routes/_app.tsx`：`!user` 
 
 ## 7. 分享入口
 
-### 7.1 `/report` prefill route（先做這個）
+### 7.1 首頁直接吃分享參數（先做這個）
 
-一條路由吃下所有來源：
+不另開路由，**首頁 `/` 直接承接**所有來源：
 
 ```
-https://cofacts.ai/report?url=<encoded>&text=<encoded>&title=<encoded>
+https://cofacts.ai/?url=<encoded>&text=<encoded>&title=<encoded>
 ```
 
 行為：
@@ -423,20 +452,30 @@ https://cofacts.ai/report?url=<encoded>&text=<encoded>&title=<encoded>
 2. **預填進 `ChatInput`，不自動送出** —— 讓使用者可以補一句「這是我媽傳的」再送。
 3. 送出後就是 §3 的流程。
 
-> [!IMPORTANT]
-> **未登入時會掉單，這是目前程式碼的實際缺口。**
-> `LoginPrompt` 呼叫的是 `login()`（無參數）→ redirect 一律回 `/`；
-> `AuthProvider` 的 auth-expired handler 用的是 `router.state.location.pathname`，**會丟掉 query string**。
-> 分享進來的人十之八九沒登入，這一掉就全掉。
-> 修法很小：兩處都改成帶 `pathname + search`（`sanitizeRedirectPath` / `safeRedirectPath` 本來就保留 `search`，
-> 後端不用改）。**這是整個功能裡 CP 值最高的一行改動。**
+原本這裡寫的是一條 `/report` 路由，改掉的理由有兩個：登入 redirect 與路由無關（見下），
+所以 `/report` 沒有換到任何東西；而 §9 的 LINE 導流本來就是連到 `cofacts.ai/?article=<id>`，
+統一在 `/` 上少一個要維護的入口。`validateSearch` 要寬鬆、未知參數要忽略 —— 這是全站最常被連的 URL，
+一個 `?utm_source=` 不該讓它壞掉。
+
+> [!NOTE]
+> **「未登入會掉單」其實不會發生 —— 這裡原本的判斷是錯的。**
+> 未登入時 `_app.tsx` 一律以 `LoggedOutLanding` 取代 `<Outlet/>`，**與 match 到哪條路由無關**；
+> 而 `LoginPrompt` 的 `login()`（無參數）會讓 `pendingRedirect` 變成 `''`，
+> `LoginModal` 收到的 `redirectPath` 因此是 `undefined`，於是 fallback 到
+> `window.location.pathname + search + hash`。`sanitizeRedirectPath` 與 `safeRedirectPath` 也都保留 `search`。
+> **這條路徑本來就是對的**，`Header` 的登入按鈕同理。
+>
+> 真正會掉 `search` 的只有一處：`AuthProvider` 的 auth-expired handler 用
+> `router.state.location.pathname`（改用 `location.href` 即可）。但它只在 session 中途過期時觸發，
+> 而那發生在 `/session/$sessionId` —— 本來就沒有 query string 可掉。
+> 所以這是個真實但**與分享入口無關**的小 bug，順手修就好，不是原本說的「CP 值最高的一行」。
 
 ### 7.2 系統分享選單
 
 | 平台 | 做法 | 成本 | 備註 |
 | --- | --- | --- | --- |
-| **Android** | PWA `manifest.json` 宣告 `share_target`（`action: /report, method: GET`） | 低 | 但需要使用者「加到主畫面」才會註冊；目前 TanStack Start 專案沒有 manifest，要補 |
-| **iOS** | 官方發一個 iOS 捷徑（接收 URL/Text → URL encode → 開 `cofacts.ai/report?...`） | 低 | Safari 不支援 Web Share Target；捷徑是唯一不用上架的解 |
+| **Android** | PWA `manifest.json` 宣告 `share_target`（`action: /, method: GET`） | 低 | 但需要使用者「加到主畫面」才會註冊；`public/manifest.json` **已經存在**（TanStack 樣板的預設值，內容還是 "Create TanStack App Sample"），所以是改它而不是新增 |
+| **iOS** | 官方發一個 iOS 捷徑（接收 URL/Text → URL encode → 開 `cofacts.ai/?url=...`） | 低 | Safari 不支援 Web Share Target；捷徑是唯一不用上架的解 |
 | **iOS（真 Share Sheet）** | 包殼 App + Share Extension | 高 | 本階段不做 |
 | **桌機** | 直接貼 | 0 | 主要使用情境仍是複製貼上 |
 
@@ -657,18 +696,27 @@ event 進 BigQuery，rumors-api 再從 GA4 dataset 聚合出 `stats`
 
 ### M1 — 讓「貼東西進來」不再被拒絕（最小可用）
 
-- [ ] `/report` prefill route + ChatInput 預填
-- [ ] **修正登入 redirect 保留 query string**（§7.1，一行等級的改動，先做）
-- [ ] 新增 root agent `ai_receptionist`，`ai_writer` 變 sub_agent；搬移 `after_agent_callback`
+- [ ] 首頁 `/` 承接 `?url=&text=&title=` + ChatInput 預填（§7.1）
+- [ ] 順手修 auth-expired 的 redirect 保留 query string（§7.1；與分享入口無關的小 bug）
+- [ ] 新增 root agent `ai_receptionist`，`ai_writer` 變 sub_agent；
+      `after_agent_callback` 依 §4.3 重新安排（`update_last_event_time` 兩邊都掛、
+      `generate_session_title` 只掛 root）
+- [ ] 櫃檯專用的精簡搜尋工具（§4.3：不要共用 `search_cofacts_database`）
 - [ ] receptionist 能分辨「查核 / 回報 / 客服」三種來意，並在拿到 article URL 時 transfer 給 writer
-- [ ] writer 能在「使用者送進另一則未回報的可疑訊息」時 transfer 回 receptionist，
-      且**不會**把佐證用的連結誤判成新回報（§4.5）
-- [ ] 命中分支：有回應 → 導讀；無回應 → `CreateOrUpdateReplyRequest` +1
+- [ ] writer 接手後自己重抓文章（§4.3 攤平行為），並能在「使用者送進另一則未回報的可疑訊息」時
+      transfer 回 receptionist，且**不會**把佐證用的連結誤判成新回報（§4.5）
+- [ ] 命中分支：有回應 → 導讀；無回應 → 先問「為什麼覺得可疑」再 `CreateOrUpdateReplyRequest` +1。
+      **+1 由 agent 工具直接寫入**（不做前端確認卡片）：它是 create-or-*update*、以人為單位、
+      不會灌大數字，風險遠低於 M2 的 `CreateArticle`，而後者仍走 BFF（§5.3）
 - [ ] **§8 的分流**：A～H 八類非查核來意都有明確去處；個資偵測到就停手；
-      B 類（已受騙）第一句就給 165；H 類（執法／媒體／合作）一律轉人工
+      B 類（已受騙）第一句就給 165；H 類（執法／媒體／合作）一律轉人工。
+      **M1 的個資防護是 prompt-level** —— §5.2 的機械式驗證跟著 M2 的提案工具一起做，
+      因為 M1 根本還沒有寫入新文章的路徑
+- [ ] 查無相似訊息時**誠實說明目前還不能建檔**，不要假裝送出了（建檔是 M2）
 - **驗收**：(1) 貼一個 Threads 連結進去，不會被要求「請提供 cofacts.tw 文章連結」；
   (2) 貼「我要退貨，訂單編號 xxx，我叫 O 先生電話 09xx」不會被當成可疑訊息回報，
-  也不會被 AI 複述那些數字
+  也不會被 AI 複述那些數字；
+  (3) transfer 之後的後續 turn 的 author 只有 `writer`，沒有每輪多一次櫃檯呼叫（§4.3）
 
 ### M2 — 真的能寫進資料庫
 
@@ -683,7 +731,7 @@ event 進 BigQuery，rumors-api 再從 GA4 dataset 聚合出 `stats`
 
 ### M3 — 入口與導流
 
-- [ ] PWA manifest + `share_target`（Android）
+- [ ] PWA manifest（改寫既有的 `public/manifest.json`）+ `share_target` → `/`（Android）
 - [ ] iOS 捷徑並在官網/社群提供下載
 - [ ] LINE bot 三處導流按鈕（§9）
 - [ ] 客服 → GitHub prefill 連結（§8.5）
