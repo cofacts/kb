@@ -48,8 +48,11 @@
 ```
 
 > [!NOTE]
-> **維度為 768，不是模型原生的 3072。** 實作端透過 Matryoshka Representation Learning (MRL)
-> 將輸出截短至 768 維（見 §5.4），以換取小得多的 HNSW 圖與 per-doc 儲存量。
+> **維度為 768，不是模型原生的 3072。** 實作端在呼叫時傳入
+> `outputDimensionality: 768`（見 §5.4），以換取小得多的 HNSW 圖與 per-doc 儲存量。
+> 之所以能直接截斷而不需重新訓練，是因為 `gemini-embedding-2` 本身是以
+> Matryoshka Representation Learning (MRL) 訓練的 —— 前 N 維本身即具備獨立語意。
+> 官方建議的截斷點為 768 / 1536 / 3072。
 > 此值必須與 `rumors-api` 的 `EMBEDDING_DIMS` (`src/util/embedding.ts`) 保持一致。
 > `rumors-db` 的 seed examples 內含 768 維的 `EXAMPLE_VECTOR`，兩者若飄移，
 > `npm run seed` 的 bulk request 會失敗，CI 會當場擋下。
@@ -255,7 +258,14 @@ const esQuery = {
 1. **AIResponses Index 的成長速度：** 將 Embedding 存入 `airesponses` 後，該 Index 的磁碟使用量會顯著增加。設定 Mapping 時務必針對 `embeddings` 欄位加入 `"enabled": false` 參數，確保 ES 只儲存原始 JSON 資料而不對其建立倒排索引 (Inverted Index)，以大幅節省記憶體與建置時間。  
 2. **API 請求數與 Rate Limit (Quota)：** 長影片需要對 Vertex AI 發起多次 API 呼叫。在執行回填腳本或高流量時，必須實作穩健的限速 (Rate Limiting) 與重試機制。  
 3. **ES 效能與 Nested Query：** 使用 `nested` 儲存影片片段，會使得 ES 內部 doc 數量倍增，`nested` query 的效能成本較高。需仔細調校 `num_candidates` 以避免過載。  
-4. **儲存空間與 MRL 降維：** 預設 3072 維度加上影片分段會造成資料量暴增。**已採用** Matryoshka Representation Learning (MRL) 在呼叫 Vertex AI API 時降維至 768 維 (`EMBEDDING_DIMS`)。
+4. **儲存空間與維度截斷：** 原生 3072 維度加上影片分段會造成資料量暴增。**已採用 768 維** (`EMBEDDING_DIMS`)，做法是呼叫 Vertex AI 時傳入 `outputDimensionality: 768`。
+
+   `gemini-embedding-2` 以 Matryoshka Representation Learning (MRL) 訓練，因此截斷是模型本身支援的能力，呼叫端不需要做任何額外處理 —— 不是我們自行降維。768 維約為完整維度的 25% 儲存量，品質損失極小。
+
+   > [!NOTE]
+   > **不需要在呼叫端做向量正規化。** `gemini-embedding-2` 會自動正規化截斷後的向量（768 / 1536 皆然）。
+   > 這與前一代不同：`gemini-embedding-001` 僅 3072 維是預先正規化的，其他維度必須自行正規化後才能計算相似度。
+   > 若沿用 `-001` 的經驗，容易多寫一段不必要的 normalize。
 5. **`_source` 不含向量，JS 端 reindex 會靜默掉資料：** ES 9 對新建 index 預設開啟 `index.mapping.exclude_source_vectors`，`dense_vector` 不再存入 `_source`，只存在 doc values。詳見下節。
 
 ## **5.1 `exclude_source_vectors` 的連帶影響**
