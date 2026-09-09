@@ -47,6 +47,8 @@ CCPRIP 下的工作項目以前綴標示所屬類別：
 - **2025-09** — [Infra] 移除 nginx：production 與 staging 改用 Cloudflare tunnel 取代 nginx，production 於 2025-09-28 完成切換。[20250930](../../src/meetings/2025/20250930.md)
 - **2025-10** — [Infra] 降載計畫明確化：研究 ElasticSearch v9 reindex（支援 vector search）、Linode 遷移至 Compute Engine + Container-optimized OS、url-resolver 重寫。[20251021](../../src/meetings/2025/20251021.md)
 - **2025-11** — [Infra] ElasticSearch v9 reindex 研究：直接從 v6 reindex 到 v9 觸發 OOM，需分次轉換；確認兩種 migration 方案（downtime 較長的 snapshot 載入 vs. downtime 較短的雙機切換）。[20251125](../../src/meetings/2025/20251125.md)
+- **2026-04** — [Op] Anti-SEO spam：分散式爬蟲鎖定博弈／廣告帳號的 `/user/*` 頁面與 `/search` 端點，打爆 Elasticsearch；Cloudflare WAF 對兩者開 Managed Challenge。詳見 [垃圾訊息／詐騙集團下架處理](spam-takedown.md)。[20260428](../../src/meetings/2026/20260428.md)
+- **2026-08** — [Op] Anti-SEO spam：觀察到廣告帳號以「假故事包裝＋工具/遊戲連結」洗版查核回應（[takedowns#310](https://github.com/cofacts/takedowns/issues/310)），與博弈廣告集團案例比對中。詳見 [垃圾訊息／詐騙集團下架處理](spam-takedown.md)。[20260804](../../src/meetings/2026/20260804.md)
 
 ## 目前狀態
 
