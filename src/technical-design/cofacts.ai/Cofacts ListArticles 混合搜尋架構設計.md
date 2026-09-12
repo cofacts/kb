@@ -8,6 +8,18 @@ Cofacts 的 `ListArticles` API 負責處理使用者回報的可疑訊息，並�
 
 為了提升對於「同義詞替換」、「換句話說」等變形訊息的召回率，我們計畫引入 **Gemini Embedding 2** 產生的 Dense Vector，並透過 Elasticsearch 的 `knn` 搜尋來進行語意比對。
 
+> [!NOTE]
+> **本文是方案比較階段的探討，實作細節請以《[支援 Gemini Embedding 2 與 ES9 混合搜尋架構](./Gemini%20Embedding%202%20%E8%88%87%20ES9%20%E6%B7%B7%E5%90%88%E6%90%9C%E5%B0%8B.md)》為準。**
+>
+> 特別注意：下方 pseudo-code 中的 `"field": "embeddings"` 是扁平 `dense_vector` 的寫法，
+> **與實際實作不符**。實際採用的是 `nested` 結構，欄位為 `embeddings.vector`，
+> 且 knn 查詢需包在 `nested` 查詢中並搭配 `score_mode: "max"`：
+>
+> ```ts
+> { nested: { path: 'embeddings', score_mode: 'max',
+>     query: { knn: { field: 'embeddings.vector', query_vector: qv, num_candidates: 100 } } } }
+> ```
+
 **挑戰：** 由於我們使用的是 Elasticsearch 的 **Basic (Free and Open)** 版本，該版本**不支援**進階的 Retriever 功能，如 `Linear Retriever` (線性組合加權) 與內建的 `RRF` (Reciprocal Rank Fusion)。因此，我們無法直接依賴 ES 內部現成的高階演算法來完美融合 BM25 (文字) 與 kNN (向量) 的分數。
 
 **目標：** 本文件旨在探討與設計在 ES Basic 授權限制下，如何將原有的 `more_like_this` 與新的 `knn` 搜尋有效結合，以達到類似 Hybrid Search 的效果，並評估各方案的優缺點。

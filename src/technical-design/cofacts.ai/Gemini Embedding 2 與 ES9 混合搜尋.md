@@ -34,9 +34,10 @@
       "properties": {
         "vector": {
           "type": "dense_vector",
-          "dims": 3072,
+          "dims": 768,
           "index": true,
-          "similarity": "cosine"
+          "similarity": "cosine",
+          "index_options": { "type": "hnsw" }
         },
         "startOffsetSec": { "type": "integer" },
         "endOffsetSec": { "type": "integer" }
@@ -45,6 +46,20 @@
   }
 }
 ```
+
+> [!NOTE]
+> **維度為 768，不是模型原生的 3072。** 實作端在呼叫時傳入
+> `outputDimensionality: 768`（見 §5.4），以換取小得多的 HNSW 圖與 per-doc 儲存量。
+> 之所以能直接截斷而不需重新訓練，是因為 `gemini-embedding-2` 本身是以
+> Matryoshka Representation Learning (MRL) 訓練的 —— 前 N 維本身即具備獨立語意。
+> 官方建議的截斷點為 768 / 1536 / 3072。
+> 此值必須與 `rumors-api` 的 `EMBEDDING_DIMS` (`src/util/embedding.ts`) 保持一致。
+> `rumors-db` 的 seed examples 內含 768 維的 `EXAMPLE_VECTOR`，兩者若飄移，
+> `npm run seed` 的 bulk request 會失敗，CI 會當場擋下。
+>
+> **`index_options` 必須明確指定 `hnsw`。** ES 9.1 起 `dense_vector` 的預設索引型別
+> 改為 BBQ (32x binary quantization)，會犧牲 recall。以目前約 269k 篇文章來說，
+> 768 維 x 4 bytes 僅約 826 MB 原始向量，不需要量化。
 
 **2\. `airesponses` Mapping 更新 (Cache Storage)：** 為了避免將龐大的 JSON 陣列直接塞入會被 Tokenize 的 `text` 欄位中，建議在 `airesponses` index 新增不參與全文檢索的物件欄位，專門用來存放快取特徵：
 
@@ -70,11 +85,31 @@
   2. `src/util/vertexAI.ts` (或相應工具檔)  
 * **實作重點：**  
   1. **擴充 Enum：** 在 `AIResponseTypeEnum` 新增 `EMBEDDING` 類型。  
-  2. **實作核心方法 `createEmbedding(queryInfo, parts, durationSec?)`**：  
-     * **Cache Check:** 首先以傳入的 `queryInfo.id` 與類型 `EMBEDDING` 查詢 `airesponses`。若命中快取，直接回傳 `airesponse.embeddings`。  
-     * **API Call:** 若無快取，呼叫 Vertex AI SDK `generateEmbeddings`。影片/音訊處理依照 `durationSec` 使用 `startOffsetSec`/`endOffsetSec` 迴圈分段請求。  
-     * **Cache Save:** 取得 `number[][]` 後，建立一筆 `AIResponse` 記錄存入 Elasticsearch (欄位為 `type: 'EMBEDDING'`, `docId: id`, `embeddings: <陣列資料>`)。  
-     * **Return:** 回傳算好的陣列。
+  2. **實作核心方法 `createEmbedding(queryInfo, parts, user?, options?)`**：  
+     * **Cache Check:** 首先以傳入的 `queryInfo.id` 與類型 `EMBEDDING` 查詢 `airesponses`。若命中快取，直接回傳 `airesponse.embeddings`（型別為 `EmbeddingChunk[]`，見下方說明）。  
+     * **API Call:** 若無快取，呼叫 `genAI.models.embedContent`（注意：`gemini-embedding-2` 只提供 `:embedContent`，舊的 `:predict` 端點不適用；且該模型僅在 `global` endpoint 提供服務，指向 region 會 404）。影音以明確的 `endOffset` 限制在前 `EMBEDDING_MEDIA_MAX_SEC` 秒，不做迴圈分段 —— 見下方說明。  
+     * **Cache Save:** 建立一筆 `AIResponse` 記錄存入 Elasticsearch (欄位為 `type: 'EMBEDDING'`, `docId: id`, `embeddings: <chunk 陣列>`)。  
+     * **Return:** 回傳 `EmbeddingChunk[]`。
+
+> [!IMPORTANT]
+> **`createEmbedding` 的回傳與快取格式是 `EmbeddingChunk[]`，不是 `number[][]`。**
+> 本文件早期版本寫的是 `number[][]`，與實作不符，已更正。實際型別
+> (`rumors-api` `src/util/embedding.ts`)：
+>
+> ```ts
+> export type EmbeddingChunk = {
+>   vector: number[];
+>   startOffsetSec?: number;
+>   endOffsetSec?: number;
+> };
+> ```
+>
+> 也就是說**快取層就已經包成物件**，與 `articles` / `replies` 的 nested entry
+> 結構完全一致。這是刻意的：三個 index 的 entry 形狀統一，且未來加入分段
+> (chunking) 時 offsets 有現成的位置可放，不需要再改格式。
+>
+> 因此凡是要拿裸向量的地方（例如餵給 `knn` 的 `query_vector`），都必須先取
+> `.vector` 欄位。
 
 ### **3.2 寫入路徑：建立與更新資料 (Mutations)**
 
@@ -85,19 +120,20 @@
   * `src/graphql/mutations/CreateReply.js` (處理純文字)  
   * `src/graphql/mutations/CreateMediaArticle.js` (處理多媒體檔案)  
 * **實作重點：**  
-  * 準備送入 ES 的 `document` 物件前，呼叫 `await createEmbedding({ id: articleId }, parts, duration)`。  
-  * 將回傳的 `number[][]` 轉換為 ES `nested` 欄位所期望的包含時間標記的格式：
+  * 準備送入 ES 的 `document` 物件前，呼叫 `await createEmbedding({ id: articleId, type }, parts)`。  
+  * `createEmbedding` 的回傳值已經是 ES `nested` 欄位所期望的形狀，直接指派即可：
 
 ```ts
-// 假設分段常數為 120 秒
-const CHUNK_SEC = 120;
-
-document.embeddings = vectors.map((vec, idx) => ({
-  vector: vec,
-  startOffsetSec: idx * CHUNK_SEC,
-  endOffsetSec: Math.min((idx + 1) * CHUNK_SEC, duration)
-}));
+document.embeddings = await createEmbedding({ id: articleId, type }, parts);
 ```
+
+> [!NOTE]
+> **目前尚未實作分段 (chunking)。** 文字與圖片整份嵌入；音訊與影片只嵌入前
+> `EMBEDDING_MEDIA_MAX_SEC` (80) 秒 —— 這是 Gemini Embedding 2 單次媒體輸入的硬上限，
+> 透過明確的 `endOffset` 傳入，因此不需要用 `fluent-ffmpeg` 探測媒體長度。
+> 每篇 doc 目前恆為一個 chunk，`startOffsetSec` / `endOffsetSec` 都不會被寫入，
+> 但 mapping 已保留這兩個欄位，日後補上分段不需要 migration。
+> 超出 80 秒的內容仍由逐字稿的 BM25 涵蓋。
 
 ### **3.3 讀取路徑：支援多片段的 Linear Retriever 混合搜尋 (Queries)**
 
@@ -134,7 +170,10 @@ document.embeddings = vectors.map((vec, idx) => ({
 * **ES Retriever 結構範例 (Pseudo-code)：**
 
 ```ts
-const nestedKnnQueries = queryVectors.map(qv => ({
+// createEmbedding 回傳 EmbeddingChunk[]，餵進 knn 前必須先取出 .vector
+const queryVectors = chunks.map(c => c.vector);
+
+const nestedKnnQueries = queryVectors.map(qv => ({
   nested: {
     path: "embeddings",
     query: {
@@ -201,8 +240,11 @@ const esQuery = {
 * **1\. Embedding Utility 測試 (`createEmbedding`)：**  
   * **Cache Hit:** 測試當 `AIResponses` 存在 `EMBEDDING` 類型的資料時，是否直接回傳該特徵且**未**呼叫 Vertex AI API。  
   * **Cache Miss & API Call:** 測試無快取時，是否正確呼叫 Vertex AI 取得陣列，並將結果存入 Elasticsearch `AIResponses` 中。  
-  * **Video Chunking Logic:** 模擬一個大於 120 秒的 `durationSec`，驗證程式是否產生了多次對 Vertex AI 的 API 呼叫，且每次的 `startOffsetSec` 與 `endOffsetSec` 皆正確遞增。  
-  * **Duration Fallback:** 測試當未提供 `durationSec` 參數時，是否正確呼叫了 `fluent-ffmpeg` 的 mock 函式來獲取媒體長度。  
+  * **Media Capping:** 驗證 `gs://` 與公開 https 的媒體 part 會以單一向量嵌入，且帶有正確的 `endOffset` (`EMBEDDING_MEDIA_MAX_SEC`)。  
+  * **Error Path:** 驗證 Vertex 回傳空向量時，快取記錄被標記為 `ERROR` 且例外向上拋出。  
+  * **Anonymous Call:** 驗證未帶 user 呼叫時，快取記錄不會寫入 `userId` / `appId`。  
+
+  > 註：原設計規劃的 Video Chunking 與 Duration Fallback (`fluent-ffmpeg`) 測試已不適用 —— 目前不做分段、也不探測媒體長度，改以固定的 `endOffset` 上限處理。
 * **2\. 寫入路徑整合測試 (Mutation Integration)：**  
   * 在 `CreateMediaArticle` 的測試中，新增一組 assert 驗證產生出來送往 ES 的 `document` 物件是否包含了正確結構的 `embeddings` 欄位 (確保 `vector`, `startOffsetSec`, `endOffsetSec` 被正確映射)。  
 * **3\. 搜尋路徑整合測試 (Query Integration)：**  
@@ -216,7 +258,42 @@ const esQuery = {
 1. **AIResponses Index 的成長速度：** 將 Embedding 存入 `airesponses` 後，該 Index 的磁碟使用量會顯著增加。設定 Mapping 時務必針對 `embeddings` 欄位加入 `"enabled": false` 參數，確保 ES 只儲存原始 JSON 資料而不對其建立倒排索引 (Inverted Index)，以大幅節省記憶體與建置時間。  
 2. **API 請求數與 Rate Limit (Quota)：** 長影片需要對 Vertex AI 發起多次 API 呼叫。在執行回填腳本或高流量時，必須實作穩健的限速 (Rate Limiting) 與重試機制。  
 3. **ES 效能與 Nested Query：** 使用 `nested` 儲存影片片段，會使得 ES 內部 doc 數量倍增，`nested` query 的效能成本較高。需仔細調校 `num_candidates` 以避免過載。  
-4. **儲存空間與 MRL 降維：** 預設 3072 維度加上影片分段會造成資料量暴增。建議在呼叫 Vertex AI API 時評估使用 Matryoshka Representation Learning (MRL) 降維至 768 維。
+4. **儲存空間與維度截斷：** 原生 3072 維度加上影片分段會造成資料量暴增。**已採用 768 維** (`EMBEDDING_DIMS`)，做法是呼叫 Vertex AI 時傳入 `outputDimensionality: 768`。
+
+   `gemini-embedding-2` 以 Matryoshka Representation Learning (MRL) 訓練，因此截斷是模型本身支援的能力，呼叫端不需要做任何額外處理 —— 不是我們自行降維。768 維約為完整維度的 25% 儲存量，品質損失極小。
+
+   > [!NOTE]
+   > **不需要在呼叫端做向量正規化。** `gemini-embedding-2` 會自動正規化截斷後的向量（768 / 1536 皆然）。
+   > 這與前一代不同：`gemini-embedding-001` 僅 3072 維是預先正規化的，其他維度必須自行正規化後才能計算相似度。
+   > 若沿用 `-001` 的經驗，容易多寫一段不必要的 normalize。
+5. **`_source` 不含向量，JS 端 reindex 會靜默掉資料：** ES 9 對新建 index 預設開啟 `index.mapping.exclude_source_vectors`，`dense_vector` 不再存入 `_source`，只存在 doc values。詳見下節。
+
+## **5.1 `exclude_source_vectors` 的連帶影響**
+
+ES 9 對新建 index 預設開啟 `index.mapping.exclude_source_vectors`。這件事有四個必須知道的後果：
+
+**1. 直接讀 `_source` 拿不到向量。** `GET articles/_doc/<id>` 回傳的 `embeddings` 是 `[{}]`。因此 `rumors-db` 的 zod schema 中，`articles` / `replies` 的 `vector` 必須是 `optional`，否則 `npm run scan` 會在每一筆有 embedding 的文件上失敗。
+
+**2. `airesponses` 不受影響。** 該欄位是 `type: 'object', enabled: false` 而非 `dense_vector`，向量完整保留在 `_source` 中，所以它的 zod schema 中 `vector` 是 **required**。三個 index 的這個差異是刻意設計，不要「統一」它們。
+
+**3. Server-side `_reindex` 安全，JS 端 scroll + bulk 會掉資料。** 官方文件說明，當請求需要 `_source` 時（recovery 或 reindex），向量會從內部格式 rehydrate 回來。已在 ES 9.3.2 上實測驗證：
+
+| 驗證項目 | 結果 |
+| :---- | :---- |
+| `npm run reload -- articles`（VERSION bump 觸發 reindex）前後，相同 knn 查詢 | doc id / score / count 完全一致（max\_score `0.999998`） |
+| 從 `_source` 無向量的 index 原生 `_reindex` 到 `exclude_source_vectors: false` 的 index | 目的地 `_source` 出現完整 768 維向量 |
+| 以 scroll API 讀取 `_source`（`201712-001-reindex.js` 的模式） | `embeddings` 為 `[{}]`，**向量遺失** |
+
+> [!CAUTION]
+> **撰寫任何涉及 `articles` / `replies` 的 migration 時，必須使用 Elasticsearch 原生的 `_reindex` API。**
+> `db/reloadSchema.js` 走的是這條路，是安全的。
+> 但 `db/migrations/201712-001-reindex.js` 那種「JS 端 scroll 撈 `_source` → bulk 寫回」的模式
+> **一定會靜默地把 embeddings 弄丟**，且不會有任何錯誤訊息。不要拿它當範本。
+>
+> 風險之所以嚴重，是因為 `reloadSchema.js` 的 `switchAndRemoveOldAlias()` 把 alias 切換與
+> `remove_index` 放在同一個 atomic action —— reindex 一結束舊 index 立即被刪除，沒有回復餘地。
+
+**4. 此行為目前吃的是 ES 版本預設值。** `util/indexSetting.js` 並未明確 pin 住 `exclude_source_vectors`，未來 ES 版本若改變預設，行為會跟著變。
 
 ## **6\. 參考文獻 (References)**
 
