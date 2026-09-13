@@ -1,6 +1,7 @@
 # Cofacts 會議記錄
 
 ## 2026
+- [0910 Cofacts.ai回報入口設計調整、URL resolver進度、User-level memory研究與Memory Bank採用、GCE磁碟清理與Production週報](./2026/20260910.md)
 - [0901 URL resolver進cofacts.ai、Hybrid search與vector search、cofacts.ai收謠言與前端skill、Log retention調查結果與GCS sink、Cloudflare Analytics retention、Production週報](./2026/20260901.md)
 - [0818 Cofacts搜尋回應優化、Log保留政策討論、cofacts.ai開發與公開session提案、AI爬蟲政策追蹤、小聚檢討、Production週報](./2026/20260818.md)
 - [0811 url-resolver與AI爬蟲開放討論、COSCUP完成、AI幻覺修正追蹤、cofacts.ai出處與markdown問題、AI eval pipeline設計、cofactsAi回報體驗討論、八月小聚籌備與rundown、Production週報](./2026/20260811.md)
