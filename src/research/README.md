@@ -14,6 +14,7 @@ timestamp: "2026-06-24T00:00:00+08:00"
 > [!TIP]
 > Latest research docs first
 
+- [中央社 CNA MCP 觀察報告](cofacts.ai/中央社%20CNA%20MCP%20觀察報告.md)
 - [Authentication Comparison](cofacts.ai/Authentication%20Comparison.md)
 - [Cofacts Elasticsearch 9 升級與架構評估報告](cofacts.ai/Cofacts%20Elasticsearch%209%20升級與架構評估報告.md)
 - [Cofacts.ai website](cofacts.ai/Cofacts.ai%20website.md)
