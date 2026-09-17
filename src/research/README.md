@@ -14,6 +14,7 @@ timestamp: "2026-06-24T00:00:00+08:00"
 > [!TIP]
 > Latest research docs first
 
+- [中央社 MCP 專業 Subagent：可行性與必要性評估](cofacts.ai/中央社%20MCP%20專業%20Subagent：可行性與必要性評估.md)
 - [Authentication Comparison](cofacts.ai/Authentication%20Comparison.md)
 - [Cofacts Elasticsearch 9 升級與架構評估報告](cofacts.ai/Cofacts%20Elasticsearch%209%20升級與架構評估報告.md)
 - [Cofacts.ai website](cofacts.ai/Cofacts.ai%20website.md)
