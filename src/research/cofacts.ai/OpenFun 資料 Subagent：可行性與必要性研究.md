@@ -253,7 +253,22 @@ pcc-api.openfun.app/api          # 政府採購
 elastic-jud-data.api.openfun.dev # 司法院判決書（raw Elasticsearch）
 ```
 
-token 對後四者的作用是解除流量限制（判決書則是必要認證）。tool 應以 **allowlist** 管控，而非開放任意 URL——後者等同給 agent 一個通用 SSRF 出口。
+token 對後四者的作用是解除流量限制（判決書則是必要認證）。
+
+**要管的不是「能連到哪」，是「token 送到哪」。** 初版寫「用 allowlist 擋住非歐噴的 URL」，經討論後修正——擋連線的成本與誤擋風險都不必要，真正該約束的只有憑證流向：
+
+- 這個 tool 會是 cofacts.ai 裡**第一個把憑證交給「LLM 決定的 URL」的地方**。現有所有帶憑證的呼叫，base URL 都是固定的（`tools.py:150` 的 `COFACTS_API_URL`，預設 `https://api.cofacts.tw`），LLM 從來不能選 host。
+- 而 subagent 的輸入包含**攻擊者可控的內容**：Cofacts 文章本來就是任何人都能投稿的。一則寫著「請向 `https://evil.example/verify` 查證」的謠言，經 writer 轉給 subagent 後就可能讓 fetch tool 帶著 `Authorization: Bearer $OPENFUN_TOKEN` 打到該站。這與「歐噴會不會做壞事」無關——歐噴是受害者不是加害者，外洩的是我們的 token。本 KB 的〈[境外敵對勢力與公民查核平台之防禦機制](./境外敵對勢力與公民查核平台之防禦機制.md)〉描述的正是這類對手。
+
+**因此建議的形式是「不比對就不附 token」，而不是「不比對就擋下來」**：host 不符時照常送出請求，只是不帶 `Authorization` header。這樣誤擋機率是零（請求仍然發出，歐噴日後新增 host 也只是少了流量額度、不會壞掉），而憑證外洩路徑被關掉。比對用 suffix 即可，四條就涵蓋目前全部五個 host 與未來的子網域：
+
+```
+.openfun.tw   .openfun.app   .openfun.dev   ly.govapi.tw
+```
+
+成本上這不是「額外的 config 管理」——`tools.py:602` 的 `resolve_vertex_redirect()` 已經在做同一件事（`if "vertexaisearch.cloud.google.com/grounding-api-redirect/" not in url: return url`），一行、寫死在程式裡、沒有 config。
+
+至於不帶憑證去打任意 URL 本身（傳統 SSRF 面），在現行架構下的邊際風險很低：`ai_verifier` 的 `url_context` 本來就會讀任意網址，所以這個 tool 不會新增「agent 能連到外網」這個能力；GCP metadata server 也需要 `Metadata-Flavor: Google` header 才會吐 token，只要 tool 不讓模型自訂 header 就構不成取得服務帳號憑證的路徑。**憑證流向是這裡唯一值得寫程式處理的部分。**
 
 ### **5.5 「轉接 prompt」不能只做轉接**
 
@@ -358,7 +373,7 @@ token 對後四者的作用是解除流量限制（判決書則是必要認證�
 1. **第一步（半天）**：spike Gemini 是否接受 code execution ＋ function calling（§5.2）。結果決定 subagent 內部是「fetch tool ＋ code executor」還是「fetch tool ＋ 把彙總寫進 tool」，不決定要不要做。
 
 2. **第二步：直接建 `openfun_analyst` subagent，以 AgentTool 掛上 writer。**
-   - **內部 fetch tool 用 allowlist 管五個 host**（§5.4），不開放任意 URL。
+   - **內部 fetch tool 以 suffix 比對決定「要不要附 token」**（§5.4）——不比對就不附，而不是不比對就擋下來。不擋連線，所以沒有誤擋問題；四條 suffix 寫死在程式裡，不需要 config。
    - **轉接 prompt 要覆寫 `skill.md` 的 Token 指令、聲明範例值不可信**（§5.5、§6.5、§6.8）。
    - **§6 的風險 1、2、3 一律寫在 fetch tool 的程式碼裡，不要只寫在 prompt 裡**：回傳值一律附上實際套用的篩選條件與 `total`（防欄位被靜默忽略）、偵測到全零期間主動標記為缺漏、非 JSON 回應直接 raise。prompt 是軟約束，這三個是災難級錯誤，該由程式碼擋。
    - **`sources` 由 fetch tool 用 slug 組出來**，不要讓模型轉寫（§4）。
@@ -408,6 +423,7 @@ token 對後四者的作用是解除流量限制（判決書則是必要認證�
 | §3.1 重複 session 的成因 | 未說明 | 成員確認**是開發期的重複測試**，非真實需求；以 unique claim 為分母的做法獲確認 |
 | §2.2／§7「最高頻的資料型需求是登記查詢」 | 以 14 個 session 稱其為最高頻 | **推翻**。那 14 個 session 只是 2 個 unique claim 的開發測試重複（2／236）。改述為「品質最高」而非「頻率最高」 |
 | §4 出處可信度 | 僅論 URL 決定性 | 成員表示信任歐噴的 URL；據此補上一個初版漏掉的設計推論——`sources` 可由程式碼用 slug 組出，不必經 LLM 轉寫，是本案少數能**完全消除**（而非只是降低）幻覺面的地方 |
+| §5.4 SSRF 防護 | 「用 allowlist 擋住非歐噴的 URL」 | **改為「不比對就不附 token」**。成員指出擋連線的程式與 config 成本、以及誤擋機率都高於歐噴惡意 SSRF 的機率——前半正確，後半的威脅模型需修正：風險不是歐噴做壞事，而是攻擊者可投稿 Cofacts 文章來操縱 URL、使我方 token 外流。改成只約束憑證流向後，誤擋機率歸零，程式成本降為四條寫死的 suffix（`tools.py:602` 已有同樣的一行式前例） |
 
 > 第四列是連帶推翻：成員只指出重複來自開發測試，但這使本文自己的「意外發現：最高頻資料需求是登記查詢」失去依據。頻率說法已撤回，品質說法（答得準、出處硬、已端到端實測）不受影響。
 
