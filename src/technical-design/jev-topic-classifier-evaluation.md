@@ -210,15 +210,48 @@ Jev 的 context window 為 32,000 tokens。輸入由三部分組成：
 
 ## 4. 成本估算
 
-### 4.1 Jev 的單價目前無法查得
+### 4.1 Jev 的單價
 
-Cloudflare 官方文件對 `typesafe/jev` 的 Pricing 欄位只寫
-「[View pricing in the Cloudflare dashboard](https://dash.cloudflare.com/?to=/:account/ai/models/typesafe/jev)」，
-**未列在 [Workers AI pricing 頁](https://developers.cloudflare.com/workers-ai/platform/pricing/) 的任何價目表中**；
-本次也無法透過 API 取得（同 3.3 末項）。
-Workers AI 的計價基礎為 **Neurons，$0.011 / 1,000 Neurons，每日前 10,000 Neurons 免費**。
+> [!WARNING]
+> **來源待證。** 以下單價為 mrorz 口頭提供，本文無法獨立驗證：
+> Cloudflare 官方文件對 `typesafe/jev` 的 Pricing 欄位只寫
+> 「[View pricing in the Cloudflare dashboard](https://dash.cloudflare.com/?to=/:account/ai/models/typesafe/jev)」，
+> **未列在 [Workers AI pricing 頁](https://developers.cloudflare.com/workers-ai/platform/pricing/) 的任何價目表中**，
+> 透過帳號的 models API 也查不到（同 §3.3 末項）。**實作前請在 dashboard 再確認一次。**
 
-因此以下用**參數化**方式估算，實際單價請由 mrorz 在 dashboard 確認後代入。
+| 項目 | 單價 |
+|---|---|
+| Input tokens | **$0.042 / M tokens** |
+| Output tokens | **免費（$0.00）** |
+
+換算成 Workers AI 的計價單位（$0.011 / 1,000 Neurons）：
+**$0.042 / M ÷ $0.011 × 1,000 ≈ 3,818 neurons / M input tokens**。
+
+這個價位低於 Workers AI 價目表上所有的 text generation 模型
+（最便宜的 `llama-3.2-1b-instruct` 是 $0.027 in / $0.201 out），
+考量到 output 免費，**Jev 屬於極低價帶**。
+
+### 4.1.1 免費額度可能覆蓋全部用量
+
+Workers AI **每日前 10,000 Neurons 免費**（Free 與 Paid plan 皆有）。以每篇 4,500 input tokens 計：
+
+| 每月訊息量 | 每日篇數 | 每日 neurons | 是否超出免費額度 |
+|---|---|---|---|
+| 3,000 篇 | ~100 | ~1,718 | ❌ 未超出 |
+| 10,000 篇 | ~333 | ~5,727 | ❌ 未超出 |
+| **17,400 篇** | **~580** | **~10,000** | **⚠️ 臨界點** |
+
+> [!IMPORTANT]
+> 以 Cofacts 目前的訊息量，**這個功能的邊際成本可能是 $0**，
+> 要到每天約 580 篇（每月約 1.7 萬篇）才開始計費。
+
+兩個但書：
+
+1. **免費額度是否適用於 third-party partner model 需確認。**
+   Cloudflare 文件明列部分模型「require a paid billing method」（kimi、glm、deepseek 系列），
+   Jev 不在該名單上，但它連 pricing 頁都沒列，不能只靠推論。
+2. 補跑 script（§6.5）一次掃大量舊訊息時**會瞬間衝破每日額度**，
+   這部分要當作付費用量估算（見 §4.3 末）。
 
 ### 4.2 每篇訊息的 token 用量
 
@@ -231,15 +264,24 @@ Workers AI 的計價基礎為 **Neurons，$0.011 / 1,000 Neurons，每日前 10,
 
 ### 4.3 情境成本
 
-用 Workers AI 現有模型的價格帶當上下界（Jev 為結構化評估模型，推測落在中低價帶）：
+因為 output 免費，**成本完全由 input 決定**：4,500 tokens × $0.042/M = **$0.000189 / 篇**。
 
-| 假設單價（in / out per M tokens） | 每篇成本 | 每月 3,000 篇 | 每月 10,000 篇 |
-|---|---|---|---|
-| $0.10 / $0.30（gemma-4 級距） | $0.00053 | **$1.6** | **$5.3** |
-| $0.35 / $0.75（gpt-oss-120b 級距） | $0.00177 | **$5.3** | **$17.7** |
-| $0.95 / $4.00（kimi-k2.6 級距，上界） | $0.00528 | **$15.8** | **$52.8** |
+| 用量 | 篇數 | 成本（不計免費額度） |
+|---|---|---|
+| 每月 3,000 篇 | 3,000 | **$0.57** |
+| 每月 10,000 篇 | 10,000 | **$1.89** |
+| 重跑 17K ground truth dataset | 17,000 | **$3.21** |
+| 回填全部既有訊息（`articles` index ~279,286 筆） | 279,286 | **$52.8** |
 
-即使取最貴的情境，**每月成本在數十美元量級**。
+即時分類的部分（前兩列）**大機率落在每日免費額度內**（§4.1.1）。
+唯一需要編列預算的是**一次性回填**：把 28 萬筆舊訊息全部分類約 **$53**，
+且會連續數日衝破免費額度——建議補跑 script 支援限速，分散到數週執行，或直接接受這筆一次性費用。
+
+> [!NOTE]
+> output 免費還有一個設計上的意涵：**增加 category 數量（N）幾乎不增加 output 成本**，
+> 成本只隨「問題區的文字長度」成長。
+> 因此 criteria 可以寫得詳細一點以換取準確率，不必為了省 token 而寫得太精簡——
+> 但仍受 §3.2 的 32k context 限制。
 
 ### 4.4 與 2021 年 BERT 主機對比
 
@@ -247,8 +289,9 @@ Workers AI 的計價基礎為 **Neurons，$0.011 / 1,000 Neurons，每日前 10,
 市面上最便宜的常駐 GPU 執行個體月費也在 **USD 100~500** 量級，
 且 GPU 不論有沒有訊息進來都在計費，還要加上維運與重訓練的人力。
 
-> **Jev 方案比 2021 年的自架 GPU 便宜約 1~2 個數量級，且成本隨訊息量線性變動、閒置時為零。**
-> 成本已經不是這件事的阻礙——**準確率（特別是中文表現）才是**。
+> **Jev 方案比 2021 年的自架 GPU 便宜約 3 個數量級**（每月 $0~2 vs $100~500），
+> 且成本隨訊息量線性變動、閒置時為零。
+> 成本已經完全不是這件事的阻礙——**準確率（特別是中文表現）才是**。
 
 ### 4.5 與 Gemini「一個大 prompt」方案的對照
 
@@ -269,40 +312,44 @@ Workers AI 的計價基礎為 **Neurons，$0.011 / 1,000 Neurons，每日前 10,
 
 | 方案 | output tokens | 每篇 | 每月 3,000 篇 | 每月 10,000 篇 |
 |---|---|---|---|---|
-| **Gemini 3 Flash**，短 reasoning | ~300 | $0.00158 | **$4.7** | **$15.8** |
-| **Gemini 3 Flash**，中等 reasoning | ~600 | $0.00203 | **$6.1** | **$20.3** |
-| **Gemini 3 Flash** + thinking | ~1,500 | $0.00338 | **$10.1** | **$33.8** |
-| **Gemini 3 Flash** + 較長 thinking | ~3,000 | $0.00563 | **$16.9** | **$56.3** |
-| Jev（下界 $0.10/$0.30） | ~250 | $0.00053 | $1.6 | $5.3 |
-| Jev（中間 $0.35/$0.75） | ~250 | $0.00176 | $5.3 | $17.6 |
-| Jev（上界 $0.95/$4.00） | ~250 | $0.00528 | $15.8 | $52.8 |
+| **Jev**（$0.042 in / 免費 out） | ~250 | **$0.000189** | **$0.57** | **$1.89** |
+| Gemini 3 Flash，短 reasoning | ~300 | $0.00158 | $4.7 | $15.8 |
+| Gemini 3 Flash，中等 reasoning | ~600 | $0.00203 | $6.1 | $20.3 |
+| Gemini 3 Flash + thinking | ~1,500 | $0.00338 | $10.1 | $33.8 |
+| Gemini 3 Flash + 較長 thinking | ~3,000 | $0.00563 | $16.9 | $56.3 |
+
+**Jev 比 Gemini 便宜 8~30 倍**（視 Gemini 的 reasoning / thinking 長度而定），
+且 Jev 在 Cofacts 的量級下大機率落在免費額度內，而 Gemini 沒有等價的免費額度。
 
 三點觀察：
 
-1. **Gemini 的 input 成本是寫死的地板**：4,500 × $0.25/M = **$0.001125/篇**，
-   佔不開 thinking 時總成本的 71%。Jev 要比它便宜，input 單價必須低於 $0.25/M。
-2. **變數幾乎全在 output**。Gemini 從短 reasoning 到開 thinking 差 2.1 倍
-   （且 [20250623](../meetings/2025/20250623.md) 記到「thinking token 會算在 max output token 裡」）；
-   Jev 每題只吐一個數字，output 基本上是常數。
-   Jev 的中間情境與 Gemini 幾乎打平（$5.3 vs $4.7），**上界則比開 thinking 的 Gemini 更貴**。
-3. **兩者都落在每月 $5~$50 之間**，差距對 Cofacts 的預算無意義。
+1. **Gemini 的 input 成本就贏不了**：4,500 × $0.25/M = $0.001125/篇，
+   已經是 Jev 全額成本（$0.000189）的 **6 倍**，還沒算 output。
+2. **Gemini 的變數在 output，Jev 沒有這個變數**。
+   Gemini 從短 reasoning 到開 thinking 差 2.1 倍
+   （[20250623](../meetings/2025/20250623.md) 記到「thinking token 會算在 max output token 裡」），
+   而且這段 reasoning **不能為了省錢砍掉**——
+   [20250722](../meetings/2025/20250722.md) 的結論是「reason 應該放在 category 之前才有 CoT 之效」。
+   Jev 的 output 免費，等於這整個變數消失。
+3. **但兩者的絕對金額都很小**（每月 $0.6 ~ $56）。
+   即使差 30 倍，對 Cofacts 的預算來說仍然是「都付得起」。
 
 而且 Gemini 版本的 reasoning **不能為了省錢而砍掉**——
 [20250722](../meetings/2025/20250722.md) 的結論是「reason 應該放在 category 之前才有 CoT 之效」，
 那段 output 是刻意要的。
 
-**真正的成本差異不在單次推論，而在重跑：**
+**除了單價，兩者在「調整閾值」上的差異更大：**
 
 | 動作 | Gemini | Jev |
 |---|---|---|
-| 調整一次閾值（需對 17K dataset 重跑） | $27（不開 thinking）~ $58（開 thinking） | **$0**（重掃 `airesponses`，見 §6.3） |
-| 取得 per-category 信心值 | 只能請模型自評，**未校準** | 原生 calibrated |
-
-上線後只要調過兩三次閾值，省下的重跑費用就超過單價差距。
+| 取得 per-category 信心值 | 只能請模型自評，**未校準**，不適合當 gate | 原生 calibrated，直接可用 |
+| 調整一次閾值（對 17K dataset 重跑） | $27 ~ $58 | $3.2，或 **$0**（重掃 `airesponses`，見 §6.3） |
 
 > [!NOTE]
-> **結論：成本比較沒有結論。** 兩個方案每月都是數十美元以內，
-> 選型應由 **per-category precision / recall** 決定，而不是單價。
+> **結論：Jev 在成本上明顯勝出（便宜 8~30 倍，且可能全在免費額度內），
+> 但兩者的絕對金額都小到不足以單獨決定選型。**
+> 真正該決定的仍是 **per-category precision / recall**——
+> 只是現在「Jev 比較貴」這個可能的反對理由已經排除了。
 
 ## 5. Confidence gate 的校準流程
 
@@ -383,7 +430,12 @@ Jev 每次回傳 N 個機率，但只有超過閾值的會進 `articleCategories
 - `articleCategories` 只存過閾值的結果，維持 `aiModel` = Jev 回傳的 `model`（如 `jev-1.13.0`）、
   `aiConfidence` = 該題的 noul 原值。
 
-如此一來，調整閾值只要重掃 `airesponses`，不必再花一毛推論費用。
+如此一來，調整閾值只要重掃 `airesponses`，不必重跑推論。
+
+> [!NOTE]
+> 在 §4.1 的單價下，重跑 17K dataset 只要 $3.2，所以這個設計的理由**不是省錢**，
+> 而是：可重現（同一批分數重複比較）、快（不必等數千次 API 呼叫）、
+> 以及保留 production 上每篇訊息的完整機率分布供日後分析。
 
 ### 6.4 Category 清單的取得
 
@@ -430,13 +482,16 @@ worker 版本是每次分類都打一次 GraphQL `ListCategories(first: 50)`。
    且 `aiModel` / `aiConfidence` 欄位在 rumors-api 已經存在，落地成本極低。
 2. **Context window 不是問題**：N=20 的問題區約 3.3k~5.3k tokens，
    一般訊息遠低於上限；只有超長影音逐字稿需截斷處理。**不需要分批呼叫**。
-3. **成本不是問題**：即使取最保守的單價假設，每月也在數十美元以內，
-   比 2021 年常駐 GPU host 便宜 1~2 個數量級。
+3. **成本不是問題**：Jev 的 input $0.042/M、output 免費，
+   每篇僅 $0.000189，Cofacts 的量級**大機率全在每日免費額度內**；
+   比 2021 年常駐 GPU host 便宜約 3 個數量級，也比 Gemini 方案便宜 8~30 倍。
+   唯一要編預算的是一次性回填 28 萬筆舊訊息（約 $53）。
 4. **真正的風險是中文準確率**，完全未知，必須實測。
 
 **建議的下一步（成本很低，因為基礎建設都在）：**
 
-1. 在 Cloudflare dashboard 確認 `typesafe/jev` 在本帳號可用，並記下實際單價。
+1. 在 Cloudflare dashboard 確認 `typesafe/jev` 在本帳號可用、驗證 §4.1 的單價，
+   並確認免費額度是否適用（跑一次小量呼叫看 neurons 怎麼計）。
 2. 用 Langfuse 上既有的 17K dataset，跑一次 Jev（N 個 noul）與現行 Gemini 大 prompt 的 A/B，
    比較 **cost、per-category PR 曲線、confusion matrix**——
    這正是 [20250630](../meetings/2025/20250630.md) 訂下的比較基準，指標不必重新發明。
@@ -448,7 +503,10 @@ worker 版本是每次分類都打一次 GraphQL `ListCategories(first: 50)`。
 
 ## 8. 待確認事項
 
-- [ ] `typesafe/jev` 在 Cofacts 的 Cloudflare 帳號是否已啟用？實際單價為何？（dashboard）
+- [ ] `typesafe/jev` 在 Cofacts 的 Cloudflare 帳號是否已啟用？（dashboard）
+- [ ] **驗證 §4.1 的單價**（$0.042/M input、output 免費）——目前來源為口頭，官方文件與 API 皆查不到。
+- [ ] **每日 10,000 Neurons 免費額度是否適用於 third-party partner model？**
+      這決定了即時分類是 $0 還是每月 $2（§4.1.1）。
 - [ ] 目前 `ListCategories` 實際有幾個 category（本文以 N=20 估算）？其中幾個是 AI-only？
 - [ ] 目前每月新增 article 數（本文以 3,000 / 10,000 兩種情境估算）。
       註：2026-09 的 ES reindex 記錄顯示 `articles` index 共 **279,286** 筆（[20260914](../meetings/2026/20260914.md)），
