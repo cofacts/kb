@@ -41,7 +41,9 @@ Article category（主題標籤）自動分類的歷程與 Jev 可行性評估�
 
 - 2021：`rumors-ai-bert` + 若水 ground truth，因需常駐 GPU host 而停用
 - 2025：改以 LLM 實作，程式碼在 [cofacts/worker](https://github.com/cofacts/worker) PR #1 / #3，benchmark 未結案、尚未上線
-- 2026：評估 Cloudflare Workers AI 的 `typesafe/jev`（每個 category 一題 noul，取得 calibrated 機率後訂 precision-recall gate）
+- 2026：評估 Cloudflare Workers AI 的 `typesafe/jev`（每個 category 一題 noul，取得 calibrated 機率後訂 precision-recall gate）；
+  同時決定**放棄 cofacts/worker 路線**——classifier 直接做在 rumors-api 的 `CreateArticle` / `CreateMediaArticle`，
+  url-resolver 維持現有 gRPC 寫法
 
 ### [Design] Langfuse LLM observability
 

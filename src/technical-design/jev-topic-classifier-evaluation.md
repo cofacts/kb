@@ -89,9 +89,35 @@ Jev 這種「給定 state + typed questions、回傳 calibrated probability」�
 用 `gemini-3-flash-preview`，透過 GraphQL 取 `GetArticle.text` 與 `ListCategories(first: 50)`，
 要求回傳 `{ categoryIds: string[], reasoning: string }`，再逐一呼叫 `CreateArticleCategory`。
 
+### 1.5 2026-09：放棄 cofacts/worker，改為 rumors-api 直接呼叫
+
+本文撰寫時（2026-09）做出的決定：
+
+- **classifier 不走 cofacts/worker**，直接在 rumors-api 的 `CreateArticle` / `CreateMediaArticle` 呼叫 Jev。
+- **url-resolver 也不搬去 worker**，維持現狀：rumors-api 透過 gRPC（`URL_RESOLVER_URL`、`src/util/grpc.js`）
+  呼叫 [cofacts/url-resolver](https://github.com/cofacts/url-resolver)，並以 `urls` index 作 cache
+  （見 `src/util/scrapUrls.js`）。
+- 因此 [worker#2](https://github.com/cofacts/worker/issues/2)、[worker#3](https://github.com/cofacts/worker/pull/3)
+  的路線整個停用，2025-11 的實作路徑不再採用。
+
+判斷依據：
+
+1. **Jev 不需要 Workers runtime。** `env.AI.run()` 只是 binding 的糖，
+   Workers AI 另有 REST endpoint（`POST /accounts/{id}/ai/run` + Bearer token），
+   任何 Node 程式都能呼叫。「用 Jev」與「跑在 Cloudflare 上」是兩件事。
+2. **當初選 Workflow 的理由消失了。** [20250623](../meetings/2025/20250623.md) 選 Cloudflare Workflow，
+   是為了 Gemini / o4-mini 的 **batch API**：要打包檔案、要 polling、要等數分鐘到數小時，
+   才需要 durable execution。Jev 是一次同步呼叫、輸出僅數百 token，
+   為單一 HTTP request 架 Workflow 不成比例——[20250722](../meetings/2025/20250722.md)
+   自己也檢討過「有點 over-engineer，單一 article 要分類會簡單很多」。
+3. **Langfuse 已經在 rumors-api 裡**（`langfuse@3.32.0`、`src/util/langfuse.ts`），
+   分類器的 trace 可與 AI reply、transcript 放在同一個 project 下比較成本；worker 則要另外接一次。
+4. **rumors-api 有地方存原始分數**：既有的 `airesponses` index 與 `createAIResponse()`
+   可以存下 Jev 回傳的 N 個機率（見 §6.3），這是 worker 那條路沒有的。
+
 > [!IMPORTANT]
-> 也就是說，本次要評估的 Jev **不是一個新專案，而是既有 workflow 裡 step 2 的替代實作**。
-> 這讓導入成本低很多：資料集、pipeline、寫回機制、實驗場（Langfuse）都已經存在。
+> 本文其餘部分（資料集、confidence gate 校準方式、成本試算）不受這個決定影響——
+> 那些都是模型層的問題。改變的只有 §6「掛載方式」。
 
 ## 2. 現有可用資產
 
@@ -101,8 +127,10 @@ Jev 這種「給定 state + typed questions、回傳 calibrated probability」�
 | Script 1 / Script 2 | `rumors-api/src/scripts/genCategoryReview.js`、`genBERTInputArticles.js` | 持續從網友 feedback 產生新 ground truth |
 | `aiModel` / `aiConfidence` 欄位 | `rumors-api/src/graphql/mutations/CreateArticleCategory.js` | **已存在**，可直接寫入 Jev 的 noul 機率，不需 schema migration |
 | Category feedback 機制 | `CreateOrUpdateArticleCategoryFeedback` | 線上持續回收 precision 訊號 |
-| Workflow 骨架 | `cofacts/worker` PR#3 | 直接替換 step 2 |
-| Langfuse | `langfuse.cofacts.tw` | 成本 / 準確率比較 |
+| Langfuse SDK | `rumors-api` 已裝 `langfuse@3.32.0`、`src/util/langfuse.ts` | 成本 / 準確率比較、線上 trace |
+| `airesponses` index + `createAIResponse()` | `rumors-api/src/graphql/util.js` | 存 Jev 回傳的 N 個原始機率 |
+| Prompt / 分類定義 | [Cofacts 標籤定義](../research/cofacts-標籤定義.md) | 轉成 noul 問題的 `instructions` / `criteria` |
+| 參考實作 | [worker#3 `article-classifier.ts`](https://github.com/cofacts/worker/pull/3/files)（已停用） | GraphQL 取資料與寫回的邏輯可搬 |
 
 ## 3. Jev 適配性分析
 
@@ -261,45 +289,88 @@ Workers AI 的計價基礎為 **Neurons，$0.011 / 1,000 Neurons，每日前 10,
 `CreateMediaArticle` 已有現成範例可循：AI 逐字稿的寫入就是
 「失敗只 `console.warn`、不影響 mutation 回傳」的 fire-and-forget 模式。
 
-### 6.2 建議架構：延續既有共識，不要在 rumors-api 直接呼叫 Jev
-
-[20251111](../meetings/2025/20251111.md) 已定案「worker 提供 HTTP endpoint、rumors-api 射後不理」，
-建議維持：
+### 6.2 架構：rumors-api 直接呼叫 Workers AI REST API
 
 ```
 CreateArticle / CreateMediaArticle
-  └─ (fire-and-forget) POST https://worker.../classify  { articleId }
-        └─ Cloudflare Workflow: article-classifier
-             step 1: GetArticle + ListCategories (GraphQL)
-             step 2: env.AI.run('typesafe/jev', { state, questions })   ← 本次評估的替換點
-             step 3: 套 per-category 閾值 → CreateArticleCategory(aiModel, aiConfidence)
+  └─ (fire-and-forget) classifyArticle({ articleId, text })
+       ├─ 取 categories（本地 cache，見 6.4）
+       ├─ POST https://api.cloudflare.com/client/v4/accounts/{id}/ai/run
+       │    { model: 'typesafe/jev', input: { state, questions } }
+       ├─ createAIResponse({ type: 'CATEGORY' })  ← 存下 N 個原始機率
+       └─ 對每個 noul ≥ 該 category 閾值者：
+            createArticleCategory({ articleId, categoryId, user, aiModel, aiConfidence })
 ```
 
-理由：
+需要的改動：
 
-- 重試、平行化、durable execution 由 Cloudflare Workflow 負責，rumors-api 不必處理。
-- category 系列本來就與 API 拆開（2021 的 rumors-ai 即如此，[20250630](../meetings/2025/20250630.md) 也重申）。
-- 未來要改成 batch 或換模型，不需動 rumors-api。
+1. **`src/util/jev.ts`**：包裝 Workers AI REST 呼叫。
+   - 環境變數 `CLOUDFLARE_ACCOUNT_ID`、`CLOUDFLARE_AI_API_TOKEN`
+     （`.env.sample` 已有 `CLOUDFLARE_ACCESS_TEAM_DOMAIN` 的前例）。
+   - **未設定時整個功能 no-op**，本地開發與 CI 不受影響（比照現有 AI 功能的寫法）。
+   - 設定 timeout（建議 30s）與 `AbortController`，不可讓 promise 無限掛著。
+   - 用 `src/util/langfuse.ts` 包一層 trace，沿用既有 observability。
+2. **`src/util/classifyArticle.ts`**：組 questions、呼叫 Jev、套閾值、寫回。
+   - 閾值表（per-category）建議放程式碼常數或設定檔並版本控管，
+     每次調整都要能對應到一次 benchmark。
+3. **`CreateArticle.js`**：在 `newArticlePromise` resolve 且 `result === 'created'` 時呼叫，
+   **不加入最後的 `Promise.all`**——比照既有的 `archiveUrlsFromText(text)` 寫法。
+4. **`CreateMediaArticle.js`**：掛在 `writeAITranscript()` 成功之後
+   （逐字稿寫入後才有文字可分類），包在既有的 `.catch(e => console.warn(...))` 之內。
+5. **`src/scripts/classifyArticles.ts`**（見 6.5）：補跑用的 batch script。
 
-rumors-api 端需要的改動很小：
+### 6.3 把原始機率存成 `AIResponse`
 
-1. 新增 `util/classifyArticle.js`：一個 fire-and-forget 的 POST（帶 Cloudflare Zero Trust service token）。
-2. `CreateArticle.js`：在 `newArticlePromise` resolve 後呼叫，**不加入最後的 `Promise.all`**
-   （比照 `archiveUrlsFromText(text)` 的既有寫法）。
-3. `CreateMediaArticle.js`：在 `writeAITranscript` 成功之後呼叫（逐字稿寫入後才有文字可分類），
-   同樣包在既有的 `.catch(e => console.warn(...))` 之內。
-4. 環境變數：`CLASSIFIER_WORKER_URL`、service token；未設定時整段 no-op（本地開發／測試不受影響）。
+Jev 每次回傳 N 個機率，但只有超過閾值的會進 `articleCategories`。
+**其餘的分數若不留下，日後每次調閾值都得重跑推論**——這會抵銷掉選 Jev 的最大好處。
 
-### 6.3 邊界情況
+建議：
 
-- **媒體訊息去重**：`createNewMediaArticle` 遇到相同 `attachmentHash` 會回傳既有 article，
-  此時不該重複分類 → 需要能區分「新建」與「命中既有」（`CreateArticle` 已有 `result === 'created'` 可用，
-  media 端需另外判斷）。
-- **逐字稿失敗**：`aiResponse` 為空時 media article 的 `text` 為空字串，**不可送去分類**。
-- **空文字 / 純網址訊息**：交給「只有網址其他資訊不足」這個既有分類處理，
-  或在 worker 端直接短路。
-- **spam / takedown**：已被下架的訊息不必分類。
-- **不要阻塞 mutation**：LINE bot 的使用者在等回應，分類延遲數秒是可接受的（本來就是事後才顯示）。
+- `AIResponseTypeEnum` 新增 `CATEGORY`（現有為 `AI_REPLY`、`TRANSCRIPT`）。
+- 用既有的 `createAIResponse()` 把整包 `answers`（N 個 `noul` 值）與 `usage`
+  存進 `airesponses` index，`docId` 用 articleId。
+- `articleCategories` 只存過閾值的結果，維持 `aiModel` = Jev 回傳的 `model`（如 `jev-1.13.0`）、
+  `aiConfidence` = 該題的 noul 原值。
+
+如此一來，調整閾值只要重掃 `airesponses`，不必再花一毛推論費用。
+
+### 6.4 Category 清單的取得
+
+worker 版本是每次分類都打一次 GraphQL `ListCategories(first: 50)`。
+在 rumors-api 內不必如此——直接讀 `categories` index 並在 process 內 cache
+（categories 幾乎不變動，TTL 設 1 小時即可）。
+若 category 有增刪，閾值表也必須跟著更新，因此**建議把「新增 category」視為一次需要重新 benchmark 的變更**。
+
+### 6.5 補跑機制（取代 Workflow 的 durable execution）
+
+放棄 Cloudflare Workflow 後，失去的是自動重試與跨 process 重啟的持久性。
+補救方式是一支 script，而**這支 script 本來就必須存在**：
+既有訊息（~28 萬筆）、新增的 category、Jev 呼叫失敗的訊息、閾值調整後的重算，都需要它。
+
+- `src/scripts/classifyArticles.ts`
+  - 條件：`articleCategories` 中沒有 `aiModel` 符合目前 Jev 版本者
+  - 支援 `--from` / `--limit` / `--dry-run`，並用 `getAllDocs` 掃 ES（既有 util）
+  - 併發上限（建議 5~10）以避開 Workers AI 的 rate limit
+- 以 cron 每日跑一次，即可涵蓋所有 fire-and-forget 漏掉的案例。
+
+> [!NOTE]
+> 這是刻意的取捨：用「即時呼叫 + 每日補跑」取代「durable workflow」。
+> 對一個結果本來就非即時呈現的功能而言，這個一致性等級足夠。
+
+### 6.6 邊界情況與注意事項
+
+- **`createArticleCategory` 目前沒有 `retry_on_conflict`**
+  （`src/graphql/mutations/CreateArticleCategory.js` 的 painless script update）。
+  它與 `createOrUpdateReplyRequest`、`updateArticleHyperlinks` 都在更新同一份 article doc，
+  射後不理的分類呼叫進來後衝突機率上升。
+  **應比照 `writeAITranscript()` 的 `retry_on_conflict: 3` 補上**，否則會出現隨機失敗。
+- **媒體訊息去重**：`createNewMediaArticle` 命中相同 `attachmentHash` 時回傳既有 article，
+  此時不該重複分類。`CreateArticle` 有 `result === 'created'` 可判斷，**media 端目前沒有，要另外加**。
+- **逐字稿失敗**：`aiResponse` 為空時 media article 的 `text` 是空字串，不可送去分類。
+- **空文字 / 純網址訊息**：在 `classifyArticle` 內短路（例如 text 長度 < 10），省下呼叫費用。
+- **spam / takedown**：`status` 非 `NORMAL` 的訊息不必分類。
+- **併發與 rate limit**：尖峰時多篇同時進來需節流（process 內 queue 或 concurrency limit）。
+- **不要阻塞 mutation**：LINE bot 使用者在等回應，分類延遲數秒完全可接受。
 
 ## 7. 結論與建議
 
@@ -319,8 +390,10 @@ rumors-api 端需要的改動很小：
    比較 **cost、per-category PR 曲線、confusion matrix**——
    這正是 [20250630](../meetings/2025/20250630.md) 訂下的比較基準，指標不必重新發明。
 3. 若 Jev 的 per-category precision 在合理 recall 下可達 0.9，
-   就把 worker#3 的 step 2 換成 Jev，並補上 per-category 閾值表。
-4. 最後才在 `CreateArticle` / `CreateMediaArticle` 掛上 fire-and-forget 呼叫。
+   就在 rumors-api 實作 `util/jev.ts` + `util/classifyArticle.ts`，並補上 per-category 閾值表。
+4. 先做 `src/scripts/classifyArticles.ts` 與 `CATEGORY` 型 AIResponse，用 `--dry-run` 在小量 production 資料上驗證。
+5. 最後才在 `CreateArticle` / `CreateMediaArticle` 掛上 fire-and-forget 呼叫，
+   並記得補 `createArticleCategory` 的 `retry_on_conflict`。
 
 ## 8. 待確認事項
 
@@ -330,5 +403,8 @@ rumors-api 端需要的改動很小：
       註：2026-09 的 ES reindex 記錄顯示 `articles` index 共 **279,286** 筆（[20260914](../meetings/2026/20260914.md)），
       但這是累積值，不是流量。
 - [ ] 2021 年 BERT GPU host 的實際月費與停用時間點（kb 內未記載）。
-- [ ] [worker#3](https://github.com/cofacts/worker/pull/3) 停在哪裡？2025 年那份一直沒結案的 benchmark 結果是否存在？
+- [ ] 2025 年那份一直沒結案的 benchmark 結果是否存在？（可作為 Jev 的對照組）
+- [ ] [cofacts/worker](https://github.com/cofacts/worker) repo 與 [worker#3](https://github.com/cofacts/worker/pull/3)、
+      [worker#2](https://github.com/cofacts/worker/issues/2) 要關閉 / archive 還是留著？
+      （url-resolver 確定維持現有 gRPC 寫法，classifier 改進 rumors-api，worker 已無待辦）
 - [ ] 第三方模型的資料處理條款是否可接受（<https://docs.typesafe.ai/legal.md>）。
