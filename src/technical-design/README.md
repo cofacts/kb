@@ -14,6 +14,7 @@ timestamp: "2026-06-24T00:00:00+08:00"
 > [!TIP]
 > Latest design docs first
 
+- [以 Jev 實作 Cofacts Topic Classifier 之可行性評估](jev-topic-classifier-evaluation.md)
 - [Authentication](cofacts.ai/Authentication.md)
 - [Cofacts ListArticles 混合搜尋架構設計](cofacts.ai/Cofacts%20ListArticles%20混合搜尋架構設計.md)
 - [ES v6 to v9 升級計畫](cofacts.ai/ES%20v6%20to%20v9%20升級計畫.md)
