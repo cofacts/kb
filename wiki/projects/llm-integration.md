@@ -3,7 +3,7 @@ type: Project
 title: "LLM 整合"
 description: "Cofacts 逐步將 LLM 引入查核流程的設計與研究歷程，從 ChatGPT 使用情境探索到 MCP server 與 Langfuse 可觀測性。"
 tags: [cofacts, llm, chatgpt, mcp, langfuse, ai]
-timestamp: "2026-06-25T00:00:00+08:00"
+timestamp: "2026-09-22T17:01:00+08:00"
 ---
 
 ## 背景
@@ -32,6 +32,16 @@ Cofacts 的 LLM 整合分為兩個軸線：
 [src/technical-design/chatgpt-integration.md](../../src/technical-design/chatgpt-integration.md)
 
 上述研究的工程設計文件，說明 ChatGPT 整合的具體實作方式。
+
+### [Design] Topic Classifier：從 BERT 到 LLM
+
+[src/technical-design/jev-topic-classifier-evaluation.md](../../src/technical-design/jev-topic-classifier-evaluation.md)
+
+Article category（主題標籤）自動分類的歷程與 Jev 可行性評估：
+
+- 2021：`rumors-ai-bert` + 若水 ground truth，因需常駐 GPU host 而停用
+- 2025：改以 LLM 實作，程式碼在 [cofacts/worker](https://github.com/cofacts/worker) PR #1 / #3，benchmark 未結案、尚未上線
+- 2026：評估 Cloudflare Workers AI 的 `typesafe/jev`（每個 category 一題 noul，取得 calibrated 機率後訂 precision-recall gate）
 
 ### [Design] Langfuse LLM observability
 
