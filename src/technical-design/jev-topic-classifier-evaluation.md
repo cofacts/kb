@@ -250,8 +250,59 @@ Workers AI 的計價基礎為 **Neurons，$0.011 / 1,000 Neurons，每日前 10,
 > **Jev 方案比 2021 年的自架 GPU 便宜約 1~2 個數量級，且成本隨訊息量線性變動、閒置時為零。**
 > 成本已經不是這件事的阻礙——**準確率（特別是中文表現）才是**。
 
-另外，即使 Jev 比現行 `gemini-3-flash-preview` 方案略貴，
-「原生 calibrated 機率」帶來的可調閾值能力，通常值這個價差。
+### 4.5 與 Gemini「一個大 prompt」方案的對照
+
+對照組是 [worker#3](https://github.com/cofacts/worker/pull/3) 現行實作：`gemini-3-flash-preview`，
+一次 prompt 分辨 N 個 category，輸出 `{ categoryIds, reasoning }`。
+單價為 **$0.25 / M input、$1.50 / M output**
+（[pricepertoken](https://pricepertoken.com/pricing-page/model/google-gemini-3-flash-preview)、
+[BenchLM](https://benchlm.ai/google/api-pricing)，2026-09 查得）。
+
+> [!IMPORTANT]
+> **以下一律用原價計算，不計入 context caching。**
+> 雖然 category 定義區（~4,000 tokens）每篇都相同、理論上是理想的 cache 前綴，
+> 但本設計是「每篇訊息進來就即時分類」，訊息零星抵達，
+> 而 implicit cache 的存活時間是分鐘級——**大多數呼叫都會 cache miss**。
+> 要讓 cache 生效必須累積一批再一起跑，那就繞回 [20250722](../meetings/2025/20250722.md) 否決掉的 batch 設計。
+
+兩者 input 皆為 ~4,500 tokens（category 區 ~4,000 + 本文 ~500）：
+
+| 方案 | output tokens | 每篇 | 每月 3,000 篇 | 每月 10,000 篇 |
+|---|---|---|---|---|
+| **Gemini 3 Flash**，短 reasoning | ~300 | $0.00158 | **$4.7** | **$15.8** |
+| **Gemini 3 Flash**，中等 reasoning | ~600 | $0.00203 | **$6.1** | **$20.3** |
+| **Gemini 3 Flash** + thinking | ~1,500 | $0.00338 | **$10.1** | **$33.8** |
+| **Gemini 3 Flash** + 較長 thinking | ~3,000 | $0.00563 | **$16.9** | **$56.3** |
+| Jev（下界 $0.10/$0.30） | ~250 | $0.00053 | $1.6 | $5.3 |
+| Jev（中間 $0.35/$0.75） | ~250 | $0.00176 | $5.3 | $17.6 |
+| Jev（上界 $0.95/$4.00） | ~250 | $0.00528 | $15.8 | $52.8 |
+
+三點觀察：
+
+1. **Gemini 的 input 成本是寫死的地板**：4,500 × $0.25/M = **$0.001125/篇**，
+   佔不開 thinking 時總成本的 71%。Jev 要比它便宜，input 單價必須低於 $0.25/M。
+2. **變數幾乎全在 output**。Gemini 從短 reasoning 到開 thinking 差 2.1 倍
+   （且 [20250623](../meetings/2025/20250623.md) 記到「thinking token 會算在 max output token 裡」）；
+   Jev 每題只吐一個數字，output 基本上是常數。
+   Jev 的中間情境與 Gemini 幾乎打平（$5.3 vs $4.7），**上界則比開 thinking 的 Gemini 更貴**。
+3. **兩者都落在每月 $5~$50 之間**，差距對 Cofacts 的預算無意義。
+
+而且 Gemini 版本的 reasoning **不能為了省錢而砍掉**——
+[20250722](../meetings/2025/20250722.md) 的結論是「reason 應該放在 category 之前才有 CoT 之效」，
+那段 output 是刻意要的。
+
+**真正的成本差異不在單次推論，而在重跑：**
+
+| 動作 | Gemini | Jev |
+|---|---|---|
+| 調整一次閾值（需對 17K dataset 重跑） | $27（不開 thinking）~ $58（開 thinking） | **$0**（重掃 `airesponses`，見 §6.3） |
+| 取得 per-category 信心值 | 只能請模型自評，**未校準** | 原生 calibrated |
+
+上線後只要調過兩三次閾值，省下的重跑費用就超過單價差距。
+
+> [!NOTE]
+> **結論：成本比較沒有結論。** 兩個方案每月都是數十美元以內，
+> 選型應由 **per-category precision / recall** 決定，而不是單價。
 
 ## 5. Confidence gate 的校準流程
 
