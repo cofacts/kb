@@ -1,6 +1,7 @@
 # Cofacts 會議記錄
 
 ## 2026
+- [0922 url-resolver Threads修復、cofacts.ai 125s修復確認、relatedArticles誤導分析、資料subagent研究、Langfuse v4規劃、文章分類器、十月小聚籌備、Production週報](./2026/20260922.md)
 - [0914 Threads oEmbed與url-resolver、vector search DB schema上線、「我送出的訊息」與隱私決策回顧、/report placeholder accessibility、cofacts.ai 125s中斷與佐證幻覺、十月小聚場地、AI eval評分、Production週報](./2026/20260914.md)
 - [0910 Cofacts.ai回報入口設計調整、URL resolver進度、User-level memory研究與Memory Bank採用、GCE磁碟清理與Production週報](./2026/20260910.md)
 - [0901 URL resolver進cofacts.ai、Hybrid search與vector search、cofacts.ai收謠言與前端skill、Log retention調查結果與GCS sink、Cloudflare Analytics retention、Production週報](./2026/20260901.md)
