@@ -3,7 +3,7 @@ type: DesignDoc
 title: "Cofacts.ai Phase 3：網站遷移與前端架構"
 resource: "https://github.com/cofacts/kb/blob/main/src/technical-design/cofacts.ai/Phase%203%20網站遷移與前端架構.md"
 tags: [cofacts, design-docs, technical-design, cofacts.ai, frontend, design-system, accessibility]
-timestamp: "2026-09-28T00:00:00+08:00"
+timestamp: "2026-09-28T12:00:00+08:00"
 ---
 
 # Cofacts.ai Phase 3：網站遷移與前端架構
@@ -26,12 +26,12 @@ timestamp: "2026-09-28T00:00:00+08:00"
 
 本文提出：
 
-1. **網址（§2）**：rumors-site 既有 path 全部沿用；AI 功能收進 `/ai/*`；列表頁的 search param 改成小寫、可讀、有白名單的新格式，舊格式照收並 redirect 到新格式。
+1. **網址（§2）**：URL 總表依分工區塊分組。rumors-site 既有 path 全部沿用；AI 功能收進 `/ai/*`；列表頁的 search param 改成小寫、可讀、有白名單的新格式，舊格式照收並 redirect 到新格式。語系用 lingui，依 host 切換。
 2. **元件（§3）**：分四層，由下而上是 shadcn（Base UI）primitives、Cofacts 領域元件、feature 元件、route。**Penpot 元件路徑 = 程式元件 = Storybook title**，三邊名字一致。
 3. **Storybook（§4）**：元件層每個 Penpot variant 一個 story，頁面層每個 Penpot board（含狀態板）一個 scenario。light/dark × 375/1440 全跑 axe。
 4. **Penpot ↔ Tailwind（§5）**：規則是「**Penpot token 去掉角色前綴就是 Tailwind class**」，例如 `surface-raised` → `bg-raised`、`text-secondary` → `text-secondary`、`border-control` → `border-control`、`spacing-16` → `p-16`、`RADIUS-5` → `rounded-5`、font size `16` → `text-16`。Tailwind 預設色盤整個關掉，原始色不做成 utility，所以 `text-gray-400`、`text-accent`（品牌黃當字）、`text-15` 這類 class **根本編譯不出來**。已用 Tailwind 4.2.0 實測。
 5. **無障礙（§6）**：指南四條規則中，R2（品牌黃不當字）與 R3（只用語意名）靠 token 設計在建構時就擋掉，R1（狀態要有文字）靠元件擋，R4（底色與前景配套）靠 dark 主題的 axe 測試抓。這些規則寫成 `cofacts/ai` 的 repo-level skill `cofacts-frontend`，做前端時自動載入。
-6. **分工（§8）**：依 WG 提出的框架，共 0 + 5 塊。另外補上漏掉的兩件事：「App shell 與共用領域元件」歸入第 0 塊；「上線切換（routing、redirect、RSS、SEO、GTM）」獨立成第 6 塊。
+6. **分工（§8）**：0（WG 基礎）＋ 1 列表、2 單一訊息與回應、3 回報、4 Infographics、5 AI chat，另加 6 上線切換。§8 談規模與人力建議。**切換前必須讓 Cloudflare 的 HTML cache rule 排除 session cookie**（§2.6）。
 
 ---
 
@@ -67,7 +67,7 @@ cofacts/ai 目前的前端狀況（Phase 3 要一併處理）：
 
 - ADK agent 行為調整（`adk/`）。唯一例外是 AI 頁面 URL 搬家可能要改的地方（目前評估不需要）。
 - rumors-api schema 的大改動。個別頁面需要的小欄位另開 PR。
-- 新增 en / ja 版本（見 §9 Q1）。
+- en / ja 的翻譯內容本身。Phase 3 只把 i18n 機制建好、把文案抽成 key（§2.5）。
 
 ---
 
@@ -81,55 +81,85 @@ cofacts/ai 目前的前端狀況（Phase 3 要一併處理）：
 4. **query 值要可讀、有白名單**：未知的 param 忽略，不合法的值退回預設，**任何輸入都不能讓頁面 crash**（rumors-site 的 `/search?type=messages` 沒帶 `q`、`/tutorial?tab=xxx` 都會 crash）。
 5. **預設值不寫進 URL**，空值不留（rumors-site 會留下 `?filters=&types=`）。
 6. **舊網址、舊 param 照收**，再轉到新格式：path 層級用 HTTP 301/308（SSR 做得到）；只有 query 格式不同時，由 route 的 `beforeLoad` 丟出 `redirect({ search, replace: true })`。
-7. **不加 locale 前綴**（見 §9 Q1）。
+7. **不加 locale 前綴**，語系由 host 決定（§2.5）。
 8. 預留的頂層 namespace：`/ai`、`/api`、`/report`、`/storybook`（若要自架）。
 
-### 2.2 URL 總表
+### 2.2 URL 總表（依分工區塊）
 
-圖例：🟢 沿用；🔵 新增；🟠 沿用 path 但 query 改版；🔴 退場或 redirect。
+圖例：
+- 狀態：🟢 沿用；🔵 新增；🟠 沿用 path 但 query 改版；🔴 退場或 redirect。
+- **❌ 無稿**：Penpot 沒有這頁的設計。**工程師以 Penpot `Guide` 頁為範例**（它示範了既有頁面怎麼套上新元件與新 token），用新元件自行拼湊，不等新稿。
 
-**公開內容（由 rumors-site 遷移）**
+各塊的規模觀察與人力建議見 §8。
+
+#### 塊 0　基礎（WG）：全站共用與系統路由
+
+| URL | 頁面 / 用途 | Penpot | 狀態 | 備註 |
+|---|---|---|---|---|
+| （全站） | App shell：`Layout/Nav`（Default / login / search / AI 四種）、mobile 選單、`Layout/Footer`、登入 modal、header 搜尋 | ✅ UI system | 🔵 | 各塊都依賴它 |
+| （全站） | 語系判定（§2.5） | — | 🔵 | server 依 host 決定 locale |
+| `/api/auth/callback?code&state` | OAuth callback（Phase 2） | — | 🟢 | |
+| `/api/run-sse` | ADK 串流 proxy | — | 🟢 | |
+| 404 / 500 | 錯誤頁（rumors-site 沒有自訂頁） | ❌ 無稿 | 🔵 | |
+
+#### 塊 1　列表：列表、篩選與 URL params
 
 | URL | 頁面 | Penpot | 狀態 | 備註 |
 |---|---|---|---|---|
-| `/` | 首頁（landing） | ❌ 無新稿 | 🟢 | 移植現有設計，JSS 改寫成 Tailwind / CSS Modules（§3.6） |
-| `/articles` | 可疑訊息列表 | `Doubious Message-1440` / `-Mobile` | 🟠 | 列表 param 見 §2.3 |
-| `/replies` | 最新查核 | `Latest replies` / `/ Mobile`，另有「選單展開示意」「篩選器手機版」 | 🟠 | 同上 |
-| `/hoax-for-you` | 等你來答 | ❌（推測沿用 Doubious Message 版型） | 🟠 | 只收 `topic`、時間參數 |
-| `/search?q=…&type=messages\|replies` | 搜尋 | ❌ 無新稿 | 🟠 | `type` 沿用；少了 `q` 時顯示空狀態，不 crash |
-| `/article/:id` | 單一訊息 | `MessagePage-1440` / `MessagePage-原始訊息`（mobile） | 🟢 + 🔵 hash | 新增區塊錨點，見 §2.4 |
-| `/article/:id/reply/new` | 撰寫新回應（全頁編輯器） | `Message-editor-Write Response…` ×6 | 🔵 | 設計師把編輯器改成獨立頁面層級（有 `Layout/ExitEditor`）。裡面的 3 個分頁（撰寫回應 / 原始訊息 / 不同意見出處）是表單內狀態，不進 URL |
-| `/article/:id/reply/existing` | 使用既有回應 | `Message-editor-Use Existing Response` ×2 | 🔵 | ❓Q4 |
-| `/reply/:id` | 單一回應 | ❌ 無新稿 | 🟢 | |
-| `/user/:slug` | 個人頁 | ❌ 無新稿 | 🟢 | 改用 SSR 301 canonicalize，不再用 client `router.replace`（現行會吃掉 `?tab=`） |
-| `/user?id=:userId` | 個人頁（沒有 slug 的使用者） | ❌ | 🟢 | 使用者有 slug 時 301 到 `/user/:slug`，並保留其他 query |
-| `/tutorial?tab=bust-hoaxes\|check-rumors` | 使用教學 | `Guide how-1440` | 🟢 | 不合法的 `tab` 退回預設；修掉站內的錯字連結 `/tutorial?bust-hoaxes` |
-| `/about` | Cofacts 是什麼 | `Guide what-1440` | 🟢 | 設計師註記：「目前僅針對主要樣式套上新的設計系統，原本的教學內容無更動」 |
-| `/impact` | 社會影響力報告 | ❌ | 🟢 | 現在不在 AppLayout 裡（沒有 header/footer），❓Q6 |
-| `/terms` | 使用者條款 | ❌ | 🟢 | 從 `LEGAL.md` 轉換（build-time 即可） |
-| `/instant` | 已退役的 stub | — | 🔴 | 302 到 community builder，或保留 stub |
-| `/api/articles/:feed?json=…&source=…` | RSS / Atom / JSON feed | — | 🟢（**格式必須相容**） | `json` 是 LZMA 壓縮的 GraphQL variables，訂閱者都依賴它。新版仍須解得開舊 `json`；新的訂閱 UI 可改產生可讀 param（❓Q5） |
+| `/articles` | 可疑訊息列表 | ✅ `Doubious Message-1440` / `-Mobile` | 🟠 | param 見 §2.3 |
+| `/replies` | 最新查核 | ✅ `Latest replies` / `/ Mobile`、「選單展開示意」「篩選器手機版」 | 🟠 | |
+| `/hoax-for-you` | 等你來答 | ❌ 無稿（套 `Doubious Message` 版型） | 🟠 | 只收 `topic` 與時間參數 |
+| `/search?q=…&type=messages\|replies` | 搜尋 | ❌ 無稿 | 🟠 | `type` 沿用；沒有 `q` 時顯示空狀態，不 crash |
+| `/user/:slug` | 個人頁 | ❌ 無稿 | 🟢 | `tab=replies\|comments`。改用 SSR 301 canonicalize，不用 client `router.replace`（現行會吃掉 `?tab=`） |
+| `/user?id=:userId` | 個人頁（沒有 slug 的使用者） | ❌ 無稿 | 🟢 | 使用者有 slug 時 301 到 `/user/:slug`，並保留其他 query |
 
-**AI 與回報（由 cofacts.ai 搬入）**
+- 個人頁**不**新增「送過的訊息」tab。使用者送過的訊息改由列表的「我送出的」篩選呈現（`status=reported-by-me`，§2.3）。
+
+#### 塊 2　單一訊息與回應
 
 | URL | 頁面 | Penpot | 狀態 | 備註 |
 |---|---|---|---|---|
-| `/ai` | 新查核任務（AI landing） | `AI-open page-1440` / `-Mobile` | 🔵（原為 cofacts.ai 的 `/`） | 新增 `?article=:articleId`：從訊息頁的「我要查核闢謠」「引用 AI 查核」帶入文章開新 session |
-| `/ai/session/:sessionId` | 查核對話 | `AI-main page` / `-Mobile` / `-Mobile-Draft` | 🔵 | ❓Q3 路徑命名 |
-| `/ai/session/:sessionId/tool/:toolCallId` | 對話加右側工具抽屜 | 同上 | 🔵 | 保留現行「抽屜狀態在 URL 裡」的設計 |
-| `/session/*`（cofacts.ai 舊網址） | — | — | 🔴 301 → `/ai/session/*` | |
-| `cofacts.ai/*` | — | — | 🔴 301 → `cofacts.tw/ai/*` | 在 Cloudflare 處理 |
-| `/report?url=&text=&title=` | 回報可疑訊息 | `AI` 頁的「回報可疑訊息流程」6 個狀態板 | 🔵（[cofacts/ai#138](https://github.com/cofacts/ai/pull/138)） | 參數是 Web Share Target 的形狀，維持寬鬆解析 |
+| `/article/:id` | 單一訊息 | ✅ `MessagePage-1440` / `MessagePage-原始訊息`（mobile） | 🟢 + 🔵 hash | 區塊錨點見 §2.4 |
+| `/article/:id/reply/new` | 撰寫新回應（全頁編輯器） | ✅ `Message-editor-Write Response…` ×6 | 🔵 | 編輯器裡的 3 個分頁（撰寫回應 / 原始訊息 / 不同意見出處）是表單內狀態，不進 URL |
+| `/article/:id/reply/existing` | 使用既有回應 | ✅ `Message-editor-Use Existing Response` ×2 | 🔵 | |
+| `/reply/:id` | 單一回應 | ❌ 無稿 | 🟢 | |
 
-**系統與基礎**
+#### 塊 3　回報可疑訊息（只收網址）
 
-| URL | 用途 | 狀態 |
-|---|---|---|
-| `/api/auth/callback?code&state` | OAuth callback（Phase 2） | 🟢，上線前要把 `https://cofacts.tw/api/auth/callback` 加進 rumors-api 的 `ALLOWED_CALLBACK_URLS` |
-| `/api/run-sse` | ADK 串流 proxy | 🟢 |
-| `/robots.txt`、`/sitemap.xml` | SEO（rumors-site 從來沒有） | 🔵 建議 |
-| `/analytics`、`/hack` | 現在由 infra 層處理（站內有連結，但 rumors-site 沒有這些頁） | 🟢 沿用 Cloudflare 規則 |
-| 404 / 500 頁 | rumors-site 沒有自訂頁 | 🔵（需要設計稿） |
+| URL | 頁面 | Penpot | 狀態 | 備註 |
+|---|---|---|---|---|
+| `/report?url=&text=&title=` | 回報可疑訊息 | ✅ `AI` 頁的「回報可疑訊息流程」6 個狀態板 | 🔵（[cofacts/ai#138](https://github.com/cofacts/ai/pull/138)） | 參數沿用 Web Share Target 的形狀，維持寬鬆解析；[cofacts/ai#139](https://github.com/cofacts/ai/pull/139) 讓 Android 分享選單可直達 |
+
+#### 塊 4　Infographics（靜態頁）
+
+| URL | 頁面 | Penpot | 狀態 | 備註 |
+|---|---|---|---|---|
+| `/` | 首頁（landing） | ❌ 無稿 | 🟢 | 移植現有設計；JSS 改寫成 Tailwind / CSS Modules（§3.6） |
+| `/tutorial?tab=bust-hoaxes\|check-rumors` | 使用教學 | ✅ `Guide how-1440` | 🟢 | 不合法的 `tab` 退回預設；修掉站內的錯字連結 `/tutorial?bust-hoaxes` |
+| `/about` | Cofacts 是什麼 | ✅ `Guide what-1440` | 🟢 | 設計師註記：「目前僅針對主要樣式套上新的設計系統，原本的教學內容無更動」 |
+| `/impact` | 社會影響力報告 | ❌ 無稿 | 🟢 | rumors-site 的版本沒有 header / footer；新版建議納入全站 shell |
+| `/terms` | 使用者條款 | ❌ 無稿 | 🟢 | 由 `LEGAL.md` 轉換（build-time 即可） |
+| `/instant` | 已退役的 stub | — | 🔴 | 302 到 community builder |
+
+#### 塊 5　AI chat
+
+| URL | 頁面 | Penpot | 狀態 | 備註 |
+|---|---|---|---|---|
+| `/ai` | 新查核任務 | ✅ `AI-open page-1440` / `-Mobile` | 🔵（原 cofacts.ai 的 `/`） | 新增 `?article=:articleId`：從訊息頁的「我要查核闢謠」「引用 AI 查核」帶入文章開新 session |
+| `/ai/session/:sessionId` | 查核對話 | ✅ `AI-main page` / `-Mobile` / `-Mobile-Draft` | 🔵 | 預留 `/ai/settings` 等子頁 |
+| `/ai/session/:sessionId/tool/:toolCallId` | 對話加右側工具抽屜 | 同上 | 🔵 | 保留「抽屜狀態在 URL 裡」的現行設計 |
+
+#### 塊 6　上線切換：redirect、相容與 infra（WG）
+
+| URL | 用途 | 狀態 | 備註 |
+|---|---|---|---|
+| `cofacts.ai/*` | 舊網域 | 🔴 301 → `cofacts.tw/ai/*` | 在 Cloudflare 處理 |
+| `/session/*` | cofacts.ai 舊路徑 | 🔴 301 → `/ai/session/*` | |
+| 各列表的舊 query（`filters=`、`types=`…） | 舊 bookmark | 🟠 | `normalizeLegacySearch()` 轉成新格式（§2.3） |
+| `/api/articles/:feed?json=…&source=…` | RSS / Atom / JSON feed | 🟢 **原樣保留** | `json` 是 LZMA 壓縮的 GraphQL variables；功能照舊移植，不改版 |
+| `en.cofacts.tw`、`ja.cofacts.tw` | 語系 host | 🟢 | 同一個 app 依 host 切語系（§2.5） |
+| `/robots.txt`、`/sitemap.xml` | SEO（rumors-site 從來沒有） | 🔵 建議 | |
+| `/analytics`、`/hack` | 由 Cloudflare 規則處理 | 🟢 | 沿用 |
 
 ### 2.3 列表頁 search param 改版提案
 
@@ -138,32 +168,54 @@ rumors-site 的問題：
 - 值是大寫 snake（`NO_REPLY`），時間是 Elasticsearch date math（`now-1w/d`）。
 - `types` 和 `articleTypes` 命名不一致；`orderBy` 沒驗證，直接塞進 GraphQL。
 - 同名 param 在不同頁意義不同（`start/end` 在 `/articles` 是 `createdAt`，在 `/replies` 是 `repliedAt`）。
-- 分頁 cursor 不在 URL，重新整理或按上一頁就遺失。
+- 分頁 cursor 不在 URL。**定案：維持不進 URL**；按上一頁時靠 TanStack Query cache 與 scroll restoration 還原。
 
-提案：
+URL 不需要跟 Penpot 的 token 名稱綁定，改名只為了**好讀、不容易被誤解**。
+
+#### 查核回應分類（原 `types`）：不互斥、「含有」的語意
+
+Cofacts 的四種分類是**對「一則查核回應」的標記**，不是對訊息真偽的判決：
+
+- 一則訊息可能有多則回應、分屬不同分類。篩「含有錯誤訊息」加「含有正確訊息」是指「有任一則回應屬於其中之一」（any-of），兩者並不互斥。
+- 「含有正確訊息」（`NOT_RUMOR`）不等於「這則訊息是真的」，只表示查核者認為其中含有正確資訊。
+
+rumors-site 的問題是 param 名 `types` 看不出是「回應的」分類，值 `NOT_RUMOR` 又容易被人或 AI 望文生義讀成「查證為真」。提案：
+
+| | 提案 |
+|---|---|
+| param 名 | **`replyType`**：寫明是「回應」的分類 |
+| 值 | **沿用 API enum，改小寫 kebab**：`rumor`、`not-rumor`、`opinionated`、`not-article`。與 rumors-api、open data、LINE bot 同一套詞，研究者與 agent 都查得到定義 |
+| 防誤解 | ① zod schema 的 `.describe()` 寫明「任一回應被標記為…（any-of，可多選，不代表訊息真偽）」並附中文標籤；② `cofacts-frontend` skill 與 `docs/` 收錄同一段定義；③ UI 標籤一律用「含有錯誤訊息」「含有正確訊息」「含有個人意見」「不在查證範圍」，不用「正確／錯誤」 |
+
+替代方案：值改用標籤語意（`has-misinfo`、`has-facts`、`has-opinion`、`out-of-scope`）。好處是字面就帶出「含有」；壞處是 URL 值與 API enum 不一致，每層都要做對照。目前建議沿用 enum。
+
+#### 完整對照
 
 | 新 param | 舊 param | 值（逗號分隔多選） | 說明 |
 |---|---|---|---|
-| `status` | `filters` | `asked-once`, `asked-many`, `no-reply`, `replied-many`, `no-useful-reply`, `has-useful-reply`, `replied-by-me`, `not-replied-by-me` | 互斥的組合在 schema 層就處理（後者覆蓋前者）；`*-by-me` 未登入時忽略，**只忽略它自己，其他條件照常套用**。現行實作是用 `break`，會把之後的條件一起丟掉 |
-| `verdict` | `types` | `incorrect`（RUMOR）, `correct`（NOT_RUMOR）, `opinion`（OPINIONATED）, `out-of-scope`（NOT_ARTICLE） | **值刻意與 Penpot token `status-incorrect / correct / opinion / outofscope` 用同一套詞**。URL、CSS、元件 prop 共用一套名字 |
+| `status` | `filters` | `asked-once`, `asked-many`, `no-reply`, `replied-many`, `no-useful-reply`, `has-useful-reply`, `replied-by-me`, `not-replied-by-me`, 🔵 `reported-by-me` | 互斥組合在 schema 層處理；`*-by-me` 未登入時忽略，**只忽略它自己**（現行用 `break`，會丟掉之後所有條件）。`reported-by-me` 即「我送出的」，見下方註 |
+| `replyType` | `types` | `rumor`, `not-rumor`, `opinionated`, `not-article` | 見上節 |
 | `media` | `articleTypes` | `text`, `image`, `video`, `audio` | |
-| `topic` | `categoryIds` | 分類 ID | Penpot 篩選器的標題就是「主題」 |
-| `period` | `start=now-1d/d` 等預設區間 | `1d`, `7d`, `30d` | 對應「時間不限 / 24 小時 / 一週 / 一個月」 |
-| `from`, `to` | `start`, `end`（自訂區間） | `YYYY-MM-DD` | 同頁意義不變；每頁在 schema 註明篩的是哪個時間欄位 |
-| `sort` | `orderBy` | `last-requested`, `most-requested`, `last-replied`, `my-reply`（個人頁） | 每頁白名單不同；Penpot 的「最近被查核」對應 `last-replied` |
-| `tab` | `tab` | 個人頁：`replies` / `comments`（/ 未來的 `reports`，見 Q8）；教學頁：`bust-hoaxes` / `check-rumors` | 沿用 |
+| `topic` | `categoryIds` | 分類 ID | Penpot 篩選器的標題是「主題」 |
+| `period` | `start=now-1d/d` 等預設區間 | `1d`, `7d`, `30d` | 「時間不限」即不帶此參數 |
+| `from`, `to` | `start`, `end`（自訂區間） | `YYYY-MM-DD` | 每頁在 schema 註明篩的是哪個時間欄位 |
+| `sort` | `orderBy` | `last-requested`, `most-requested`, `last-replied`, `my-reply`（個人頁） | 每頁有自己的白名單 |
+| `tab` | `tab` | 個人頁 `replies` / `comments`；教學頁 `bust-hoaxes` / `check-rumors` | 沿用 |
 | `q`, `type` | `q`, `type` | `/search` | 沿用 |
 
+> [!NOTE]
+> **「我送出的」需要確認 API 語意**：rumors-api 的 `ListArticleFilter.selfOnly` 只會列出「由目前使用者**建立**」的訊息（第一個回報者）。沒有「我曾回報過（含對既有訊息 +1）」的 filter（2026-09-28 查 `api.cofacts.tw` schema）。若「我送出的」要包含 +1 過的訊息，需要在 rumors-api 補一個依 reply request 的 `userId` 篩選的 filter。
+
 - 實作方式：每個列表 route 用 `validateSearch` + zod schema，放在 `src/features/list/searchParams.ts`。同一份 schema 產生三樣東西：GraphQL filter、篩選 UI 的狀態、canonical URL。
-- 舊 param 由 `normalizeLegacySearch()` 轉換（`filters=NO_REPLY` → `status=no-reply`、`start=now-1w/d` → `period=7d`…），轉完用 `replace` redirect。舊 bookmark 能用，網址列看到的是新格式。
-- 分頁：GraphQL 是 cursor-based，cursor 塞進 URL 很醜，建議**維持「載入更多」但不進 URL**。按上一頁時靠 TanStack Query cache 與 scroll restoration 還原（❓Q5）。
+- 舊 param 由 `normalizeLegacySearch()` 轉換（`filters=NO_REPLY` → `status=no-reply`、`types=NOT_RUMOR` → `replyType=not-rumor`、`start=now-1w/d` → `period=7d`…），轉完用 `replace` redirect。
 
 範例：
 
 ```
 舊 /articles?filters=NO_REPLY,ASKED_MANY_TIMES&types=RUMOR&start=now-1w/d&orderBy=replyRequestCount
-新 /articles?status=no-reply,asked-many&verdict=incorrect&period=7d&sort=most-requested
+新 /articles?status=no-reply,asked-many&replyType=rumor&period=7d&sort=most-requested
 ```
+
 
 ### 2.4 訊息頁的區塊錨點
 
@@ -177,18 +229,45 @@ rumors-site 的問題：
 | `#similar` | 相似可疑訊息與組合 |
 | `#original` | 原始訊息 |
 
-### 2.5 切換策略（Strangler Fig）
+### 2.5 語系（i18n）
+
+- **採用 `@lingui/react`**：以英文原文作為翻譯 key，抽出成 gettext `.po` 檔（沿用 rumors-site 的翻譯流程與既有 `.po`）。runtime 載入編譯後的 message catalog 切換語系，不必像 ttag 那樣每個語系 build 一個 image。
+- **語系由 host 決定**，沿用現有的三個 host。URL 不加 locale 前綴，既有網址不變。
+
+  | host | locale |
+  |---|---|
+  | `cofacts.tw` | `zh-TW`（預設） |
+  | `en.cofacts.tw` | `en` |
+  | `ja.cofacts.tw` | `ja` |
+
+  - root route 的 `beforeLoad` 呼叫 server function，讀 `Host` header（Cloudflare 之後讀 `X-Forwarded-Host`）決定 locale，SSR 時就載入對應 catalog，並輸出 `<html lang>`。
+  - 各語系頁面互相輸出 `hreflang` alternate link。
+  - 使用者手動切換語系時，導到對應 host 並保留 path 與 query。
+  - 不同 host 的 CDN cache key 本來就分開，不會混到語系。
+- **只翻 UI 文案**：訊息、回應等使用者內容維持原文。
+- 影響工作量的地方：
+  - cofacts/ai 現有的繁中寫死文案要改寫成英文 key（第 0 塊處理 shell 與 L1；其他塊各自處理）。
+  - `cofacts-frontend` skill 規定所有 UI 字串都要經過 `t` / `<Trans>`。
+  - 日期格式一律依當前 locale，不能寫死 `zh-TW`。
+
+### 2.6 切換策略（Strangler Fig）
 
 1. **並存期**：新 app 部署在 Cloud Run，Cloudflare 依 path 把「已遷移的路徑」導到新 app，其餘仍到 GCE 上的 rumors-site。可以一頁一頁切。
 2. **登入並存**：舊站用 api.cofacts.tw 的 session，新站用 BFF cookie。使用者在舊站已登入時，新站的 login redirect 到 api 會直接回來，體感是一鍵登入。**兩邊的登出不會同步**，這點要接受或另外處理。
-3. **全面切換**：`cofacts.tw/*` 全部導到新 app，`cofacts.ai/*` 301 到 `cofacts.tw/ai/*`，rumors-site 退場。
+3. **Cloudflare cache（⚠️ 必做）**：
+   - 現況：依 `cofacts/devops` 的 `Cloudflare.md`「Cache Rules (As of 2026-06-11)」，SSR HTML 有 **60s Edge TTL override**。範圍是 `cofacts.tw` 的 `/`、`/articles`、`/search`、`/replies`，以及 en/ja/zh 全站規則；只排除 `/_next/`、含 `.` 的路徑、`/user`，以及帶 `isUserBlocked=1` cookie 的請求。
+   - 風險：override 模式會**忽略 origin 的 `Cache-Control`**。新站在 SSR 直接渲染登入後畫面（§3.5）後，A 使用者的登入畫面可能在 60 秒內被快取並回給其他人。
+   - 切換前要做：
+     - ① 所有 cache rule 加上排除 `cofacts_session` cookie 的條件（與現行排除 `isUserBlocked=1` 同理）；
+     - ② 新 app 對帶 session 的回應一律送 `Cache-Control: private, no-store`，作為第二道防線；
+     - ③ 規則裡 rumors-site 專屬的排除條件（`/_next/`）改成新 app 對應的路徑（Vite 產生的 asset 路徑）。
+4. **全面切換**：`cofacts.tw/*` 全部導到新 app，`cofacts.ai/*` 301 到 `cofacts.tw/ai/*`，rumors-site 退場。
 
-> [!IMPORTANT]
-> 依 `cofacts/ai` 的 AGENTS.md，「Cloud Run 與 cofacts.tw 的 routing 整合」與「AI 從 `/` 搬到 `/ai`」屬於部署與 routing 的重大決策，定案後應在 `cofacts/ai/docs/decisions/` 補 ADR。
-
-❓**待討論**：Q1（i18n）、Q3（AI 路徑命名）、Q4（編輯器網址）、Q5（分頁與 RSS）。
+> [!NOTE]
+> 本文件即為上述決策（AI 搬到 `/ai`、routing 整合、token 命名規則）的設計紀錄。cofacts/ai 的 `docs/` 直接超連結到本文即可；只有實作過程中出現本文未涵蓋的取捨時，才另外寫 ADR。
 
 ---
+
 
 ## 3. 元件架構
 
@@ -329,7 +408,7 @@ docs/design/
 
 - 延續 cofacts/ai 現行做法：BFF 的 `cofactsExec` 搭配 codegen client preset（`fragmentMasking: false`）。
 - rumors-site 的「colocated fragment 掛在 `Component.fragments`」概念保留：fragment 定義在 feature 的 `*.queries.ts`，元件的 props type 用 fragment 產生的 type。
-- SSR 預設是**登入後**的畫面（rumors-site 的 SSR 一律是未登入畫面，登入資訊之後才在 client 補）：BFF 能讀 cookie，loader 直接帶 user context 查。要注意 CDN cache 的設定。
+- SSR 預設是**登入後**的畫面（rumors-site 的 SSR 一律是未登入畫面，登入資訊之後才在 client 補）：BFF 能讀 cookie，loader 直接帶 user context 查。CDN cache 的必要調整見 §2.6。
 
 ### 3.6 首頁、教學、影響力報告、條款（靜態頁）
 
@@ -341,11 +420,11 @@ docs/design/
 | `theme.palette.*`、`theme.spacing()` | 對應的語意 token 與 spacing token（§5） |
 | JSS `@keyframes`（floating、breath、flashing） | CSS Modules 的 `@keyframes`，或 `@theme` 裡的 `--animate-*` |
 | react-spring 捲動動畫 | CSS scroll-driven animation / IntersectionObserver，**一律包 `@media (prefers-reduced-motion: no-preference)`** |
-| `LOCALE` 分支（landing 圖片、新聞列表、YouTube ID） | 只留 zh-TW（見 Q1） |
+| `LOCALE` 分支（landing 圖片、新聞列表、YouTube ID） | 改讀 lingui 的當前 locale（§2.5） |
 | 圖片（首頁 888 KB、教學 1.2 MB、影響力 1.1 MB） | Vite asset import，順便轉 WebP 或 AVIF |
 
 - **教學與 `/about` 有 Penpot 新稿**（`Guide how` / `Guide what`），內容不變、換樣式。
-- **首頁、`/impact`、`/terms` 沒有新稿**：先照舊設計移植，只替換 token。要不要請設計師補稿見 Q6。
+- **首頁、`/impact`、`/terms` 沒有新稿**：以 Guide 為範例，在保留原有內容與版面結構的前提下改用新元件與 token（§9.1 Q6）。
 - 文字壓在圖片或漸層上的對比，指南寫明「要另外量」。首頁 hero 與 impact banner 是高風險區。
 
 ---
@@ -429,7 +508,7 @@ docs/design/
 2. **Typography styles 與無障礙指南不一致**：
    - library 裡 P2 是 `16/1.75`、H1 是 `36/1.2 w600`；指南規定行高只有三個值（12/14/16 → 1.8、18 → 1.5、24/28/36 → 1.3），字重 H1 900、H2–H4 700。
    - library 另外多了指南沒有的 H5（16/600）。
-   - **以指南為準**，請設計師更新 library typography（Q7）。
+   - **以指南為準**，請設計師更新 library typography（附錄 C）。
 3. `fontFamilies` token 是 `Noto Sans`，文字實際用的是 `Noto Sans TC`，以 `Noto Sans TC` 為準。
 4. 瀏覽器分頁在背景時 Penpot plugin 會被暫停（MCP 回報「no heartbeat」），**做實作時 Penpot 分頁要保持在前景**。
 5. `generateStyle` 對 text 會產生 `font-size: 0` 的外層加內層 span，不要照抄。
@@ -462,11 +541,11 @@ Tailwind v4 的 color utility 會先找「專屬 namespace」，找不到才退�
 - **R2 由建構擋住**：Penpot 沒有 `text-accent` 這個 token，所以 Tailwind 也沒有 `text-accent`，品牌黃沒辦法拿來當字色。
 - **R3 由建構擋住**：原始色（`neutral-900`、`brand-500-main`…）只做成一般 CSS 變數，不註冊進 `@theme`，所以沒有對應的 utility。
 
-**間距採用 1px 單位（`--spacing: 0.0625rem`）的取捨**：
+**間距採用 1px 單位（`--spacing: 0.0625rem`，已定案）的取捨**：
 
 - 好處：Penpot 的 px 數值（間距、寬高）直接等於 class 數字（`spacing-16` → `p-16`、寬 343 → `w-343`）；用 rem 表示，瀏覽器調整字級時仍會跟著縮放。
 - 代價：Tailwind 社群與 shadcn 範例的 `p-4`（=16px）語意會變成 4px，外部程式碼不能直接貼，必須改寫。L1 primitives 反正要整批改寫（§5.4），影響有限。
-- 替代方案：維持 Tailwind 預設 4px 單位，對應規則改成「`spacing-16` → `p-4`（px ÷ 4）」。❓Q2
+- 沒採用的方案：維持 Tailwind 預設 4px 單位，對應規則會變成「`spacing-16` → `p-4`（px ÷ 4）」，比較不直覺。
 
 ### 5.3 Mapping 總表
 
@@ -576,7 +655,7 @@ flowchart LR
   --text-*: initial;           /* 只留 7 階字級 */
   --radius-*: initial;
   --shadow-*: initial;
-  --spacing: 0.0625rem;        /* 1 單位 = 1px（Q2） */
+  --spacing: 0.0625rem;        /* 1 單位 = 1px */
 
   --background-color-base: var(--surface-base);
   --background-color-accent: var(--surface-accent);
@@ -596,7 +675,7 @@ flowchart LR
 }
 ```
 
-- **Dark mode**：元件完全不寫 `dark:` variant，換主題時 token 會自己翻轉。**`dark:` 在元件中列為禁用**，由 lint 擋。
+- **Dark mode**：元件完全不寫 `dark:` variant，換主題時 token 會自己翻轉。**`dark:` 在元件中列為禁用**，由 lint 擋。Phase 3 先跟隨 `prefers-color-scheme`；之後要加切換開關，只要由 JS 設定 `<html data-theme="light|dark">`，並存進 cookie 讓 SSR 輸出同樣的屬性，避免切換時閃一下。
 - **shadcn primitives 的改寫**：L1 的 16 個檔一次改完，不留 shadcn 那層語意變數做橋接。原因是**名字會打架**：shadcn 的 `bg-accent` 是淡灰 hover，Cofacts 的 `bg-accent` 是品牌黃；shadcn 的 `text-primary` 是品牌色字，Cofacts 的 `text-primary` 是主要文字色。
 
   | shadcn class | 改成 |
@@ -608,7 +687,7 @@ flowchart LR
   | `bg-popover`、`bg-card` | `bg-base` + `border-subtle` |
   | `border-border` / `border-input` | `border-subtle` / `border-control` |
   | `ring-ring`、`focus-visible:ring-*`、`outline-ring/50` | 刪除，改用全域 focus 規則（§6.1） |
-  | `text-destructive` / `bg-destructive` | 依情境改 `text-status-incorrect`，或另外請設計師定 danger token（Q7） |
+  | `text-destructive` / `bg-destructive` | 依情境改 `text-status-incorrect`，或等設計師定 danger token（附錄 C #6） |
   | `rounded-4xl` 等 | `rounded-5`、`rounded-10`、`rounded-full`（依 Penpot） |
   | `h-9 px-3 gap-2`（4px 單位） | `min-h-36 px-16 gap-8`（1px 單位，依 Penpot） |
 
@@ -650,7 +729,7 @@ flowchart LR
    - 字重對應 `font-normal` / `font-medium` / `font-semibold` / `font-bold` / `font-black`。
 6. **Desktop / Mobile 成對**：
    - 找同名的 `-1440` / `-Mobile` board，或 `X` / `X-Mobile` 元件，合成一個響應式元件。
-   - mobile-first：mobile 的值寫在基本 class，desktop 的值加斷點前綴（斷點見 Q2）。
+   - mobile-first：mobile 的值寫在基本 class，desktop 的值加斷點前綴（兩級斷點，切換寬度見附錄 C #11）。
 7. **Icon**：`Base/Icon` 的 `icon` 屬性值轉成 snake_case 餵給 `<Icon name>`（`Open-In-New` → `open_in_new`）；`status-*`、`fb`、`line` 用自訂 SVG。
 8. **狀態板**（`A-…`、`B-1-…`、`回報可疑訊息-未登入`）：每個對應一個 story scenario，不要只做預設狀態。
 9. **備註 board**：「開發 Note」是需求，要逐條落實或在 PR 說明為何不做；「頁面層級標記」是頁面 / route 的名稱。
@@ -682,7 +761,7 @@ sequenceDiagram
 - 「設計預檢」可以在實作前就抓到 R4 錯誤。Penpot 裡如果 `surface-dark` 的 board 下面有綁 `text-inverse` 的文字，光看 token 名稱就能判斷是錯的。agent 回報給設計師修，不必等程式寫完才發現。
 - Penpot API 有 `CommentThread`，之後可以研究讓 agent 直接在 Penpot 對應 board 留 comment。
 
-❓**待討論**：Q2（spacing 單位與斷點）、Q7（typography 與缺漏的 token）。
+需要設計師處理的差異見附錄 C。
 
 ---
 
@@ -713,7 +792,7 @@ sequenceDiagram
 }
 ```
 
-> 指南文字寫「外圈品牌黃 4px」，但示範 CSS 是 `box-shadow: 0 0 0 6px`（扣掉 2px 間隔與 2px 內圈後，外露的黃色只有 2px），另外「圓角 = 元件圓角 + 4」也要確認是否要逐元件處理。實作以示範 CSS 為準，並請設計師確認（Q7）。
+> 指南文字寫「外圈品牌黃 4px」，但示範 CSS 是 `box-shadow: 0 0 0 6px`（扣掉 2px 間隔與 2px 內圈後，外露的黃色只有 2px），另外「圓角 = 元件圓角 + 4」也要確認是否要逐元件處理。實作先以示範 CSS 為準，並請設計師確認（附錄 C #5）。
 
 **指南管不到、要在寫程式時確認的**（指南 07）：
 
@@ -792,88 +871,67 @@ description: >
 
 ---
 
-## 8. 分工
+## 8. 分工：規模觀察與建議
 
-### 8.1 評估 WG 提出的框架
+各塊涵蓋哪些 URL 見 §2.2。
 
-WG 的草案：先由 WG 打底（Tailwind config 加 tokens、Storybook、UI skill），再依頁面拆給工程師，共 5 大塊：
+### 8.1 各塊規模與注意事項
 
-1. 列表：`/articles`、`/replies`、`/hoax-for-you`、`/search`、個人頁
-2. 單一訊息與回應：`/article/[id]`、`/reply/[id]`、編輯器
-3. 回報可疑訊息流程（只收網址）
-4. Infographics 靜態頁：首頁、教學、條款、impact
-5. AI chat 頁面
+| 塊 | 規模 | 觀察與建議 |
+|---|---|---|
+| **0 基礎** | 中 | 除了 tokens、Storybook、skill，**App shell 也放這裡**。其他塊都依賴 Nav、Footer、登入 modal、header 搜尋；不先做好，A、B 會各做一個 header。i18n（lingui）的 setup 與 host 判定也在這塊。依 [20260901 會議](../../meetings/2026/20260901.md)的待辦，skill 與 Storybook 由 MrOrz 打底，之後交給 yutin |
+| **1 列表** | 大 | 5 頁共用一套 URL param 與篩選系統，交給同一人才不會做出兩套。有 3 頁**無稿**（`/search`、`/hoax-for-you`、個人頁），要以 Guide 為範例自行拼湊。個人頁除了兩個列表 tab，還有 header（名字、簡介、等級、徽章）、編輯個人資料與頭像的 dialog、貢獻 heatmap，建議排在最後。「我送出的」篩選可能需要 rumors-api 補 filter（§2.3） |
+| **2 單一訊息與回應** | **最大** | 訊息頁用到近 20 種 Penpot 元件，外加全新的全頁編輯器。其中兩個特別重：**協作逐字稿**（ProseMirror + yjs + Hocuspocus，713 LOC，要接 WebSocket 服務）與 d3 瀏覽趨勢圖。**建議把逐字稿拆成 2b**，第一階段先唯讀顯示 |
+| **2b 協作逐字稿** | 中 | 可以晚一點做，或另外排人 |
+| **3 回報** | **最小** | [cofacts/ai#138](https://github.com/cofacts/ai/pull/138)、[#139](https://github.com/cofacts/ai/pull/139) 已完成主要功能，剩下套用設計系統、對齊 6 個狀態板，以及和訊息頁、AI 的銜接。它和塊 5 在 Penpot 同一頁，回報的結束畫面也導向 AI，**建議兩塊交給同一人** |
+| **4 Infographics** | 中（體力活） | JSS 行數最多（landing 2,458、impact 2,132、tutorial 1,175），但只有教學與 about 有新稿，其他頁照舊移植、換 token。依賴很少（只需 Nav / Footer），**適合在 A、B 空檔插隊**。動畫要支援 reduced-motion，首頁 hero 的文字壓圖要量對比 |
+| **5 AI chat** | 小至中 | 主要是換皮加搬家：從 `/` 搬到 `/ai`、依 `AI-main page` / `AI-open page` 重新套設計、拆 `RightDrawer.tsx`（856 行）、補無障礙債。SSE 與 session 邏輯不動。建議由最熟這份程式的 WG 來做，或當作 contractor 的熱身 |
+| **6 上線切換** | 中 | 不屬於任何一頁，但少一件就不能切換：Cloudflare 分流與 **cache rule 排除 session cookie**（§2.6）、各種 redirect、`ALLOWED_CALLBACK_URLS`、`COFACTS_SITE_URL`、RSS 原樣移植、GTM dataLayer 與 `data-ga` 事件、Rollbar 與 request log、SEO（meta、OG、robots、sitemap，可順便加 ClaimReview JSON-LD）、rumors-site 退場。由 WG 負責 |
 
-**依頁面切是對的**，理由有三：Penpot 本來就依頁面組織；列表這塊共享一套 URL param 與篩選系統，放在同一個人手上最不會做出兩套；訊息頁與編輯器的資料與互動高度耦合。以下是補充與調整：
+### 8.2 建議的人力與順序
 
-**漏掉的部分**：
+| 塊 | 建議負責 | 依賴 |
+|---|---|---|
+| 0 基礎 | WG | — |
+| 1 列表 | Contractor A | 0 |
+| 2 單一訊息與回應 | Contractor B | 0；沿用 1 的 `FactCheckReply` |
+| 2b 協作逐字稿 | B 或 WG | 2 |
+| 3 回報 + 5 AI chat | WG，或先完成的 contractor | 0 |
+| 4 Infographics | A、B 空檔插隊，或設計師陪同 | 0（只需 Nav / Footer） |
+| 6 上線切換 | WG | 1–5 |
 
-- **App shell（Nav 的 4 種 variant、mobile 選單、Footer、Logo、登入 modal、header 全站搜尋、「等你來答」未解數 badge、使用者選單）**：每一塊都要用，建議**放進第 0 塊由 WG 做**；不然至少在 M1 指定一位 contractor 優先交付，其他人才不會各做一個 header。
-- **跨塊共用的領域元件**：`FactCheckReply`、`ReplyTypeLabel`、`ArticleCard`、`UserAvatar` / `UserFlag`、`ReplyFeedback`，列表與訊息頁都用（Penpot 的 `Latest replies` 與 `MessagePage` 各有 39 個 `FactCheckReply` 子節點）。`ReplyTypeLabel`、`UserAvatar` / `UserFlag` 放第 0 塊；其餘由第 1 塊負責、第 2 塊沿用，見 §8.3。
-- **上線切換（建議列為第 6 塊，WG 負責）**：
-  - 路由與網域：Cloudflare 依路徑分流、`cofacts.ai` → `cofacts.tw/ai`、`/session/*` redirect、rumors-api 的 `ALLOWED_CALLBACK_URLS`、`COFACTS_SITE_URL`。
-  - 相容性：舊 param redirect、**RSS feed 相容**（`/api/articles/:feed`，訂閱者依賴 LZMA `json`）。
-  - 觀測：GTM dataLayer 事件與 `data-ga` 點擊追蹤、Rollbar / 錯誤追蹤與 request log（[20260901 會議](../../meetings/2026/20260901.md)指出 rumors-site 完全沒有 request log）。
-  - SEO：meta、OG、robots、sitemap；建議順便加上 ClaimReview JSON-LD。
-  - 收尾：404 / 500 頁、en/ja 的處置、rumors-site 退場。
-
-  這些都不屬於任何一頁，但少一件就不能切換。
-- **個人頁不只有列表**：還有 `UserPageHeader`（名字、簡介、等級、徽章）、編輯個人資料與頭像的 dialog、貢獻 heatmap。**Penpot 目前沒有個人頁的設計稿**，而且「是否顯示使用者送過的訊息」的隱私討論尚未定案（[20260910](../../meetings/2026/20260910.md)、[20260914](../../meetings/2026/20260914.md) 會議）。建議個人頁放在第 1 塊的最後，或拆出來等設計與決策。
-- **第 4 塊的範圍**：少了 `/about`（Penpot `Guide what`），`/instant` 則是 stub。
-
-**規模的觀察**：
-
-- **第 2 塊最重**：
-  - 訊息頁有近 20 種 Penpot 元件，外加全新的全頁編輯器。
-  - 另有兩個重的：**協作逐字稿編輯器**（`CollabEditor`：ProseMirror + yjs + Hocuspocus，713 LOC，要接 WebSocket 服務）與 d3 瀏覽趨勢圖。
-  - 建議把逐字稿拆成 2b，第一階段先唯讀顯示，編輯功能晚一點或另外排人。
-- **第 3 塊（回報）已經做了一半**：[cofacts/ai#138](https://github.com/cofacts/ai/pull/138) 已實作 `/report` 表單（含只收網址的決策與 decision record），[cofacts/ai#139](https://github.com/cofacts/ai/pull/139) 做 PWA share target。剩下的是套用設計系統、對齊 Penpot 6 個狀態板、確認與訊息頁或 AI 的銜接。**規模最小**，可以跟第 5 塊（同在 Penpot 的「AI」頁，回報結束畫面也導向 AI）合給同一人。
-- **第 5 塊（AI chat）是「換皮加搬家」**：功能都在，要做的是：
-  - 從 `/` 搬到 `/ai`；
-  - 依 `AI-main page` / `AI-open page` 重新套設計，含 `AIMessageCard`、`AIFactCheckCard`、`Button AI`；
-  - `RightDrawer.tsx`（856 行）拆檔，並補上前面列出的無障礙債。
-
-  前後端的 SSE 與 session 邏輯不動。建議由最熟這份程式的 WG 來做，或當作 contractor 的熱身。
-- **第 4 塊是體力活**：LOC 最多（landing 2,458、impact 2,132、tutorial 1,175 行 JSS），但 Penpot 新稿只有教學與 about，其他頁是「照舊移植 + 換 token」，適合平行插隊。
-
-### 8.2 建議的切法與時程
-
-| 塊 | 內容 | 建議負責 | 依賴 | Penpot 稿 |
-|---|---|---|---|---|
-| **0 基礎** | tokens 流水線、`tokens.css`、改寫 L1 primitives、`<Icon>`、focus 規則、Storybook（併入 #126 並加 a11y、theme、viewport、router decorator）、`cofacts-frontend` skill、lint 與 CI、route 骨架（`_site` / `ai` layout、`/`→`/ai`）、**App shell**、`ReplyTypeLabel`、`UserAvatar` / `UserFlag`、search param 工具 | WG | — | ✅ UI system |
-| **1 列表** | `/replies`、`/articles`、`/hoax-for-you`、`/search`、篩選 / 排序 / 時間 / 載入更多、search param schema 與舊 param 相容、`ArticleCard` / `ArticleListItem` / `FactCheckReply` / `ReplyFeedback`、訂閱（FeedDisplay）UI；最後做個人頁 | Contractor A | 0 | ✅ replies / articles；❌ search、hoax-for-you、個人頁 |
-| **2 單一訊息與回應** | `/article/:id`（快速索引、原始訊息、分類、趨勢圖、網友回報補充、查核回應、AI 自動分析、相似訊息）、`/reply/:id`、撰寫新回應與使用既有回應編輯器、封鎖內容處理、複製時附授權文字 | Contractor B | 0；沿用 1 的 `FactCheckReply` | ✅ Article Detail；❌ reply 頁 |
-| **2b 協作逐字稿** | ProseMirror + yjs + Hocuspocus 移植（先唯讀） | B 或 WG | 2 | ✅ `Content/Transcript` |
-| **3 回報** | 以 #138 / #139 為基礎套設計系統，對齊 6 個狀態板 | WG 或 A/B 其中一人 | 0 | ✅ AI 頁「回報可疑訊息流程」 |
-| **4 靜態頁** | 首頁、`/tutorial`、`/about`、`/impact`、`/terms`，JSS 改寫成 Tailwind / CSS Modules | A/B 輪空時插隊，或設計師陪同 | 0（只需 Nav/Footer） | ✅ Guide；❌ 首頁、impact、terms |
-| **5 AI chat** | 搬到 `/ai`、依新稿換皮、拆 `RightDrawer`、補無障礙債 | WG | 0 | ✅ AI |
-| **6 上線切換** | 見 §8.1 | WG | 1–5 | — |
-
-建議順序：**0 → (1 ∥ 2) → 3、5 → 4 穿插 → 6**。依 [20260901 會議](../../meetings/2026/20260901.md)的待辦，第 0 塊的 skill 與 Storybook 由 MrOrz 先打底、之後交給 yutin。
+順序：**0 → (1 ∥ 2) → 3、5 → 4 穿插 → 6**。
 
 ### 8.3 跨塊協作約定
 
-- **L2 元件由「第一個用到的塊」負責**：做好後放進 Storybook 並登錄到 registry（`parameters.penpot`）；其他塊只能透過 PR 擴充 props，不 fork。
+- **L2 元件由「第一個用到的塊」負責**：做好後放進 Storybook 並登錄到 registry（`parameters.penpot`）；其他塊只能透過 PR 擴充 props，不 fork。`ReplyTypeLabel`、`UserAvatar` / `UserFlag` 在塊 0 先做；`FactCheckReply`、`ArticleCard`、`ReplyFeedback` 由塊 1 負責、塊 2 沿用（Penpot 的 `Latest replies` 與 `MessagePage` 各有 39 個 `FactCheckReply` 子節點）。
 - 要做新 L2 元件前，先查 Storybook 與 `components.md`，避免 A、B 各做一份。
-- search param 的 schema 工具放在第 0 塊，第 1 塊擴充。
-- **設計師的排程**要配合各塊的缺稿：`/search`、`/hoax-for-you`、`/reply/:id`、個人頁、首頁、`/impact`、`/terms`、404 / 500、登入 modal。第 0 塊期間就先排序，決定哪些「照舊移植」、哪些「等新稿」。
+- search param 的 schema 工具在塊 0 建立，塊 1 擴充。
+- 無稿頁面由工程師以 Guide 為範例拼湊，PR 附 Storybook 連結請設計師 review。**設計師的主要工作是驗收，不是補稿。**
 
 ---
 
-## 9. 待決事項
+## 9. 決策紀錄與待辦
 
-| # | 問題 | 選項 / 建議 |
+### 9.1 已定案（2026-09-28）
+
+| # | 題目 | 決定 |
 |---|---|---|
-| Q1 | en / ja 版本 | rumors-site 的 en/ja 只部署在 staging。**建議 Phase 3 只做 zh-TW**，en/ja host 退場或導回主站；文案不必先抽 i18n key，但集中在元件內、別散落在 route |
-| Q2 | spacing 單位與斷點 | (a) **1px 單位**，`spacing-16` → `p-16`（建議）；(b) Tailwind 預設 4px，`spacing-16` → `p-4`。斷點：Penpot 只有 375 與 1440，需與設計師確認切換點（建議 `md: 768px`，內容最大寬依卡片 1040）與平板行為 |
-| Q3 | AI 路徑命名 | `/ai/session/:id`（建議，沿用現行語意，未來 `/ai/settings` 之類不會衝突）vs `/ai/:id`（短但會跟未來子頁衝突）vs `/ai/s/:id` |
-| Q4 | 編輯器網址 | `/article/:id/reply/new` 與 `/article/:id/reply/existing`（建議）vs 一個 `/article/:id/reply` 加 query |
-| Q5 | 列表分頁與 RSS | 分頁 cursor 不進 URL（建議）；RSS 保留舊 `json` 相容，新訂閱 UI 是否改用可讀 param |
-| Q6 | 缺稿頁面 | 哪些照舊移植、哪些等新稿；`/impact` 要不要納入全站 Nav / Footer |
-| Q7 | 設計系統要設計師確認的 | ① library typography 對齊指南（行高、字重、H5 去留）；② danger / destructive token（刪除、錯誤訊息）；③ focus 外圈寬度與圓角規則；④ 把 variant 屬性改成具名的多屬性；⑤ 補綁約 25–30% 沒綁 token 的間距 |
-| Q8 | 個人頁 | 是否顯示使用者送過的訊息（隱私），影響 tab 設計與 `tab=` 值 |
-| Q9 | Dark mode | token 已完整；Phase 3 要不要提供切換 UI，還是先跟隨 `prefers-color-scheme` |
-| Q10 | ADR | 定案後在 cofacts/ai 補 ADR：① AI 搬到 `/ai` 與 cofacts.tw routing 整合；② token 流水線與 Tailwind 命名規則；③ SSR 預設登入後畫面的 cache 策略 |
+| Q1 | i18n | 採用 `@lingui/react`，以英文為 key，抽出 gettext `.po`；語系由 host 決定（§2.5） |
+| Q2 | spacing 與斷點 | 1px 單位（`spacing-16` → `p-16`）；斷點先跟 Penpot 一樣分 mobile（375 稿）與 desktop（1440 稿）兩級，切換的寬度請設計師一併確認（附錄 C） |
+| Q3 | AI 路徑 | `/ai/session/:sessionId` |
+| Q4 | 編輯器網址 | `/article/:id/reply/new`、`/article/:id/reply/existing` |
+| Q5 | 分頁與 RSS | 分頁 cursor 不進 URL；RSS 原樣保留舊 `json` 格式 |
+| Q6 | 缺稿頁面 | 標記 ❌ 無稿，由工程師以 Guide 為範例用新元件拼湊 |
+| Q8 | 使用者送過的訊息 | 個人頁不顯示；列表新增「我送出的」篩選（`status=reported-by-me`） |
+| Q9 | Dark mode | 先跟隨 `prefers-color-scheme`。之後若 Penpot 補上切換開關，JS 設定 `<html data-theme>` 即可，`tokens.css` 已支援（§5.4） |
+| Q10 | ADR | 以本文為設計紀錄，cofacts/ai 的 `docs/` 直接超連結過來；只有本文未涵蓋的取捨才另寫 ADR |
+
+### 9.2 待辦
+
+- **與設計師 sync 設計系統的差異**：見附錄 C（WG 負責）。
+- **「我送出的」的語意**：只算第一個回報者，還是包含 +1；若包含，需要 rumors-api 補 filter（§2.3）。
+- **Cloudflare cache rule**：切換前要排除 `cofacts_session` cookie（§2.6，塊 6）。
 
 ---
 
@@ -905,3 +963,23 @@ WG 的草案：先由 WG 打底（Tailwind config 加 tokens、Storybook、UI sk
 | `LandingPage/*`、`ReportPage/*`、`Tutorial/*` | `features/landing`、`features/impact`、`features/tutorial`（第 4 塊） |
 | `WonderCallEmbed`、`GoogleWebsiteTranslator` | 另議：是否保留 |
 | `lib/gtm.ts`、`data-ga` | `lib/analytics.ts`（第 6 塊） |
+
+## 附錄 C：與設計師 sync 的差異清單
+
+依 2026-09-28 從 Penpot MCP 讀到的狀態整理。
+
+| # | 項目 | Penpot 現況 | 無障礙指南或實作需求 | 需要設計師決定或修改 |
+|---|---|---|---|---|
+| 1 | Typography 行高 | library styles：H1 36/1.2、H2 28/1.25、H3 24/1.3、H4 18/1.4、H5 16/1.4、P1 18/1.75、P2 16/1.75、P3 14/1.7、Annotation 12/1.5 | 行高只有三個值，由字級決定：12/14/16 → 1.8、18 → 1.5、24/28/36 → 1.3 | 更新 library typography |
+| 2 | Typography 字重 | 所有標題都是 600 | 指南的字級表：H1 900、H2–H4 700 | 以哪個為準 |
+| 3 | H5 | library 有 H5（16 / 600） | 指南沒有 H5 | 保留或移除 |
+| 4 | 字型 token | `fontFamilies` token 是 `Noto Sans` | 實際文字用 `Noto Sans TC` | 把 token 改成 `Noto Sans TC` |
+| 5 | Focus 外圈 | 指南文字：「外圈品牌黃 4px」 | 指南示範 CSS 是 `box-shadow: 0 0 0 6px`，扣掉 2px 間隔與 2px 內圈，外露只有 2px | 確認外圈寬度，以及「圓角 = 元件圓角 + 4」是否要逐元件處理 |
+| 6 | danger / destructive 色 | 沒有對應 token | 刪除按鈕、表單錯誤訊息需要用色（`Base/Input` 有 `Invalid` variant） | 新增語意 token，或明訂沿用 `status-incorrect` |
+| 7 | 間距綁定 | 主要頁面的 flex 間距約 25–30% 沒綁 token（例如 MessagePage 118/144、Latest replies 82/114） | agent 靠 `shape.tokens` 對應 class | 補綁 token |
+| 8 | 字級綁定 | `Guide how-1440` 只有 35/50 的文字綁了字級 token | 同上 | 補綁 token |
+| 9 | Variant 屬性命名 | 多數還是 `Property 1` / `Value 2`，或把多個維度擠成一個字串（Button 的 `normal-2icon-default`） | 具名的多屬性（Size / Style / Icon / State）才能直接對應到元件 props | 重新命名 variant 屬性 |
+| 10 | 元件名稱錯字 | `Inorrect`（應為 Incorrect）、Nav-Mobile 的 `serch` | — | 修正 |
+| 11 | 斷點 | 只有 375 與 1440 兩種 board | 需要一個 mobile → desktop 的切換寬度，以及 1024–1440 之間怎麼排版（例如內容最大寬 1040 置中） | 決定切換寬度 |
+| 12 | Dark mode 開關 | 沒有切換 UI 的設計 | 先跟隨系統設定 | 之後是否設計開關 |
+| 13 | LINE 綠底白字 | `text-on-line` 對比 2.26，指南已記錄為已知未達標 | — | 維持現狀（僅確認） |
