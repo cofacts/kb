@@ -1,6 +1,6 @@
 """Paired bootstrap CI for micro-F1 of selected strategies (full sample)."""
 import sys, json, numpy as np
-sys.argv = ["analyze.py", "sample.jsonl", "jev=results/jev.jsonl", "clef=results/clef.jsonl", "clef-flash=results/clef-flash.jsonl"]
+sys.argv = ["analyze.py", "sample.jsonl", "jev-a=results/jev-a.jsonl", "clef-a=results/clef-a.jsonl", "clef-flash-a=results/clef-flash-a.jsonl"]
 import os; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import io, contextlib
 with contextlib.redirect_stdout(io.StringIO()):
@@ -13,7 +13,7 @@ strats = {
 rng = np.random.default_rng(1)
 B = 1000
 Y = A.Yc
-print("| 策略 | " + " | ".join(f"{n} micro-F1 [95% CI]" for n in A.P) + " | jev − clef [95% CI] |")
+print("| 策略 | " + " | ".join(f"{n} micro-F1 [95% CI]" for n in A.P) + " | jev-a − clef-a [95% CI] |")
 print("|---|" + "---|" * (len(A.P) + 1))
 for name, fn in strats.items():
     preds = {n: fn(A.P[n], Y) for n in A.P}
@@ -24,6 +24,6 @@ for name, fn in strats.items():
         idx = rng.integers(0, len(Y), len(Y))
         vals = {n: f1(preds[n], idx) for n in A.P}
         for n in A.P: boots[n].append(vals[n])
-        diff.append(vals["jev"] - vals["clef"])
+        diff.append(vals["jev-a"] - vals["clef-a"])
     cells = [f"{f1(preds[n], np.arange(len(Y))):.3f} [{np.percentile(boots[n],2.5):.3f}, {np.percentile(boots[n],97.5):.3f}]" for n in A.P]
     print(f"| {name} | " + " | ".join(cells) + f" | {np.mean(diff):+.3f} [{np.percentile(diff,2.5):+.3f}, {np.percentile(diff,97.5):+.3f}] |")

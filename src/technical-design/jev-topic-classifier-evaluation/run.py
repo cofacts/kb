@@ -1,6 +1,6 @@
 """Run one decision model over the sample; one request per article with all 16 noul questions.
 
-usage: python3 -I run.py <model: clef|clef-flash|jev> <sample.jsonl> <out.jsonl> [concurrency] [limit]
+usage: CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_AUTH_TOKEN=... python3 -I run.py <model: clef|clef-flash|jev> <sample.jsonl> <out.jsonl> [concurrency] [limit, 0 = all] [prompt: a|b]
 Resumable: articles already in out.jsonl with a successful answer are skipped.
 """
 import json
@@ -22,9 +22,9 @@ BASE = f"https://api.cloudflare.com/client/v4/accounts/{ACCOUNT}/ai/run"
 model, sample_path, out_path = sys.argv[1], sys.argv[2], sys.argv[3]
 conc = int(sys.argv[4]) if len(sys.argv) > 4 else 8
 limit = int(sys.argv[5]) if len(sys.argv) > 5 and sys.argv[5] != "0" else None
-version = int(sys.argv[6]) if len(sys.argv) > 6 else 1
+prompt = sys.argv[6] if len(sys.argv) > 6 else "a"
 
-QUESTIONS = build_questions(version)
+QUESTIONS = build_questions(prompt)
 
 
 def payload(text):

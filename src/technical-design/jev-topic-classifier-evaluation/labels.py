@@ -35,9 +35,9 @@ ID2KEY = {k: k for k in KEYS}
 KEY2TITLE = {l[0]: l[1] for l in LABELS}
 
 
-# v2: concrete true/false criteria per category (instructions and state unchanged from v1).
-# Exclusions are added only where the category definitions themselves overlap.
-V2_CRITERIA = {
+# Prompt B: concrete true/false criteria per category. Prompt A uses one generic sentence for every category.
+# Both share the same instructions and state. Exclusions are added only where category definitions overlap.
+SPECIFIC_CRITERIA = {
     "kj287XEBrIRcahlYvQoS": (  # 中國政治宣傳
         "訊息的重點是中國（含港澳、新疆、西藏）的政治、軍事、統戰或對外宣傳，例如美化中國、宣揚中國強大、貶低台灣或西方、兩岸統獨論述",
         "訊息與中國無關，或只是順帶提到中國，主要在談別的事",
@@ -105,12 +105,15 @@ V2_CRITERIA = {
 }
 
 
-def build_questions(version=1):
-    """One noul question per category, judged by stakeholder interest (誰會有興趣)."""
+def build_questions(prompt="a"):
+    """One noul question per category, judged by stakeholder interest (誰會有興趣).
+
+    prompt "a": generic criteria (the same sentence for every category); "b": SPECIFIC_CRITERIA.
+    """
     qs = {}
     for cid, title, desc in LABELS:
-        if version == 2:
-            true, false = V2_CRITERIA[cid]
+        if prompt == "b":
+            true, false = SPECIFIC_CRITERIA[cid]
         else:
             true = f"訊息落在「{title}」的範圍，目標編輯會有興趣處理它"
             false = f"訊息與「{title}」無關，目標編輯不會特別想處理它"

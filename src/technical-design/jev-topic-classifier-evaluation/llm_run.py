@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor
 import anthropic
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from labels import KEYS, LABELS, V2_CRITERIA, build_state  # noqa: E402
+from labels import KEYS, LABELS, SPECIFIC_CRITERIA, build_state  # noqa: E402
 
 ACCOUNT = os.environ["CLOUDFLARE_ACCOUNT_ID"]
 MODEL = "anthropic/claude-haiku-5.5"  # Cloudflare's id for claude-haiku-5-5
@@ -35,7 +35,7 @@ client = anthropic.Anthropic(
 
 
 def category_block(cid, title, desc):
-    true, false = V2_CRITERIA[cid]
+    true, false = SPECIFIC_CRITERIA[cid]  # same per-category conditions as prompt B
     return f"## {title}\nid: {cid}\n{desc}\n符合：{true}\n不符合：{false}"
 
 

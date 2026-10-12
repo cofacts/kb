@@ -1,6 +1,6 @@
 import json, numpy as np
 def load(p): return [json.loads(l) for l in open(p) if '"scores"' in l]
-rows = [("jev", "results/jev.jsonl", "results/latency_jev.jsonl"), ("clef", "results/clef.jsonl", "results/latency_clef.jsonl"), ("clef-flash", "results/clef-flash.jsonl", "results/latency_clef-flash.jsonl")]
+rows = [("jev-a", "results/jev-a.jsonl", "results/latency_jev-a.jsonl"), ("clef-a", "results/clef-a.jsonl", "results/latency_clef-a.jsonl"), ("clef-flash-a", "results/clef-flash-a.jsonl", "results/latency_clef-flash-a.jsonl")]
 print("| 模型 | 情境 | n | 平均 | p50 | p90 | p95 | p99 | max | 重試次數 |")
 print("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|")
 for n, main, seq in rows:
