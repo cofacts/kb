@@ -1,16 +1,17 @@
 ---
 type: DesignDoc
-title: "以 Jev 實作 Cofacts Topic Classifier 之可行性評估"
+title: "Cofacts Topic Classifier 可行性評估與實測（Jev、Clef、Haiku 比較）"
 tags: [cofacts, design-docs, technical-design, ai, classifier]
-timestamp: "2026-10-12T21:00:00+08:00"
+timestamp: "2026-10-12T22:00:00+08:00"
 ---
 
-# 以 Jev 實作 Cofacts Topic Classifier 之可行性評估
+# Cofacts Topic Classifier 可行性評估與實測（Jev、Clef、Haiku 比較）
 
 > [!NOTE]
-> 本文評估 Cloudflare Workers AI 上的第三方模型 [`typesafe/jev`](https://developers.cloudflare.com/ai/models/typesafe/jev/)
-> 是否適合作為 Cofacts article category（topic label）分類器的推論引擎，
-> 並討論其成本、context 限制，以及在 `CreateArticle` / `CreateMediaArticle` 上掛載的實作方式。
+> 本文評估 Cofacts article category（topic label）分類器的推論引擎選擇：以 Cloudflare Workers AI 上的第三方決策模型
+> [`typesafe/jev`](https://developers.cloudflare.com/ai/models/typesafe/jev/) 為主，並與
+> [`@cf/cloudflare/clef`](https://developers.cloudflare.com/workers-ai/models/clef/)、clef-flash 及 Claude Haiku 5.5 比較，
+> 討論其準確率、成本、context 限制，以及在 `CreateArticle` / `CreateMediaArticle` 上掛載的實作方式。
 >
 > 本文由 Claude Code 依據 kb 內既有會議記錄與 repo 程式碼整理。
 > §1~§6 為實測前的調查與估算；**§7 為以 ground truth 1,000 篇實測、比較 7 個分類方案的結果**
