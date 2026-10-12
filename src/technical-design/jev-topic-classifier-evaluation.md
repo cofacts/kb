@@ -2,7 +2,7 @@
 type: DesignDoc
 title: "以 Jev 實作 Cofacts Topic Classifier 之可行性評估"
 tags: [cofacts, design-docs, technical-design, ai, classifier]
-timestamp: "2026-10-12T16:00:00+08:00"
+timestamp: "2026-10-12T21:00:00+08:00"
 ---
 
 # 以 Jev 實作 Cofacts Topic Classifier 之可行性評估
@@ -1129,15 +1129,47 @@ ground truth 都只標了另一類）。以不完整的 ground truth 衡量時�
 | 延遲 p50 | **0.27s** | 0.46s | 2.55s |
 | Context window | 32k | **64k** | 1M |
 | 圖片輸入 | ✗ | **✓**（最多 4 張） | ✓ |
+| 影片／聲音輸入 | ✗ | ✗（只能截圖當圖片送，見下） | ✗ |
 | 計費 | AI Gateway 儲值 | Workers AI neurons（免費額度可能適用） | AI Gateway 儲值 |
 | 資料處理 | 第三方（標示 zero data retention） | Cloudflare 自家 | Anthropic（經 Cloudflare） |
 
 - **純文字分類建議 `jev-b`**：準確率與 `clef-b`、`haiku-medium` 打平，最便宜也最快，而且有可調的 confidence。
-- **Clef 的獨特價值是圖片輸入**：Cofacts 有大量圖片訊息，Clef 可以直接看圖分類，不必等 OCR／逐字稿。本次沒有測，值得另做一輪。
+- **Clef 多了圖片輸入，但對 Cofacts 的實際幫助有限**：Cofacts 的圖片訊息大多是文字截圖，OCR 逐字稿已經涵蓋主要內容；
+  影片則只能截圖送入，聲音完全不處理（見下方「Clef 的圖片與影片輸入」）。
 - **Haiku 清單**適合「不需要調門檻、要一份清單」的場景，或產生候選標籤再讓人工確認；成本與延遲都不如 Jev。
 - **改題目的效益（+0.02~0.07）遠大於換模型（±0.01）**：下一步應優先投資在題目與 ground truth。
 - **採用題目 B 之前**：從 10,384 篇中另抽一份沒看過的樣本（例如 500 篇隨機），用 `jev-a`、`jev-b` 各跑一次（約 $0.2），
   確認題目 B 的優勢在新樣本上仍成立。
+
+#### Clef 的圖片與影片輸入
+
+Workers AI 上的 Clef 只開放圖片輸入，**不能直接傳影片，也不處理聲音**（2026-10-12 實測，`clef` 與 `clef-flash` 相同）：
+
+| 輸入方式 | 結果 |
+|---|---|
+| `images`：base64 data URL | ✓ 文件記載的唯一媒體輸入：最多 4 張，PNG／JPEG／WebP，每張 ≤ 4 MiB、合計 ≤ 8 MiB |
+| `videos`：mp4 data URL | ✗ API 認得這個欄位（格式不對會報驗證錯誤），但送合法 mp4 會回傳 `This model accepts images but not audio or video`（code 5012） |
+| 聲音 | ✗ 沒有任何輸入欄位 |
+| 從影片截 4 張畫面當 `images` 送 | ✓ 可行，見下方測試 |
+
+截圖測試：用 ffmpeg 做兩支 4 秒、640×360 的合成影片，畫面只有一行英文字
+（健康偏方「DRINK HOT LEMON WATER / IT KILLS CANCER CELLS」、選舉舞弊「ELECTION WAS RIGGED / THE RULING PARTY CHEATED」），
+每秒截 1 張、共 4 張送入，只問「疾病、醫藥」與「政治」兩題：
+
+| 影片 | `clef`：疾病醫藥 / 政治 | `clef-flash`：疾病醫藥 / 政治 |
+|---|---:|---:|
+| 健康偏方 | 0.96 / 0.02 | 0.92 / 0.01 |
+| 選舉舞弊 | 0.02 / 0.95 | 0.01 / 0.92 |
+
+- **成本**：4 張 640×360 的畫面讓 input tokens 從 271 增為 1,166（每張約 224 tokens，文件寫明每張上限 1,024 tokens）。
+  每篇多約 900 tokens，`clef` 每篇多約 $0.0002（每 1 萬篇多約 $2.1，約為 `clef-b` 純文字成本的 +25%），`clef-flash` 每篇多約 $0.00003。
+- **這個測試只證明 Clef 讀得到畫面上的字**：合成影片的內容就是文字，等同文字截圖，不代表 Clef 看得懂真實影片的畫面。
+- **影片的主要內容在聲音裡**，仍需要 rumors-api 現有的 AI 逐字稿。比較實際的做法是「逐字稿 + 2~4 張關鍵畫面」一起送 Clef；
+  Jev 只收文字，用不到畫面。
+- Clef 在 Hugging Face 上的開放權重版本（Apache-2.0、27B）自架時可以直接收一串影格，但需要大型 GPU，與本案壓低成本的目標相反。
+- **尚未用真實影片驗證**，卡在兩件事：
+  1. 公開的 Cofacts API 在未登入時，`attachmentUrl`（`ORIGINAL`／`PREVIEW`／`THUMBNAIL`）都回傳 null，需要有權限的帳號或 GCS 讀取權限才能取得影片檔。
+  2. 本次的 ground truth（2021 年）全是文字訊息；API 上的 21,427 篇 VIDEO 文章抽查 20 篇都沒有分類，缺少標準答案。
 
 
 ## 8. 結論與建議
@@ -1155,7 +1187,8 @@ ground truth 都只標了另一類）。以不完整的 ground truth 衡量時�
    - 量到的 precision 是下限：ground truth 幾乎都是單標籤，抽查的高分誤判中 78~93% 其實合理（§7.7）。
 5. **題目寫法的影響大於模型選擇**：同一個模型，題目 B（逐類具體條件）比題目 A（通用條件）micro-F1 高 0.02~0.07；
    同樣用題目 B 時，Jev、Clef、Haiku（medium）之間的差距在 ±0.01 內、不顯著（§7.2）。
-6. **Jev vs Clef**：題目 B 下準確率打平，Jev 便宜約 5 倍、快約 40%；Clef 的優勢在可以直接吃圖片（§7.10）。
+6. **Jev vs Clef**：題目 B 下準確率打平，Jev 便宜約 5 倍、快約 40%。Clef 多了圖片輸入，但 Cofacts 的圖片多為文字截圖；
+   影片不能直接傳、聲音不處理，最多只能「逐字稿 + 4 張截圖」（§7.10）。
 7. **LLM 輸出清單可行但不划算**：Claude Haiku 5.5（medium）準確率與題目 B 的決策模型打平，
    但沒有 confidence 可調門檻，成本是 Jev 的 3~3.4 倍，延遲 p50 約 7~9 倍（§7.2、§7.9）。
 8. **模型輸出的機率並未在 Cofacts 資料上呈現良好校準**（分數 0.6 實際正例率 24~43%），
@@ -1169,7 +1202,8 @@ ground truth 都只標了另一類）。以不完整的 ground truth 衡量時�
    並抽查一批高分誤判由人工確認，才能得到可信的 precision 與校準曲線。
 3. **繼續改題目**：收窄「連署、集氣」的條件（題目 B 在 Clef 上略降）、處理「優惠措施」範圍過廣的問題（§7.6）。
    每次調整都用 `report.py` 在同一份樣本上比較，Jev 每輪約 $0.2。
-4. **測 Clef 的圖片輸入**：用圖片訊息（不經 OCR）直接分類，評估是否能取代「先逐字稿再分類」的流程。
+4. **（可選）測 Clef 的「逐字稿 + 關鍵畫面」**：需先取得影片檔的讀取權限並標註約 50~100 篇影片訊息，
+   比較「只送逐字稿」與「逐字稿 + 4 張截圖」（§7.10）。若沒有明顯提升，就沒有選 Clef 的理由。
 5. 以 `jev-b` 與 §7.5 的逐類門檻（precision ≥ 0.9）為起點，在 rumors-api 實作 `util/jev.ts` + `util/classifyArticle.ts`，
    並補上 per-category 閾值表；達不到 precision 0.9 的類別先不自動標記。
 6. 先做 `src/scripts/classifyArticles.ts` 與 `CATEGORY` 型 AIResponse，用 `--dry-run` 在小量 production 資料上驗證；
@@ -1191,6 +1225,7 @@ ground truth 都只標了另一類）。以不完整的 ground truth 衡量時�
       → 共 21 個：16 個公開分類、3 個 AI 專用、2 個已停用（🚧），見 §7.1。
 - [ ] 題目 B 在新樣本上的驗證（§8 下一步 1）。
 - [ ] Ground truth 的多標籤補齊（§7.7、§8 下一步 2）。「precision ≥ 0.9」設定的數字也受這點影響。
+- [ ] 影片訊息的分類是否值得用到畫面？需要影片檔讀取權限與一批影片訊息的標註（§7.10、§8 下一步 4）。
 - [ ] Jev 的資料處理條款（<https://docs.typesafe.ai/legal.md>）是否可接受？模型頁標示 zero data retention。
 - [ ] 目前每月新增 article 數（本文以 3,000 / 10,000 兩種情境估算）。
       註：2026-09 的 ES reindex 記錄顯示 `articles` index 共 **279,286** 筆（[20260914](../meetings/2026/20260914.md)），
