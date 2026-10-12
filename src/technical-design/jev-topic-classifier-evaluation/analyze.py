@@ -111,7 +111,7 @@ def fmt(x):
 out = []
 w = out.append
 n_art = len(common)
-w(f"評估篇數：**{n_art}**（三個模型皆成功回應者；其中隨機抽樣 {randc.sum()} 篇、補足稀有類別 {n_art - randc.sum()} 篇），"
+w(f"評估篇數：**{n_art}**（所有模型皆成功回應者；其中隨機抽樣 {randc.sum()} 篇、補足稀有類別 {n_art - randc.sum()} 篇），"
   f"正例標籤數 {Yc.sum()}，平均每篇 {Yc.sum() / n_art:.2f} 個標籤。\n")
 
 # ---------- 1. global threshold sweep ----------
@@ -250,7 +250,7 @@ w("|---|---:|---:|---:|---:|---:|---:|---:|")
 for n in runs:
     toks = np.array([runs[n][i]["usage"]["input_tokens"] for i in runs[n]])
     otoks = np.array([runs[n][i]["usage"].get("output_tokens", 0) for i in runs[n]])
-    price = PRICE_IN[n]
+    price = PRICE_IN[n.removesuffix("-v2")]
     per = toks.mean() * price / 1e6
     w(f"| {n} | {price} | {toks.mean():.0f} / {np.percentile(toks, 95):.0f} | {otoks.mean():.0f}（免費） | "
       f"${per:.6f} | ${per * 1000:.3f} | ${per * 10000:.2f} | ${toks.sum() * price / 1e6:.3f} |")

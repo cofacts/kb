@@ -3,7 +3,7 @@ type: Project
 title: "LLM 整合"
 description: "Cofacts 逐步將 LLM 引入查核流程的設計與研究歷程，從 ChatGPT 使用情境探索到 MCP server 與 Langfuse 可觀測性。"
 tags: [cofacts, llm, chatgpt, mcp, langfuse, ai]
-timestamp: "2026-10-11T23:00:00+08:00"
+timestamp: "2026-10-12T12:00:00+08:00"
 ---
 
 ## 背景
@@ -47,6 +47,8 @@ Article category（主題標籤）自動分類的歷程與 Jev 可行性評估�
 - 2026-10：以 ground truth 1,000 篇實測 Jev 與 Clef（16 類、一篇一次呼叫）：逐類 AUC 約 0.97，
   逐類門檻 micro-F1 約 0.72；以 precision ≥ 0.9 訂門檻時 P 0.97 / R 0.65（隨機子集）。
   兩者準確率打平，Jev 每篇 $0.00017、p50 0.28 秒，比 Clef 便宜 5 倍、快 40%；Jev 需先在 AI Gateway 儲值
+- 2026-10：第二版題目只改 criteria，micro-F1 再提升 0.02~0.07；Claude Haiku 5.5 一次輸出分類清單的 LLM 對照組
+  準確率與 Jev v2 打平，但無法調門檻、成本約 3.4 倍、延遲 p50 約 2.6 秒
 
 ### [Design] Langfuse LLM observability
 
