@@ -1,2 +1,4 @@
+# Crawling is allowed on purpose: noindex is delivered via <meta name="robots">,
+# which crawlers can only see if they are allowed to fetch the page.
 User-agent: *
-Disallow: /
+Allow: /
