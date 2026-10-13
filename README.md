@@ -2,16 +2,20 @@
 
 [Cofacts](https://cofacts.tw) is a Taiwan-based open-source fact-checking platform run by a civic volunteer community. This repository is Cofacts' institutional memory — weekly meeting notes dating back to 2017, plus a structured wiki distilled from them.
 
+Browse online: https://cofacts.github.io/kb/
+
 ## I want to learn about Cofacts
 
 - [Cofacts website](https://cofacts.tw) — the fact-checking database and LINE Bot
 - [wiki/projects/](wiki/projects/) — background, goals, and evolution of key initiatives
 - [wiki/people/](wiki/people/) — core contributors, their roles and focus areas
 - [wiki/activities/](wiki/activities/) — how recurring events (小聚 meetups, 大松 hackathons) are run
+- [src/research/](src/research/) — research docs: related work and design alternatives for a requirement
+- [src/technical-design/](src/technical-design/) — design docs: requirements, change scopes, migration steps
 
 ## I want to look up past records
 
-Meeting notes from 2017 onwards are stored by year under `src/meetings/`:
+Meeting notes from 2017 onwards are stored by year under [`src/meetings/`](src/meetings/):
 
 ```
 src/meetings/
@@ -33,6 +37,8 @@ When a topic recurs across multiple meetings, `wiki/` will have a summary page t
 
 ```
 src/meetings/YYYY/YYYYMMDD.md   # raw weekly meeting notes (2017 – present)
+src/research/                    # research docs: related work and design alternatives
+src/technical-design/            # design docs: requirements, change scopes, migration steps
 wiki/
   people/                        # contributors
   projects/                      # initiatives and workstreams
@@ -50,4 +56,4 @@ wiki/
 
 ---
 
-> Maintenance workflow and AI agent conventions: see [AGENTS.md](AGENTS.md) and [CLAUDE.md](CLAUDE.md)
+> Maintenance workflow and AI agent conventions: see [AGENTS.md](https://github.com/cofacts/kb/blob/main/AGENTS.md) and [CLAUDE.md](https://github.com/cofacts/kb/blob/main/CLAUDE.md)

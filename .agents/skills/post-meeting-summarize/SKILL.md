@@ -111,11 +111,20 @@ curl -s -H "Authorization: Bearer $HACKMD_API_TOKEN" \
    - 區分「有證據」與「僅推論」，照 artifact 原本的口吻，不自行加料。
    - 長度以能完整表達為主，通常 300–1000 字。
 4. **依分享設定決定是否存 HTML 原檔**：`Artifact` `read` 回傳的標頭會寫明分享狀態（例如 `shared with anyone with the link`、或僅擁有者可見）。
-   - **知道連結即可檢視（anyone with the link）**：除了摘要，也把原始 HTML 存到 `src/meetings/YYYY/artifacts/YYYYMMDD-<artifact-id>.html`（用 `Artifact` `read` 帶 `path: "index.html"` 取得本地檔再複製；`<artifact-id>` 為 URL 中 `/artifact/` 後的那段，不含 `?sk=`），並在 `<summary>` 下方加一行 `> 原始 HTML 存檔：[路徑](./artifacts/...)`。
+   - **知道連結即可檢視（anyone with the link）**：除了摘要，也把原始 HTML 存到 `src/meetings/YYYY/artifacts/YYYYMMDD-<artifact-id>.html`（用 `Artifact` `read` 帶 `path: "index.html"` 取得本地檔再複製；`<artifact-id>` 為 URL 中 `/artifact/` 後的那段，不含 `?sk=`），並在 `<head>` 內加上 `<meta name="robots" content="noindex, nofollow">`（Pages 對 `artifacts/*.html` 不套版型，不會自動帶 noindex），以及在 `<summary>` 下方加一行 `> 原始 HTML 存檔：[路徑](./artifacts/...)`。
    - **僅擁有者／特定人可見，或讀不到分享設定**：只留摘要，不存 HTML。
    - 「知道連結」只代表未列出，不代表公開；HTML 存進 kb 後就是公開的。所以存檔前仍須通過下一點的公開性檢查，**HTML 含有不宜公開的資料時，即使連結分享也不存**，只留已去識別的摘要，並在最後輸出中告知使用者。
 5. **公開性檢查**：kb 是公開 repo。摘要中不要放 IP 位址、使用者 userId、email、token、內部 URL 等 artifact 裡可能有、但不宜公開的資料；若會議記錄中的相關公告（例如 takedowns）刻意不公開某些細節，摘要也比照省略，並註明「已省略」。拿不準就省略並請使用者確認。
 6. 同一個 artifact URL 在記錄中出現多次時，只在第一次出現處加摘要。若該 URL 先前已在 `src/meetings/` 其他檔案有摘要，可直接引用該檔而不重寫。
+
+### 步驟 3.6：處理 Liquid 語法（避免 GitHub Pages build 失敗）
+
+kb 以 Jekyll 發佈到 GitHub Pages，Markdown 內的 `{%` 或 `{{` 會被當成 Liquid；HackMD 的嵌入語法（如 `{%youtube ID %}`、`{%hackmd ID %}`）會造成 `Unknown tag` 而讓整個網站無法部署。存入 wiki 前：
+
+1. 搜尋內容中的 `{%` 與 `{{`。
+2. `{%youtube ID %}` 換成 `https://www.youtube.com/watch?v=ID`（已是完整網址的就只留網址）；其他 HackMD 嵌入標籤換成對應的一般連結。
+3. 無法轉成連結的（例如程式碼範例中的 `{{ var }}`），整段用 `{% raw %}` … `{% endraw %}` 包起來。
+4. 順便把 `](/XXXX)` 這種 HackMD 短網址（站內絕對路徑）改成 `](https://g0v.hackmd.io/XXXX)`，否則在 Pages 的 `/kb` 路徑下會 404。
 
 ### 步驟 4：將會議記錄存入 wiki
 
@@ -200,6 +209,7 @@ curl -s -X PATCH \
 
 完成後列出本次執行的摘要：
 - 步驟 3.5 處理了哪些 artifact URL（分享狀態、是否存了 HTML、讀取失敗或因公開性而省略的內容）
+- 步驟 3.6 轉換了哪些 Liquid 語法／HackMD 短網址
 - 步驟 4 存入的檔案路徑
 - `src/meetings/README.md` 更新後的條目
 - HackMD 已更新為下週（YYYYMMDD）模板

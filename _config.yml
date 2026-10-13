@@ -1,0 +1,60 @@
+title: Cofacts Knowledge Base
+description: Cofacts meeting notes and curated wiki
+theme: minima
+
+plugins:
+  - jekyll-relative-links
+  - jekyll-optional-front-matter
+  - jekyll-default-layout
+  - jekyll-readme-index
+  - jekyll-seo-tag   # used by _includes/head.html
+  - jekyll-feed      # used by _includes/head.html
+
+relative_links:
+  enabled: true
+  collections: false
+
+# Setting exclude replaces Jekyll 3's defaults, so keep them. Dotfiles/dot-directories are always skipped.
+exclude:
+  - LICENSE
+  - AGENTS.md
+  - CLAUDE.md
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor
+
+optional_front_matter:
+  remove_originals: true
+
+kramdown:
+  parse_block_html: true   # render Markdown inside <details> blocks
+
+# Served at https://cofacts.github.io/kb/
+url: https://cofacts.github.io
+baseurl: /kb
+
+# minima lists every page that has a title in the header by default; limit it.
+header_pages:
+  - wiki/index.md
+  - src/meetings/README.md
+  - src/research/README.md
+  - src/technical-design/README.md
+
+# GitHub Pages titles pages from their first heading (jekyll-titles-from-headings) and minima's
+# page/home layouts would print that title again above the heading in the content.
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+  # READMEs that have front matter are not turned into index.html by jekyll-readme-index
+  # (its with_frontmatter option double-applies when combined with other plugins).
+  - scope:
+      path: src/research/README.md
+    values:
+      permalink: /src/research/
+  - scope:
+      path: src/technical-design/README.md
+    values:
+      permalink: /src/technical-design/
