@@ -111,7 +111,7 @@ curl -s -H "Authorization: Bearer $HACKMD_API_TOKEN" \
    - 區分「有證據」與「僅推論」，照 artifact 原本的口吻，不自行加料。
    - 長度以能完整表達為主，通常 300–1000 字。
 4. **依分享設定決定是否存 HTML 原檔**：`Artifact` `read` 回傳的標頭會寫明分享狀態（例如 `shared with anyone with the link`、或僅擁有者可見）。
-   - **知道連結即可檢視（anyone with the link）**：除了摘要，也把原始 HTML 存到 `src/meetings/YYYY/artifacts/YYYYMMDD-<artifact-id>.html`（用 `Artifact` `read` 帶 `path: "index.html"` 取得本地檔再複製；`<artifact-id>` 為 URL 中 `/artifact/` 後的那段，不含 `?sk=`），並在 `<summary>` 下方加一行 `> 原始 HTML 存檔：[路徑](./artifacts/...)`。
+   - **知道連結即可檢視（anyone with the link）**：除了摘要，也把原始 HTML 存到 `src/meetings/YYYY/artifacts/YYYYMMDD-<artifact-id>.html`（用 `Artifact` `read` 帶 `path: "index.html"` 取得本地檔再複製；`<artifact-id>` 為 URL 中 `/artifact/` 後的那段，不含 `?sk=`），並在 `<head>` 內加上 `<meta name="robots" content="noindex, nofollow">`（Pages 對 `artifacts/*.html` 不套版型，不會自動帶 noindex），以及在 `<summary>` 下方加一行 `> 原始 HTML 存檔：[路徑](./artifacts/...)`。
    - **僅擁有者／特定人可見，或讀不到分享設定**：只留摘要，不存 HTML。
    - 「知道連結」只代表未列出，不代表公開；HTML 存進 kb 後就是公開的。所以存檔前仍須通過下一點的公開性檢查，**HTML 含有不宜公開的資料時，即使連結分享也不存**，只留已去識別的摘要，並在最後輸出中告知使用者。
 5. **公開性檢查**：kb 是公開 repo。摘要中不要放 IP 位址、使用者 userId、email、token、內部 URL 等 artifact 裡可能有、但不宜公開的資料；若會議記錄中的相關公告（例如 takedowns）刻意不公開某些細節，摘要也比照省略，並註明「已省略」。拿不準就省略並請使用者確認。
