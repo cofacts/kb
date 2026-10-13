@@ -12,23 +12,11 @@ relative_links:
   enabled: true
   collections: false
 
-# Meeting notes contain HackMD syntax such as {%youtube ID %} — do not treat as Liquid.
-defaults:
-  - scope:
-      path: ""
-    values:
-      render_with_liquid: false
-
 exclude:
   - .agents
   - .claude
   - .env.sample
-  - AGENTS.md
-  - CLAUDE.md
-  - Gemfile
-  - Gemfile.lock
   - LICENSE
-  - vendor
 
 optional_front_matter:
   remove_originals: true
