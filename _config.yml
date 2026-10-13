@@ -1,5 +1,6 @@
 title: Cofacts Knowledge Base
 description: Cofacts meeting notes and curated wiki
+theme: jekyll-theme-minimal
 
 plugins:
   - jekyll-relative-links
