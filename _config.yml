@@ -1,6 +1,6 @@
 title: Cofacts Knowledge Base
 description: Cofacts meeting notes and curated wiki
-theme: jekyll-theme-minimal
+theme: minima
 
 plugins:
   - jekyll-relative-links
@@ -27,3 +27,7 @@ kramdown:
 # Served at https://cofacts.github.io/kb/
 url: https://cofacts.github.io
 baseurl: /kb
+
+# minima lists every page that has a title in the header by default; limit it.
+header_pages:
+  - README.md
