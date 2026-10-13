@@ -1,0 +1,41 @@
+title: Cofacts Knowledge Base
+description: Cofacts meeting notes and curated wiki
+theme: jekyll-theme-minimal
+
+plugins:
+  - jekyll-relative-links
+  - jekyll-optional-front-matter
+  - jekyll-default-layout
+  - jekyll-readme-index
+
+relative_links:
+  enabled: true
+  collections: false
+
+# Meeting notes contain HackMD syntax such as {%youtube ID %} — do not treat as Liquid.
+defaults:
+  - scope:
+      path: ""
+    values:
+      render_with_liquid: false
+
+exclude:
+  - .agents
+  - .claude
+  - .env.sample
+  - AGENTS.md
+  - CLAUDE.md
+  - Gemfile
+  - Gemfile.lock
+  - LICENSE
+  - vendor
+
+optional_front_matter:
+  remove_originals: true
+
+kramdown:
+  parse_block_html: true   # render Markdown inside <details> blocks
+
+# Served at https://cofacts.github.io/kb/
+url: https://cofacts.github.io
+baseurl: /kb

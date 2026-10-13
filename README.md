@@ -2,6 +2,8 @@
 
 [Cofacts](https://cofacts.tw) is a Taiwan-based open-source fact-checking platform run by a civic volunteer community. This repository is Cofacts' institutional memory — weekly meeting notes dating back to 2017, plus a structured wiki distilled from them.
 
+Browse online: https://cofacts.github.io/kb/
+
 ## I want to learn about Cofacts
 
 - [Cofacts website](https://cofacts.tw) — the fact-checking database and LINE Bot
