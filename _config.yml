@@ -30,7 +30,25 @@ baseurl: /kb
 
 # minima lists every page that has a title in the header by default; limit it.
 header_pages:
-  - README.md
+  - wiki/index.md
+  - src/meetings/README.md
+  - src/research/README.md
+  - src/technical-design/README.md
 
-readme_index:
-  with_frontmatter: true
+# GitHub Pages titles pages from their first heading (jekyll-titles-from-headings) and minima's
+# page/home layouts would print that title again above the heading in the content.
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+  # READMEs that have front matter are not turned into index.html by jekyll-readme-index
+  # (its with_frontmatter option double-applies when combined with other plugins).
+  - scope:
+      path: src/research/README.md
+    values:
+      permalink: /src/research/
+  - scope:
+      path: src/technical-design/README.md
+    values:
+      permalink: /src/technical-design/

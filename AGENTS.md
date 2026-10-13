@@ -2,14 +2,7 @@
 
 ## Structure
 
-```
-src/meetings/YYYY/YYYYMMDD.md   # Layer 1: raw meeting notes (read-only for wiki agents)
-wiki/                            # Layer 2: curated knowledge (agent-maintained)
-  people/
-  projects/
-  activities/
-  index.md
-```
+See [README.md](README.md#repository-structure) for the directory layout. In short: `src/` holds raw source documents (Layer 1; read-only for wiki agents), `wiki/` holds curated knowledge (Layer 2; agent-maintained).
 
 ## Layer 1: src/meetings/
 
