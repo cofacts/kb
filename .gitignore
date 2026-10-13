@@ -5,7 +5,4 @@
 Thumbs.db
 desktop.ini
 _site/
-.jekyll-cache/
-vendor/
-.bundle/
 .sass-cache/
