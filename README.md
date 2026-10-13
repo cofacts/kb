@@ -10,6 +10,8 @@ Browse online: https://cofacts.github.io/kb/
 - [wiki/projects/](wiki/projects/) — background, goals, and evolution of key initiatives
 - [wiki/people/](wiki/people/) — core contributors, their roles and focus areas
 - [wiki/activities/](wiki/activities/) — how recurring events (小聚 meetups, 大松 hackathons) are run
+- [src/research/](src/research/) — research docs: related work and design alternatives for a requirement
+- [src/technical-design/](src/technical-design/) — technical design docs
 
 ## I want to look up past records
 

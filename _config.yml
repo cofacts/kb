@@ -31,3 +31,6 @@ baseurl: /kb
 # minima lists every page that has a title in the header by default; limit it.
 header_pages:
   - README.md
+
+readme_index:
+  with_frontmatter: true
