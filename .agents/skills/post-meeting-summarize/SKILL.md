@@ -117,6 +117,15 @@ curl -s -H "Authorization: Bearer $HACKMD_API_TOKEN" \
 5. **公開性檢查**：kb 是公開 repo。摘要中不要放 IP 位址、使用者 userId、email、token、內部 URL 等 artifact 裡可能有、但不宜公開的資料；若會議記錄中的相關公告（例如 takedowns）刻意不公開某些細節，摘要也比照省略，並註明「已省略」。拿不準就省略並請使用者確認。
 6. 同一個 artifact URL 在記錄中出現多次時，只在第一次出現處加摘要。若該 URL 先前已在 `src/meetings/` 其他檔案有摘要，可直接引用該檔而不重寫。
 
+### 步驟 3.6：處理 Liquid 語法（避免 GitHub Pages build 失敗）
+
+kb 以 Jekyll 發佈到 GitHub Pages，Markdown 內的 `{%` 或 `{{` 會被當成 Liquid；HackMD 的嵌入語法（如 `{%youtube ID %}`、`{%hackmd ID %}`）會造成 `Unknown tag` 而讓整個網站無法部署。存入 wiki 前：
+
+1. 搜尋內容中的 `{%` 與 `{{`。
+2. `{%youtube ID %}` 換成 `https://www.youtube.com/watch?v=ID`（已是完整網址的就只留網址）；其他 HackMD 嵌入標籤換成對應的一般連結。
+3. 無法轉成連結的（例如程式碼範例中的 `{{ var }}`），整段用 `{% raw %}` … `{% endraw %}` 包起來。
+4. 順便把 `](/XXXX)` 這種 HackMD 短網址（站內絕對路徑）改成 `](https://g0v.hackmd.io/XXXX)`，否則在 Pages 的 `/kb` 路徑下會 404。
+
 ### 步驟 4：將會議記錄存入 wiki
 
 從會議日期（`YYYYMMDD`）決定存放路徑：`src/meetings/YYYY/YYYYMMDD.md`
@@ -200,6 +209,7 @@ curl -s -X PATCH \
 
 完成後列出本次執行的摘要：
 - 步驟 3.5 處理了哪些 artifact URL（分享狀態、是否存了 HTML、讀取失敗或因公開性而省略的內容）
+- 步驟 3.6 轉換了哪些 Liquid 語法／HackMD 短網址
 - 步驟 4 存入的檔案路徑
 - `src/meetings/README.md` 更新後的條目
 - HackMD 已更新為下週（YYYYMMDD）模板

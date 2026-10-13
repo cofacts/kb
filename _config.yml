@@ -7,16 +7,22 @@ plugins:
   - jekyll-optional-front-matter
   - jekyll-default-layout
   - jekyll-readme-index
+  - jekyll-seo-tag   # used by _includes/head.html
+  - jekyll-feed      # used by _includes/head.html
 
 relative_links:
   enabled: true
   collections: false
 
+# Setting exclude replaces Jekyll 3's defaults, so keep them. Dotfiles/dot-directories are always skipped.
 exclude:
-  - .agents
-  - .claude
-  - .env.sample
   - LICENSE
+  - AGENTS.md
+  - CLAUDE.md
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor
 
 optional_front_matter:
   remove_originals: true

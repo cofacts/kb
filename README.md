@@ -56,4 +56,4 @@ wiki/
 
 ---
 
-> Maintenance workflow and AI agent conventions: see [AGENTS.md](AGENTS.md) and [CLAUDE.md](CLAUDE.md)
+> Maintenance workflow and AI agent conventions: see [AGENTS.md](https://github.com/cofacts/kb/blob/main/AGENTS.md) and [CLAUDE.md](https://github.com/cofacts/kb/blob/main/CLAUDE.md)
