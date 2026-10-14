@@ -1,0 +1,393 @@
+<!doctype html><html><head><meta name="robots" content="noindex, nofollow"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>向量搜尋 staging 實測</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: single reading column (~72ch) with wide tables/charts allowed to scroll inside their own boxes. */
+:root {
+  --bg: #f7f8f9;
+  --surface: #ffffff;
+  --fg: #1d2329;
+  --muted: #5b6670;
+  --line: #dde2e7;
+  --accent: #1f6fb2;
+  --accent-soft: #e6f0f9;
+  --warn: #9a5b00;
+  --warn-soft: #fbf1e1;
+  --good: #17763f;
+  --good-soft: #e5f4ea;
+  --code-bg: #eef1f4;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a;
+  --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14181c; --surface: #1b2026; --fg: #e6eaee; --muted: #9aa5b0; --line: #2d353d;
+    --accent: #6fb0ea; --accent-soft: #1d2d3c; --warn: #e3a748; --warn-soft: #2e2516;
+    --good: #5cc98a; --good-soft: #17291f; --code-bg: #232a31;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #14181c; --surface: #1b2026; --fg: #e6eaee; --muted: #9aa5b0; --line: #2d353d;
+  --accent: #6fb0ea; --accent-soft: #1d2d3c; --warn: #e3a748; --warn-soft: #2e2516;
+  --good: #5cc98a; --good-soft: #17291f; --code-bg: #232a31;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15.5px; line-height: 1.75; margin: 0; }
+.wrap { max-width: 920px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 80px; }
+.prose { max-width: 72ch; }
+h1, h2, h3 { text-wrap: balance; line-height: 1.35; }
+h1 { font-size: 1.9rem; margin: 0 0 8px; }
+h2 { font-size: 1.35rem; margin: 56px 0 12px; padding-top: 16px; border-top: 1px solid var(--line); }
+h3 { font-size: 1.08rem; margin: 32px 0 8px; }
+p { margin: 0 0 12px; }
+a { color: var(--accent); text-underline-offset: 2px; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+code, .mono { font-family: var(--font-mono); font-size: 0.86em; }
+code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+pre { background: var(--code-bg); padding: 12px 14px; border-radius: 6px; overflow-x: auto; font-size: 0.84rem; line-height: 1.55; margin: 0 0 14px; }
+pre code { background: none; padding: 0; }
+.meta { color: var(--muted); font-size: 0.9rem; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.lede { font-size: 1.05rem; margin-top: 18px; }
+.tldr { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; margin-top: 24px; }
+.tldr h2 { border: 0; margin: 0 0 8px; padding: 0; font-size: 1.1rem; }
+.tldr ol { margin: 0; padding-left: 1.3em; display: grid; gap: 8px; }
+.callout { border-left: 3px solid var(--warn); background: var(--warn-soft); padding: 10px 14px; border-radius: 0 6px 6px 0; margin: 14px 0; }
+.callout.good { border-color: var(--good); background: var(--good-soft); }
+.callout.info { border-color: var(--accent); background: var(--accent-soft); }
+.label { font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.tbl { overflow-x: auto; margin: 10px 0 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.88rem; font-variant-numeric: tabular-nums; }
+th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 700; color: var(--muted); font-size: 0.78rem; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; white-space: nowrap; }
+td.bad { color: var(--warn); font-weight: 700; }
+td.ok { color: var(--good); font-weight: 700; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0 16px; }
+.doc { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; min-width: 0; font-size: 0.86rem; line-height: 1.6; }
+.doc .id { font-family: var(--font-mono); font-size: 0.78rem; display: block; margin-bottom: 4px; overflow-wrap: anywhere; }
+.doc .t { overflow-wrap: anywhere; }
+.doc .x { color: var(--muted); margin-top: 6px; overflow-wrap: anywhere; }
+.pairhead { font-size: 0.86rem; color: var(--muted); margin-top: 14px; }
+.pairhead b { color: var(--fg); font-family: var(--font-mono); }
+@media (max-width: 620px) { .pair { grid-template-columns: 1fr; } }
+.chart-box { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 12px 10px; margin: 12px 0 8px; overflow-x: auto; position: relative; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.84rem; margin: 0 4px 8px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+svg text { fill: var(--muted); font-family: var(--font-body); }
+svg .grp text { fill: var(--muted); }
+#tip { position: absolute; pointer-events: none; background: var(--fg); color: var(--bg); font-size: 0.8rem; padding: 6px 9px; border-radius: 5px; line-height: 1.45; white-space: nowrap; }
+ul.tight { padding-left: 1.2em; margin: 0 0 12px; display: grid; gap: 4px; }
+.steps { padding-left: 1.3em; display: grid; gap: 10px; }
+.steps li::marker { color: var(--accent); font-weight: 700; }
+details { margin: 10px 0; }
+summary { cursor: pointer; color: var(--accent); font-weight: 500; }
+</style>
+
+<div class="wrap">
+<header class="prose">
+  <div class="label">rumors-api · cofacts/rumors-api#388 · 混合搜尋（BM25 + kNN）</div>
+  <h1>向量搜尋 staging 實測</h1>
+  <div class="meta"><span>2026-10-08</span><span>staging（production snapshot）</span><span>996 篇已 backfill 的文章</span><span>gemini-embedding-2 · 768 維</span></div>
+  <p class="lede">在 staging backfill 了 1,000 篇文章的 embedding，用離線實驗量測：同一則謠言改寫、轉傳、翻譯之後，向量還找不找得到原文；以及不相關的文章會不會被誤判成相似。這份報告整理測了什麼、看到什麼，以及在全量 backfill 之前建議先改的地方。</p>
+</header>
+
+<section class="tldr prose">
+  <h2>重點摘要</h2>
+  <ol>
+    <li><b><code>taskType</code> 對 gemini-embedding-2 完全沒有作用。</b>同一段文字用 <code>RETRIEVAL_QUERY</code>、<code>RETRIEVAL_DOCUMENT</code>、<code>SEMANTIC_SIMILARITY</code> 算出的向量逐位元相同。官方做法是把任務寫進文字前綴。</li>
+    <li><b>只有網址的文章（佔文字文章 34%）會互相黏在一起。</b>兩個內容無關的 Facebook 分享連結 cosine 可達 0.999；相似度最高的 50 組配對中，46 組是這類文章。改用「原文＋連結標題與摘要」來算 embedding 可以大幅改善。</li>
+    <li><b>0.7 門檻幾乎過濾不掉雜訊。</b>在 996 篇隨機文章裡，一半的查詢光是「最像的不相關文章」就超過 0.777。到了 27.9 萬篇的全庫，kNN 實際上會變成「取最近的 k 篇」，而不是「取相似度超過門檻的」。</li>
+    <li><b>用文字查不到圖片和影片。</b>拿圖片的 OCR 文字去比對該圖片自己的向量，cosine 中位數只有 0.62，<b>100% 低於 0.7</b>。因為 kNN 是硬性過濾，開啟 hybrid 後文字查詢會把所有圖片文章排除掉，即使 BM25 本來找得到。</li>
+    <li><b>近似重複的偵測很穩，改寫和翻譯則中等。</b>加「轉傳」前綴、去標點、改簡體、英譯等情況，cosine 大多在 0.85～0.95。只用關鍵字查詢時最弱，現行設定下有 26% 低於 0.7。</li>
+  </ol>
+  <p style="margin-top:12px">建議先改完 embedding 的輸入格式和 kNN 的套用方式，<b>確定設定後再全量 backfill</b>。目前 cache key 只有 docId，改了設定後舊的向量會被悄悄沿用。</p>
+</section>
+
+<h2>測了什麼</h2>
+<div class="prose">
+<h3>資料</h3>
+<p>staging 的資料是 production 的 snapshot。用 PR 附的 <code>backfillVertexEmbeddings</code> 跑了 <code>--limit 1000</code>，scroll 沒有排序，所以等於從約 27.9 萬篇沒有 embedding 的文章中隨機抽樣。其中 999 篇成功；失敗的 1 篇是音訊文章，Gemini 回傳 400 INVALID_ARGUMENT（見「其他問題」一節）。有 3 篇影片文章共用同一個媒體檔，因此 airesponses 裡實際只有 996 筆向量。</p>
+<div class="tbl"><table>
+<thead><tr><th>類型</th><th class="num">篇數</th><th>說明</th></tr></thead>
+<tbody>
+<tr><td>TEXT</td><td class="num">741</td><td>其中 251 篇只有網址；232 篇的 <code>hyperlinks</code> 有解析出可用的標題或摘要</td></tr>
+<tr><td>IMAGE</td><td class="num">175</td><td>向量從圖片本身算出；比對時用的是 <code>text</code> 欄位裡的 OCR 文字</td></tr>
+<tr><td>VIDEO</td><td class="num">80</td><td>向量從影片前 80 秒算出；比對時用的是逐字稿</td></tr>
+</tbody></table></div>
+
+<h3>方法</h3>
+<p>這是<b>離線實驗</b>：從 <code>airesponses</code> 讀出文章向量，查詢向量直接呼叫 Gemini 產生，再在記憶體裡算 cosine。<b>沒有經過 ES 的 kNN 查詢</b>，也沒有測 BM25 和 hybrid 的排序。查詢和正確答案的配對是人工造出來的：拿池子裡的一篇文章做變形當成查詢，正確答案就是原文。</p>
+<ul class="tight">
+  <li><b>規則式變形</b>（688 篇有文字的文章）：加前綴「轉傳：」、加前綴「這是真的嗎？」、加結尾「請大家轉發分享🙏」、去掉 emoji 和標點、去掉網址、去掉網址的追蹤參數、取前半段、取後半段、只取前 50 字。</li>
+  <li><b>LLM 變形</b>（隨機抽 200 篇，用 Gemini flash-lite 產生）：改寫、一句話摘要、英譯、越南文、簡體中文、3～5 個關鍵字。</li>
+  <li><b>原文自查</b>：用原文（媒體文章則用 OCR 文字或逐字稿）去查。</li>
+</ul>
+<p>每個查詢都和池子裡全部 996 篇算 cosine，記錄以下指標：</p>
+<ul class="tight">
+  <li><b>和原文的 cosine</b></li>
+  <li><b>排第一的比例</b>：原文是否是最相似的一篇。池子裡本來就有真的重複文章，所以這個數字偏保守。</li>
+  <li><b>背景值</b>：最相似的「非原文」文章的 cosine，代表雜訊大概會到多高。</li>
+</ul>
+
+<h3>比較的格式</h3>
+<p>因為 <code>taskType</code> 沒有作用，改成比較官方建議的文字前綴，以及「把連結內容一起算進去」的作法。</p>
+<div class="tbl"><table>
+<thead><tr><th>代號</th><th>查詢端的文字</th><th>文件端的文字</th></tr></thead>
+<tbody>
+<tr><td><b>RAW</b>（PR 現況）</td><td><code>{text}</code></td><td><code>{text}</code></td></tr>
+<tr><td><b>ASYM_SEARCH</b></td><td><code>task: search result | query: {text}</code></td><td><code>title: none | text: {text}</code></td></tr>
+<tr><td>ASYM_FACTCHECK</td><td><code>task: fact checking | query: {text}</code></td><td>同上</td></tr>
+<tr><td>SYM_SIM</td><td><code>task: sentence similarity | query: {text}</code></td><td>同左</td></tr>
+<tr><td>EXP_RAW</td><td>原文＋連結標題與摘要</td><td>原文＋連結標題與摘要</td></tr>
+<tr><td><b>EXP_ASYM_SEARCH</b></td><td><code>task: search result | query: </code>原文＋連結內容</td><td><code>title: none | text: </code>原文＋連結內容</td></tr>
+</tbody></table></div>
+<p>「連結內容」取自 <code>articles.hyperlinks[].title / summary</code>，並過濾掉 FB 登入牆（例如「このページを見るには、ログイン…」）、「Sorry, we're having trouble playing this video」這類沒有實際內容的文字。查詢端只在網址還留在查詢裡時才展開，模擬 <code>ListArticles</code> 用 <code>scrapUrls</code> 的作法。媒體文章一律沿用已存的向量，不加前綴，因為官方不建議對多模態輸入加前綴。</p>
+
+<div class="callout info"><b>限制：</b>996 篇隨機樣本裡幾乎沒有「同一則謠言的不同版本」這種天然配對，所以這份報告<b>量不到真實的 recall</b>，只能看各種變形下向量的穩定度，以及雜訊的程度。真實 recall 需要全量資料加上 reply 群組當標準答案，見最後的「交接」一節。</div>
+</div>
+
+<h2>觀察 1：<code>taskType</code> 被忽略</h2>
+<div class="prose">
+<p>三種 <code>taskType</code> 是三次獨立的 API 呼叫、cache key 也不同，但回傳的向量最大絕對差是 0。<a href="https://ai.google.dev/gemini-api/docs/embeddings" target="_blank" rel="noopener">Gemini embeddings 文件</a>明確寫到 gemini-embedding-2 不能用 <code>task_type</code>，要把任務寫進文字：查詢用 <code>task: search result | query: …</code>，文件用 <code>title: none | text: …</code>。</p>
+<p>這代表 PR 裡 <code>createEmbedding</code> 傳的 <code>taskType</code> 沒有任何效果，現在查詢端和文件端其實都是用原文、不加前綴去算。好消息是原文查自己的 cosine 是 1.0，不會發生「一模一樣的文字被門檻擋掉」的情況。</p>
+</div>
+
+<h2>觀察 2：只有網址的文章互相黏在一起</h2>
+<div class="prose">
+<p>RAW 格式只看得到網址字串，所以不同的 Facebook 分享連結長得幾乎一樣。996 篇兩兩比對，相似度最高的 50 組裡：</p>
+</div>
+<div class="tbl"><table>
+<thead><tr><th>文件端格式</th><th class="num">兩邊都只有網址</th><th class="num">其中連結相同（真的重複）</th><th class="num">其中連結不同</th><th class="num">內文真的相似</th><th class="num">第 50 名的 cosine</th></tr></thead>
+<tbody>
+<tr><td>RAW（現況）</td><td class="num">46</td><td class="num">13</td><td class="num bad">33</td><td class="num">0</td><td class="num">0.996</td></tr>
+<tr><td>ASYM_SEARCH</td><td class="num">35</td><td class="num">14</td><td class="num">21</td><td class="num">0</td><td class="num">0.991</td></tr>
+<tr><td>EXP_ASYM_SEARCH</td><td class="num">28</td><td class="num">16</td><td class="num">12</td><td class="num ok">6</td><td class="num">0.948</td></tr>
+</tbody></table></div>
+<div class="prose"><p>其餘的配對都是媒體文章。另外 3 組 cosine 1.0 的影片配對是因為三篇用同一個檔案，所以向量本來就一樣。</p></div>
+
+<h3>RAW 下被誤判為幾乎相同的配對</h3>
+<div id="ex-url"></div>
+
+<h3>加上連結內容之後</h3>
+<div class="prose"><p>加上連結內容後，排在前面的變成真正的重複：同一支 YouTube 影片只差追蹤參數，或同一則謠言的不同版本。<code>url_strip_params</code>（把網址的追蹤參數去掉再查）找到原文排第一的比例，從 RAW 的 0.62 提高到 0.96。</p></div>
+<div id="ex-exp"></div>
+<div class="callout"><b>剩下的 12 組</b>幾乎都是 FB <code>share/p</code>、<code>share/r</code> 連結，url-resolver 只拿到登入牆，沒有任何可用內容。這類文章算 embedding 只會製造雜訊，建議<b>不要算</b>。但目前 kNN 是硬性過濾，沒有向量的文章會被直接排除，所以這一點要和觀察 4 的建議一起改。</div>
+
+<h2>觀察 3：0.7 門檻與 recall</h2>
+<div class="prose">
+<p>背景值是「最像的那篇非原文文章的 cosine」，代表門檻至少要設多高才擋得住雜訊。下表是各格式在 996 篇池子裡的背景值：</p>
+</div>
+<div class="tbl"><table id="bg-table"></table></div>
+<div class="prose">
+<p>RAW 的背景中位數是 0.777。也就是說，在這麼小、這麼隨機的池子裡，<b>一半的查詢光靠不相關的文章就能超過 0.7</b>。到了 27.9 萬篇的全庫，超過門檻的候選只會更多，所以 kNN 實際上會被 <code>num_candidates</code> 或 <code>k</code> 的上限卡住，變成「取最近的 k 篇」。不同格式的 cosine 分數尺度不同（例如 SYM_SIM 整體偏高），所以門檻要針對最後選定的格式重新校準，不能直接沿用 0.7。</p>
+<p>下表是 RAW（現況）在各種變形下，原文 cosine 低於門檻、會被 kNN 過濾掉的比例：</p>
+</div>
+<div class="tbl"><table id="drop-table"></table></div>
+
+<h2>觀察 4：用文字查不到圖片和影片</h2>
+<div class="prose">
+<p>拿圖片的 OCR 文字去比對該圖片自己的向量（跨模態）時：</p>
+<ul class="tight">
+<li><b>RAW</b>：cosine 中位數 0.62，100% 低於 0.7，排第一的比例是 0。</li>
+<li><b>影片</b>：69% 低於 0.7。</li>
+<li><b>ASYM_SEARCH</b>：查詢加上前綴後，中位數提高到 0.76，排第一的比例 0.62，但仍低於文字對文字的水準。</li>
+</ul>
+<p>因為 kNN 是 <code>bool.filter</code> 加上 <code>minimum_should_match: 0</code>，被 kNN 刷掉的文章 BM25 也救不回來。<b>只要開啟 hybrid，文字查詢就幾乎不會出現圖片文章</b>，即使圖片的 OCR 文字和查詢一模一樣。例子：</p>
+</div>
+<div id="ex-img"></div>
+<div class="prose"><p>這兩例中，排在原圖前面的那篇文字文章其實內容相關，同樣是詐騙手法。問題在於跨模態的分數整體比文字對文字低一截，所以不管門檻設多少，混在同一個池子裡排序時，圖片都會輸給文字。</p></div>
+
+<h2>觀察 5：各格式比較</h2>
+<div class="prose"><p>下圖是各種變形下，原文排第一的比例。藍色是現況，橘色是加上官方前綴，綠色是加上前綴並展開連結內容。</p></div>
+<div class="chart-box" id="chart-box">
+  <div class="legend"><span><i style="background:var(--s1)"></i>RAW（現況）</span><span><i style="background:var(--s2)"></i>ASYM_SEARCH</span><span><i style="background:var(--s3)"></i>EXP_ASYM_SEARCH</span></div>
+  <div id="chart"></div>
+  <div id="tip" hidden></div>
+</div>
+<div class="prose">
+<p><b>怎麼讀這張圖：</b></p>
+<ul class="tight">
+<li><b>ASYM_SEARCH 幾乎每一列都贏 RAW。</b>差距最大的是跨模態（圖片 0→0.62）、去標點（0.86→0.99）、加結尾（0.76→0.94）、翻譯和改寫（+0.1 左右）。</li>
+<li><b>EXP_ASYM_SEARCH 在「查詢裡還留著網址」的情況最好</b>（加前綴或結尾約 0.98～0.99，去追蹤參數 0.96）。</li>
+<li><b>但查詢沒有網址時，EXP 會變差</b>，例如取前半、去標點導致網址斷掉，以及 LLM 改寫。原因是文件端的向量混入了連結內容，查詢端卻沒有。</li>
+</ul>
+<p>從這點推測，比較好的作法可能是<b>每篇文章存兩個向量</b>：一個只用原文，一個用原文＋連結內容。<code>embeddings</code> 本來就是 nested array，搭配 <code>score_mode: max</code> 就能各取所長。這個作法還沒測，建議列為下一輪的比較組。</p>
+</div>
+<details><summary>完整數字表（6 種格式 × 18 種變形）</summary><div class="tbl"><table id="full-table"></table></div></details>
+
+<h2>其他問題</h2>
+<div class="prose">
+<ul class="tight">
+<li><b>音訊 400 錯誤：</b><a href="https://dev.cofacts.tw/article/zUeT4ZwBB0eXeo826-DL" target="_blank" rel="noopener">zUeT4ZwBB0eXeo826-DL</a>（AUDIO）在 backfill 時收到 <code>400 INVALID_ARGUMENT</code>。可能的原因有三個：GCS 上的 <code>contentType</code> 不被模型接受、音訊不該帶 <code>videoMetadata.endOffset</code>，或檔案本身有問題，還沒釐清。ERROR 不會被 cache，所以每次重跑 backfill 都會再打一次。</li>
+<li><b>cache key 沒有包含設定版本：</b>airesponses 的 EMBEDDING cache 只以 <code>docId</code> 為 key。以後改格式、換模型或改維度，舊的向量都會被悄悄沿用。</li>
+<li><b>沒有向量的文章會消失：</b>kNN 放在 <code>bool.filter</code>，所以還沒 backfill、或刻意不算向量的文章，一開 hybrid 就搜不到。</li>
+<li><b>未登入時會悄悄退回 BM25：</b>查詢向量沒有 cache 時，<code>createEmbedding</code> 需要 user 才能建立，否則丟出例外，被 catch 之後就只跑 BM25。做線上 A/B 時一定要帶 app 憑證，並確認 airesponses 有產生 <code>query-text:*</code> 的紀錄。</li>
+<li><b>kNN 的 k 可能等於 <code>size</code>（待驗證）：</b>ES 的 <code>knn</code> query 的 <code>k</code> 預設等於 request 的 size。如果是這樣，<code>first: 10</code> 時每個 shard 只會留最近的 10 筆，<code>totalCount</code> 和翻頁都會受影響。</li>
+</ul>
+</div>
+
+<h2>給 PR 的建議</h2>
+<div class="prose">
+<ol class="steps">
+<li><b>拿掉 <code>taskType</code>，改用文字前綴。</b>文件端用 <code>title: none | text: …</code>，查詢端用 <code>task: search result | query: …</code>；媒體不加前綴。<code>task: fact checking</code> 的結果和 search 差不多，search 稍好。</li>
+<li><b>embedding 的輸入要包含連結內容。</b>文件端用原文加上過濾過的 <code>hyperlinks</code> 標題與摘要；查詢端在 <code>ListArticles</code> 裡把 <code>scrapUrls</code> 的結果用同樣方式組進去（BM25 已經這樣做了）。只有網址而且解析不出內容的文章，不要算向量。可以評估「每篇存兩個向量」的作法。</li>
+<li><b>kNN 不要做成硬性過濾。</b>至少改成「kNN 命中，或這篇沒有向量」才保留。更好的作法是 kNN 和 BM25 取聯集再融合排序（例如 RRF），避免跨模態和還沒 backfill 的文章整批消失。</li>
+<li><b>門檻依最後選定的格式重新校準。</b>以 ASYM_SEARCH 為例，非網址文章的背景第 95 百分位約 0.89，RAW 的 0.7 不能直接沿用。</li>
+<li><b>cache key 要包含設定版本</b>（模型、維度、格式），或把版本存進 airesponses 並在讀取時檢查。</li>
+<li><b>修掉音訊 400 的問題</b>，之後再全量 backfill。</li>
+</ol>
+</div>
+
+<h2>交接：下一輪測試</h2>
+<div class="prose">
+<p>YuTin 會把 production 的 ES 備份 restore 到自己的機器上，就能做 staging 上做不到的完整測試。建議順序如下：</p>
+<ol class="steps">
+<li><b>先選定格式。</b>依上面的建議改完 PR，加上「每篇存兩個向量」作為比較組。可以先用評估腳本在小池子上比較，不需要全量資料。</li>
+<li><b>全量 backfill 文字文章和 replies。</b>staging 上 concurrency 2 大約每秒 1.6 篇，27.9 萬篇約 48 小時，建議調高 concurrency 並注意 429。媒體文章可以晚點再做。</li>
+<li><b>用 reply 群組當標準答案量真實 recall。</b>連到同一則 reply 的多篇文章視為同一則謠言。只用 RUMOR、NOT_RUMOR、OPINIONATED 類型的 reply，並排除被連到太多篇的通用回覆。每個群組取一篇當查詢，透過 <code>ListArticles</code> 比較 BM25 和 hybrid 的 Recall@10/@50、BM25 找得到但 hybrid 沒有的比例，以及 hybrid 額外找到的比例。</li>
+<li><b>驗證 ES 的行為。</b>同一個查詢用 <code>first: 10</code> 和 <code>first: 50</code>，比較 <code>totalCount</code>；確認沒有向量的文章在 hybrid 下的表現；呼叫時要帶 app 憑證。</li>
+<li><b>媒體測試。</b>圖片重新壓縮、裁切、截圖後再截圖；音訊關鍵內容在 80 秒之後；文字查圖片的情況，對應觀察 4。</li>
+<li><b>ListReplies。</b>replies 是用 text＋reference 算 embedding，reference 裡的網址可能也有觀察 2 的問題。</li>
+</ol>
+<h3>評估腳本</h3>
+<p><code>evalEmbeddings.js</code>（另外提供）是單一檔案的 Node 腳本，只會讀 ES，不會寫入。它會找出 <code>airesponses</code> 裡 <code>userId: embedding-backfill</code> 的向量，自己呼叫 Gemini 產生查詢向量並快取，可以中斷後續跑。在 rumors-api 根目錄執行：</p>
+<pre><code># 會用到 ./build/util/genai 與 ./build/util/client（若有），否則改用 @google/genai + @elastic/elasticsearch
+# env：ELASTICSEARCH_URL、GOOGLE_APPLICATION_CREDENTIALS（Vertex AI）
+node evalEmbeddings.js --out /tmp/eval --dry-run
+node evalEmbeddings.js --out /tmp/eval --limit 30 --llm-sample 5
+node evalEmbeddings.js --out /tmp/eval --concurrency 8
+node evalEmbeddings.js --help   # --arms、--perturb-arms、--llm-sample 等參數</code></pre>
+<p>產出的檔案包括 <code>summary.json</code>、<code>self.csv</code>、<code>perturb.csv</code>、<code>background.csv</code>、<code>pairs_*.csv</code>、<code>examples.json</code>，以及 <code>queries.jsonl</code>。<code>queries.jsonl</code> 收錄所有查詢原文，可以直接拿去打 <code>ListArticles</code> 做線上 A/B。這次 staging 那輪的設定是 6 種格式，約 2.1 萬次 embedding 呼叫，花了 27 分鐘。</p>
+</div>
+</div>
+
+<script>
+const DATA = {"rows":{"self:TEXT_urlOnly":{"RAW":{"n":251,"p50":1,"rank1":1,"mBelow0":0,"fb":{"0.6":0,"0.65":0,"0.7":0,"0.75":0,"0.8":0,"0.85":0}},"ASYM_SEARCH":{"n":251,"p50":0.8921,"rank1":0.9801,"mBelow0":0.0199,"fb":null},"ASYM_FACTCHECK":{"n":251,"p50":0.8487,"rank1":0.9363,"mBelow0":0.0637,"fb":null},"SYM_SIM":{"n":251,"p50":1,"rank1":1,"mBelow0":0,"fb":null},"EXP_RAW":{"n":251,"p50":1,"rank1":1,"mBelow0":0,"fb":null},"EXP_ASYM_SEARCH":{"n":251,"p50":0.9715,"rank1":0.992,"mBelow0":0.008,"fb":null}},"prefix_fwd":{"RAW":{"n":688,"p50":0.9481,"rank1":0.766,"mBelow0":0.234,"fb":{"0.6":0,"0.65":0,"0.7":0,"0.75":0,"0.8":0.0102,"0.85":0.2195}},"ASYM_SEARCH":{"n":688,"p50":0.9402,"rank1":0.8997,"mBelow0":0.1003,"fb":null},"ASYM_FACTCHECK":{"n":688,"p50":0.9237,"rank1":0.7573,"mBelow0":0.2427,"fb":null},"SYM_SIM":{"n":688,"p50":0.9854,"rank1":1,"mBelow0":0,"fb":null},"EXP_RAW":{"n":688,"p50":0.967,"rank1":0.9797,"mBelow0":0.0203,"fb":null},"EXP_ASYM_SEARCH":{"n":688,"p50":0.9636,"rank1":0.9884,"mBelow0":0.0116,"fb":null}},"prefix_q":{"RAW":{"n":688,"p50":0.9477,"rank1":0.7282,"mBelow0":0.2718,"fb":{"0.6":0,"0.65":0,"0.7":0,"0.75":0.0436,"0.8":0.2195,"0.85":0.2776}},"ASYM_SEARCH":{"n":688,"p50":0.9316,"rank1":0.7384,"mBelow0":0.2616,"fb":null},"ASYM_FACTCHECK":{"n":688,"p50":0.9227,"rank1":0.7267,"mBelow0":0.2733,"fb":null},"SYM_SIM":{"n":688,"p50":0.9772,"rank1":0.9172,"mBelow0":0.0828,"fb":null},"EXP_RAW":{"n":688,"p50":0.965,"rank1":0.9695,"mBelow0":0.0305,"fb":null},"EXP_ASYM_SEARCH":{"n":688,"p50":0.9533,"rank1":0.9782,"mBelow0":0.0218,"fb":null}},"suffix_share":{"RAW":{"n":688,"p50":0.9422,"rank1":0.7631,"mBelow0":0.2369,"fb":{"0.6":0,"0.65":0,"0.7":0,"0.75":0.0015,"0.8":0.064,"0.85":0.2355}},"ASYM_SEARCH":{"n":688,"p50":0.9402,"rank1":0.9419,"mBelow0":0.0581,"fb":null},"ASYM_FACTCHECK":{"n":688,"p50":0.9316,"rank1":0.7776,"mBelow0":0.2224,"fb":null},"SYM_SIM":{"n":688,"p50":0.9828,"rank1":0.9956,"mBelow0":0.0044,"fb":null},"EXP_RAW":{"n":688,"p50":0.9679,"rank1":0.984,"mBelow0":0.016,"fb":null},"EXP_ASYM_SEARCH":{"n":688,"p50":0.9655,"rank1":0.9913,"mBelow0":0.0087,"fb":null}},"strip_emoji_punct":{"RAW":{"n":678,"p50":0.938,"rank1":0.8614,"mBelow0":0.1386,"fb":{"0.6":0,"0.65":0,"0.7":0,"0.75":0.0029,"0.8":0.0118,"0.85":0.031}},"ASYM_SEARCH":{"n":678,"p50":0.9282,"rank1":0.9867,"mBelow0":0.0133,"fb":null},"ASYM_FACTCHECK":{"n":678,"p50":0.9239,"rank1":0.9897,"mBelow0":0.0103,"fb":null},"SYM_SIM":{"n":678,"p50":0.9827,"rank1":1,"mBelow0":0,"fb":null},"EXP_RAW":{"n":678,"p50":0.8964,"rank1":0.7006,"mBelow0":0.2994,"fb":null},"EXP_ASYM_SEARCH":{"n":678,"p50":0.9163,"rank1":0.7375,"mBelow0":0.2625,"fb":null}},"strip_urls":{"RAW":{"n":241,"p50":0.9646,"rank1":0.9917,"mBelow0":0.0083,"fb":{"0.6":0,"0.65":0,"0.7":0,"0.75":0,"0.8":0.0083,"0.85":0.0622}},"ASYM_SEARCH":{"n":241,"p50":0.9349,"rank1":0.9959,"mBelow0":0.0041,"fb":null},"ASYM_FACTCHECK":{"n":241,"p50":0.9334,"rank1":0.9959,"mBelow0":0.0041,"fb":null},"SYM_SIM":{"n":241,"p50":0.9893,"rank1":0.9917,"mBelow0":0.0083,"fb":null},"EXP_RAW":{"n":241,"p50":0.9349,"rank1":0.9751,"mBelow0":0.0249,"fb":null},"EXP_ASYM_SEARCH":{"n":241,"p50":0.9273,"rank1":0.9751,"mBelow0":0.0249,"fb":null}},"url_strip_params":{"RAW":{"n":225,"p50":0.9822,"rank1":0.6222,"mBelow0":0.3778,"fb":{"0.6":0,"0.65":0,"0.7":0,"0.75":0,"0.8":0,"0.85":0.0133}},"ASYM_SEARCH":{"n":225,"p50":0.87,"rank1":0.88,"mBelow0":0.12,"fb":null},"ASYM_FACTCHECK":{"n":225,"p50":0.8337,"rank1":0.8711,"mBelow0":0.1289,"fb":null},"SYM_SIM":{"n":225,"p50":0.9838,"rank1":0.9244,"mBelow0":0.0756,"fb":null},"EXP_RAW":{"n":225,"p50":0.9918,"rank1":0.9556,"mBelow0":0.0444,"fb":null},"EXP_ASYM_SEARCH":{"n":225,"p50":0.9692,"rank1":0.9556,"mBelow0":0.0444,"fb":null}},"first_half":{"RAW":{"n":688,"p50":0.9427,"rank1":0.7994,"mBelow0":0.2006,"fb":{"0.6":0,"0.65":0,"0.7":0.0029,"0.75":0.0102,"0.8":0.032,"0.85":0.0872}},"ASYM_SEARCH":{"n":688,"p50":0.8987,"rank1":0.8823,"mBelow0":0.1177,"fb":null},"ASYM_FACTCHECK":{"n":688,"p50":0.8978,"rank1":0.8779,"mBelow0":0.1221,"fb":null},"SYM_SIM":{"n":688,"p50":0.9642,"rank1":0.8852,"mBelow0":0.1148,"fb":null},"EXP_RAW":{"n":688,"p50":0.8933,"rank1":0.6788,"mBelow0":0.3212,"fb":null},"EXP_ASYM_SEARCH":{"n":688,"p50":0.8848,"rank1":0.689,"mBelow0":0.311,"fb":null}},"second_half":{"RAW":{"n":688,"p50":0.867,"rank1":0.6904,"mBelow0":0.3096,"fb":{"0.6":0.0058,"0.65":0.0262,"0.7":0.0698,"0.75":0.1279,"0.8":0.2442,"0.85":0.4201}},"ASYM_SEARCH":{"n":688,"p50":0.8325,"rank1":0.7529,"mBelow0":0.2471,"fb":null},"ASYM_FACTCHECK":{"n":688,"p50":0.8301,"rank1":0.7267,"mBelow0":0.2733,"fb":null},"SYM_SIM":{"n":688,"p50":0.9157,"rank1":0.8576,"mBelow0":0.1424,"fb":null},"EXP_RAW":{"n":688,"p50":0.816,"rank1":0.5901,"mBelow0":0.4099,"fb":null},"EXP_ASYM_SEARCH":{"n":688,"p50":0.8186,"rank1":0.6119,"mBelow0":0.3881,"fb":null}},"first50":{"RAW":{"n":499,"p50":0.9174,"rank1":0.9018,"mBelow0":0.0982,"fb":{"0.6":0.02,"0.65":0.0381,"0.7":0.0641,"0.75":0.0902,"0.8":0.1383,"0.85":0.2124}},"ASYM_SEARCH":{"n":499,"p50":0.885,"rank1":0.9659,"mBelow0":0.0341,"fb":null},"ASYM_FACTCHECK":{"n":499,"p50":0.8873,"rank1":0.9579,"mBelow0":0.0421,"fb":null},"SYM_SIM":{"n":499,"p50":0.958,"rank1":0.9579,"mBelow0":0.0421,"fb":null},"EXP_RAW":{"n":499,"p50":0.8682,"rank1":0.7315,"mBelow0":0.2685,"fb":null},"EXP_ASYM_SEARCH":{"n":499,"p50":0.8673,"rank1":0.8417,"mBelow0":0.1583,"fb":null}},"llm_zh_cn":{"RAW":{"n":200,"p50":0.8655,"rank1":0.72,"mBelow0":0.28,"fb":{"0.6":0.025,"0.65":0.045,"0.7":0.08,"0.75":0.115,"0.8":0.225,"0.85":0.44}},"ASYM_SEARCH":{"n":200,"p50":0.8687,"rank1":0.81,"mBelow0":0.19,"fb":null},"ASYM_FACTCHECK":{"n":200,"p50":0.8717,"rank1":0.805,"mBelow0":0.195,"fb":null},"SYM_SIM":{"n":200,"p50":0.9555,"rank1":0.82,"mBelow0":0.18,"fb":null},"EXP_RAW":{"n":200,"p50":0.825,"rank1":0.64,"mBelow0":0.36,"fb":null},"EXP_ASYM_SEARCH":{"n":200,"p50":0.8551,"rank1":0.705,"mBelow0":0.295,"fb":null}},"llm_paraphrase":{"RAW":{"n":200,"p50":0.8654,"rank1":0.68,"mBelow0":0.32,"fb":{"0.6":0.015,"0.65":0.04,"0.7":0.055,"0.75":0.115,"0.8":0.22,"0.85":0.425}},"ASYM_SEARCH":{"n":200,"p50":0.8621,"rank1":0.79,"mBelow0":0.21,"fb":null},"ASYM_FACTCHECK":{"n":200,"p50":0.8682,"rank1":0.78,"mBelow0":0.22,"fb":null},"SYM_SIM":{"n":200,"p50":0.941,"rank1":0.81,"mBelow0":0.19,"fb":null},"EXP_RAW":{"n":200,"p50":0.8418,"rank1":0.61,"mBelow0":0.39,"fb":null},"EXP_ASYM_SEARCH":{"n":200,"p50":0.8538,"rank1":0.695,"mBelow0":0.305,"fb":null}},"llm_en":{"RAW":{"n":200,"p50":0.8628,"rank1":0.73,"mBelow0":0.27,"fb":{"0.6":0.025,"0.65":0.065,"0.7":0.12,"0.75":0.185,"0.8":0.27,"0.85":0.45}},"ASYM_SEARCH":{"n":200,"p50":0.8688,"rank1":0.83,"mBelow0":0.17,"fb":null},"ASYM_FACTCHECK":{"n":200,"p50":0.8604,"rank1":0.825,"mBelow0":0.175,"fb":null},"SYM_SIM":{"n":200,"p50":0.9382,"rank1":0.825,"mBelow0":0.175,"fb":null},"EXP_RAW":{"n":200,"p50":0.8218,"rank1":0.63,"mBelow0":0.37,"fb":null},"EXP_ASYM_SEARCH":{"n":200,"p50":0.8461,"rank1":0.71,"mBelow0":0.29,"fb":null}},"llm_vi":{"RAW":{"n":200,"p50":0.845,"rank1":0.715,"mBelow0":0.285,"fb":{"0.6":0.045,"0.65":0.065,"0.7":0.105,"0.75":0.115,"0.8":0.215,"0.85":0.555}},"ASYM_SEARCH":{"n":200,"p50":0.8515,"rank1":0.825,"mBelow0":0.175,"fb":null},"ASYM_FACTCHECK":{"n":200,"p50":0.8485,"rank1":0.82,"mBelow0":0.18,"fb":null},"SYM_SIM":{"n":200,"p50":0.9357,"rank1":0.82,"mBelow0":0.18,"fb":null},"EXP_RAW":{"n":200,"p50":0.8125,"rank1":0.62,"mBelow0":0.38,"fb":null},"EXP_ASYM_SEARCH":{"n":200,"p50":0.8296,"rank1":0.715,"mBelow0":0.285,"fb":null}},"llm_summary":{"RAW":{"n":200,"p50":0.8248,"rank1":0.62,"mBelow0":0.38,"fb":{"0.6":0.03,"0.65":0.07,"0.7":0.095,"0.75":0.16,"0.8":0.355,"0.85":0.68}},"ASYM_SEARCH":{"n":200,"p50":0.8281,"rank1":0.71,"mBelow0":0.29,"fb":null},"ASYM_FACTCHECK":{"n":200,"p50":0.8317,"rank1":0.695,"mBelow0":0.305,"fb":null},"SYM_SIM":{"n":200,"p50":0.9033,"rank1":0.715,"mBelow0":0.285,"fb":null},"EXP_RAW":{"n":200,"p50":0.798,"rank1":0.595,"mBelow0":0.405,"fb":null},"EXP_ASYM_SEARCH":{"n":200,"p50":0.8122,"rank1":0.68,"mBelow0":0.32,"fb":null}},"llm_keywords":{"RAW":{"n":200,"p50":0.7503,"rank1":0.54,"mBelow0":0.46,"fb":{"0.6":0.07,"0.65":0.14,"0.7":0.26,"0.75":0.495,"0.8":0.77,"0.85":0.945}},"ASYM_SEARCH":{"n":200,"p50":0.7934,"rank1":0.65,"mBelow0":0.35,"fb":null},"ASYM_FACTCHECK":{"n":200,"p50":0.7954,"rank1":0.615,"mBelow0":0.385,"fb":null},"SYM_SIM":{"n":200,"p50":0.8718,"rank1":0.645,"mBelow0":0.355,"fb":null},"EXP_RAW":{"n":200,"p50":0.712,"rank1":0.525,"mBelow0":0.475,"fb":null},"EXP_ASYM_SEARCH":{"n":200,"p50":0.7858,"rank1":0.605,"mBelow0":0.395,"fb":null}},"self:IMAGE":{"RAW":{"n":166,"p50":0.6194,"rank1":0,"mBelow0":1,"fb":{"0.6":0.3193,"0.65":0.7651,"0.7":1,"0.75":1,"0.8":1,"0.85":1}},"ASYM_SEARCH":{"n":166,"p50":0.763,"rank1":0.6205,"mBelow0":0.3795,"fb":null},"ASYM_FACTCHECK":{"n":166,"p50":0.7464,"rank1":0.3916,"mBelow0":0.6084,"fb":null},"SYM_SIM":{"n":166,"p50":0.7985,"rank1":0.1807,"mBelow0":0.8193,"fb":null},"EXP_RAW":{"n":166,"p50":0.6194,"rank1":0,"mBelow0":1,"fb":null},"EXP_ASYM_SEARCH":{"n":166,"p50":0.763,"rank1":0.6084,"mBelow0":0.3916,"fb":null}},"self:VIDEO":{"RAW":{"n":80,"p50":0.6002,"rank1":0.25,"mBelow0":0.75,"fb":{"0.6":0.5,"0.65":0.6625,"0.7":0.6875,"0.75":0.7125,"0.8":0.7875,"0.85":0.9}},"ASYM_SEARCH":{"n":80,"p50":0.7579,"rank1":0.55,"mBelow0":0.45,"fb":null},"ASYM_FACTCHECK":{"n":80,"p50":0.7455,"rank1":0.5125,"mBelow0":0.4875,"fb":null},"SYM_SIM":{"n":80,"p50":0.8087,"rank1":0.425,"mBelow0":0.575,"fb":null},"EXP_RAW":{"n":80,"p50":0.6002,"rank1":0.2375,"mBelow0":0.7625,"fb":null},"EXP_ASYM_SEARCH":{"n":80,"p50":0.7579,"rank1":0.525,"mBelow0":0.475,"fb":null}}},"bg":{"RAW":{"p50":0.7768,"p95":0.9949,"url":0.998,"nonurl":0.9234},"ASYM_SEARCH":{"p50":0.7649,"p95":0.8899,"url":0.894,"nonurl":0.8912},"ASYM_FACTCHECK":{"p50":0.7711,"p95":0.8746,"url":0.8794,"nonurl":0.8906},"SYM_SIM":{"p50":0.8461,"p95":0.9596,"url":0.9825,"nonurl":0.948},"EXP_RAW":{"p50":0.7677,"p95":0.9177,"url":0.9955,"nonurl":0.9158},"EXP_ASYM_SEARCH":{"p50":0.7553,"p95":0.894,"url":0.9602,"nonurl":0.8974}}};
+const ART = (id) => `https://dev.cofacts.tw/article/${id}`;
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const VL = {
+  "self:TEXT_urlOnly": "原文自查（只有網址）",
+  prefix_fwd: "加「轉傳：」",
+  prefix_q: "加「這是真的嗎？」",
+  suffix_share: "加結尾「請大家轉發分享」",
+  strip_emoji_punct: "去 emoji 與標點",
+  strip_urls: "去掉網址",
+  url_strip_params: "網址去追蹤參數",
+  first_half: "只取前半",
+  second_half: "只取後半",
+  first50: "只取前 50 字",
+  llm_zh_cn: "LLM：簡體中文",
+  llm_paraphrase: "LLM：改寫",
+  llm_en: "LLM：英譯",
+  llm_vi: "LLM：越南文",
+  llm_summary: "LLM：一句話摘要",
+  llm_keywords: "LLM：3–5 個關鍵字",
+  "self:IMAGE": "圖片 OCR 文字 → 圖片",
+  "self:VIDEO": "影片逐字稿 → 影片",
+};
+const ARMS = ["RAW", "ASYM_SEARCH", "ASYM_FACTCHECK", "SYM_SIM", "EXP_RAW", "EXP_ASYM_SEARCH"];
+const f2 = (x) => (x == null ? "–" : x.toFixed(2));
+const pct = (x) => (x == null ? "–" : Math.round(x * 100) + "%");
+
+function docCard(id, d) {
+  return `<div class="doc"><a class="id" href="${ART(id)}" target="_blank" rel="noopener">${esc(id)}</a>`
+    + `<div class="t">${esc(d.p)}</div>${d.x ? `<div class="x">連結內容：${esc(d.x)}</div>` : ""}</div>`;
+}
+function pairs(el, list) {
+  document.getElementById(el).innerHTML = list.map((p) =>
+    `<div class="pairhead">${esc(p.note)}：cosine <b>${p.cos}</b></div><div class="pair">${docCard(p.a, p.da)}${docCard(p.b, p.db)}</div>`
+  ).join("");
+}
+pairs("ex-url", [
+  { note: "RAW · 不同的 FB 影片（F-16V 回饋金 vs. 伊朗哈米尼）", cos: "0.9987", a: "2nabq2dyuis9d", b: "3nczveq3zkd2k",
+    da: { p: "https://www.facebook.com/share/v/1ZmxzxF11i/?mibextid=wwXIfr", x: "33K views · 1.2K reactions | 【台灣國防最強投資：F-16V 變身金雞母 🐣】…" },
+    db: { p: "https://www.facebook.com/share/v/1ANgDkKx9T/?mibextid=wwXIfr", x: "龍編：甚至伊朗流亡的王儲都喊話，要伊朗人民伺機起義 伊朗哈米尼身亡！…" } },
+  { note: "RAW · 不同的 FB 影片（中老年肌肉 vs. 腎臟保健品廣告）", cos: "0.9986", a: "19tkd5l76nh88", b: "29ehh6h3d4p48",
+    da: { p: "https://www.facebook.com/share/v/18UQYDt1hb/?mibextid=wwXIfr", x: "130K views · 2.3K reactions | 50歲以上的朋友，你不是老了…" },
+    db: { p: "https://www.facebook.com/share/v/18ag8A4fAs/?mibextid=wwXIfr", x: "172K views · 832 reactions | 🛡️【美國原裝進口・腎康寶】…" } },
+]);
+pairs("ex-exp", [
+  { note: "EXP_ASYM_SEARCH · 同一支 YouTube 影片，只差 si= 參數（真的重複）", cos: "0.998", a: "31gbkcxkfzy1o", b: "zhvdrsoomwp8",
+    da: { p: "https://youtu.be/QoJeDjBfVFE?si=0waZA-_y1Ew2po-e", x: "【緊急通知】2026政府大發錢！65歲滿足條件，最高現省 90,000 元「看護紅包」！…" },
+    db: { p: "https://youtu.be/QoJeDjBfVFE?si=MlSW8SWXWcpYTBZI", x: "【緊急通知】2026政府大發錢！65歲滿足條件，最高現省 90,000 元「看護紅包」！…" } },
+  { note: "EXP · 同一則交通罰款謠言的兩個版本（3 月 vs. 6 月 1 號）", cos: "0.962", a: "25aiwpuratmtp", b: "3g4xmgatxxelu",
+    da: { p: "切記！3月開始取締行人違規！只要不走斑馬線，一律開罰$1800元！…本月開始紅燈右轉罰$5400，三次馬上吊銷駕照…" },
+    db: { p: "切記！6月1號開始取締行人違規！只要不走斑馬線，一律開罰$1800元！…本月20日開始紅燈右轉罰$5400，三次馬上…" } },
+  { note: "EXP · 仍然黏在一起：兩個只拿到登入牆的 FB 貼文連結", cos: "0.997", a: "2rxh9zalak6i3", b: "3kbz1gsdl3fuv",
+    da: { p: "https://www.facebook.com/share/p/1D25sfKpmT/?mibextid=wwXIfr" },
+    db: { p: "https://www.facebook.com/share/p/177fwN9TUq/?mibextid=wwXIfr" } },
+]);
+pairs("ex-img", [
+  { note: "RAW · 貸款詐騙截圖（IMAGE，用 OCR 文字查自己 cosine 0.604，排第 507 名）vs. 排第一的文字文章", cos: "0.881", a: "dJWcz5sB9EfTQQdNVrs2", b: "3hiriqa5t257p",
+    da: { p: "[IMAGE] OCR：誠信 爲本 你好 這邊為您遞交了三個方案 1個人金主駁回 2公司當天撥款方案(駁回) 3我們合作的公司過件了…" },
+    db: { p: "這邊為您遞交了三個方案 1銀行駁回 2公司當天撥款方案（駁回） 3我們合作的公司過件了 需要下載公司貸款軟體…" } },
+  { note: "RAW · 假 7-11 賣貨便網址截圖（IMAGE，查自己 cosine 0.552，排第 630 名）vs. 排第一的文字文章", cos: "0.876", a: "GrrANJ0B-5SQhC6hpqsL", b: "w691u1p05me8",
+    da: { p: "[IMAGE] OCR：https://myship.711.com.tw.at- tw.top/goods.php?id=1062" },
+    db: { p: "http://myship.7-11.com.tw.mphu.top/ht/index.php?te" } },
+]);
+
+// background table
+(() => {
+  const t = document.getElementById("bg-table");
+  let h = `<thead><tr><th>格式</th><th class="num">背景值中位數</th><th class="num">背景值 p95（全部）</th><th class="num">p95：只有網址的文章</th><th class="num">p95：其他文字文章</th></tr></thead><tbody>`;
+  for (const a of ARMS) { const b = DATA.bg[a];
+    h += `<tr><td>${a}</td><td class="num">${f2(b.p50)}</td><td class="num">${f2(b.p95)}</td><td class="num">${f2(b.url)}</td><td class="num">${f2(b.nonurl)}</td></tr>`; }
+  t.innerHTML = h + "</tbody>";
+})();
+// drop table (RAW)
+(() => {
+  const t = document.getElementById("drop-table");
+  const th = ["0.6", "0.7", "0.8"];
+  let h = `<thead><tr><th>變形（RAW）</th><th class="num">n</th><th class="num">cosine 中位數</th>${th.map((x) => `<th class="num">&lt; ${x}</th>`).join("")}</tr></thead><tbody>`;
+  for (const [v, r] of Object.entries(DATA.rows)) { const a = r.RAW; if (!a || !a.fb) continue;
+    h += `<tr><td>${VL[v] || v}</td><td class="num">${a.n}</td><td class="num">${f2(a.p50)}</td>${th.map((x) => { const val = a.fb[x]; const cls = x === "0.7" && val >= 0.1 ? " bad" : ""; return `<td class="num${cls}">${pct(val)}</td>`; }).join("")}</tr>`; }
+  t.innerHTML = h + "</tbody>";
+})();
+// full table
+(() => {
+  const t = document.getElementById("full-table");
+  let h = `<thead><tr><th>變形</th>${ARMS.map((a) => `<th class="num">${a}<br>排第一 / 中位數</th>`).join("")}</tr></thead><tbody>`;
+  for (const [v, r] of Object.entries(DATA.rows)) {
+    h += `<tr><td>${VL[v] || v}<br><span class="mono" style="color:var(--muted);font-size:.75rem">${v} · n=${r.RAW.n}</span></td>${ARMS.map((a) => r[a] ? `<td class="num">${f2(r[a].rank1)} / ${f2(r[a].p50)}</td>` : "<td>–</td>").join("")}</tr>`; }
+  t.innerHTML = h + "</tbody>";
+})();
+// dot chart
+(() => {
+  const S = [["RAW", "--s1"], ["ASYM_SEARCH", "--s2"], ["EXP_ASYM_SEARCH", "--s3"]];
+  const rows = Object.keys(DATA.rows);
+  const W = 760, L = 190, R = 24, T = 26, rh = 26, H = T + rows.length * rh + 10;
+  const x = (v) => L + v * (W - L - R);
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:560px;display:block" role="img" aria-label="各變形原文排第一的比例">`;
+  for (const g of [0, 0.25, 0.5, 0.75, 1]) {
+    s += `<line x1="${x(g)}" x2="${x(g)}" y1="${T - 6}" y2="${H - 6}" stroke="var(--line)" stroke-width="1"/>`;
+    s += `<text x="${x(g)}" y="${T - 12}" text-anchor="middle" font-size="11">${Math.round(g * 100)}%</text>`;
+  }
+  rows.forEach((v, i) => {
+    const y = T + i * rh + rh / 2;
+    s += `<text x="${L - 10}" y="${y + 4}" text-anchor="end" font-size="12" style="fill:var(--fg)">${esc(VL[v] || v)}</text>`;
+    const vals = S.map(([a]) => DATA.rows[v][a].rank1);
+    s += `<line x1="${x(Math.min(...vals))}" x2="${x(Math.max(...vals))}" y1="${y}" y2="${y}" stroke="var(--line)" stroke-width="2"/>`;
+    S.forEach(([a, c], j) => {
+      const r = DATA.rows[v][a];
+      s += `<circle class="dot" cx="${x(r.rank1)}" cy="${y}" r="5.5" fill="var(${c})" stroke="var(--surface)" stroke-width="2" data-t="${esc(VL[v] || v)}｜${a}：排第一 ${pct(r.rank1)}，cosine 中位數 ${f2(r.p50)}（n=${r.n}）"/>`;
+    });
+  });
+  s += "</svg>";
+  const host = document.getElementById("chart"); host.innerHTML = s;
+  const tip = document.getElementById("tip"), box = document.getElementById("chart-box");
+  host.querySelectorAll(".dot").forEach((c) => {
+    c.addEventListener("mouseenter", () => { tip.textContent = c.dataset.t; tip.hidden = false; });
+    c.addEventListener("mousemove", (e) => { const b = box.getBoundingClientRect(); tip.style.left = Math.min(e.clientX - b.left + 12, b.width - tip.offsetWidth - 4) + "px"; tip.style.top = (e.clientY - b.top + 14) + "px"; });
+    c.addEventListener("mouseleave", () => { tip.hidden = true; });
+  });
+})();
+</script>
+
+</body></html>
