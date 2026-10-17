@@ -466,7 +466,7 @@ docs/design/
 2. **SSR 就要有的資料，用 `useSuspenseQuery`**；只需在 client 取得的（例如 AI session 列表、「我是否已回饋」），用 `useQuery`。`useEffect` 與一般 `useQuery` 都不會在 SSR 執行，資料不會出現在 HTML 裡。
 3. **只有 `head()` 需要資料，或要決定頁面是否存在（`notFound()`、`redirect()`）時，才寫 route loader**。loader 裡用 `await context.queryClient.ensureQueryData(...)` 填 cache，**只回傳 `head()` 需要的欄位**：loader 的回傳值也會 serialize 到前端，回傳整份資料會和 query cache 重複。頁面內容一律從 query cache 讀，不用 `useLoaderData()`。在 loader 裡決定 404，SSR 的 HTTP 狀態碼才會正確；元件 streaming 開始後才丟錯，狀態碼已經送出。
 4. **寫入**用 `useMutation` 呼叫 server function，成功後 `invalidateQueries` 對應的 query key。
-5. **queryKey = `[GraphQL operation name, variables]`**，例如 `['GetArticle', { id }]`。每個 route 各自定義 `queryOptions`，若用 `['article', id]` 這類自訂 key，兩個 route 選了不同欄位卻用同一個 key 就會互相覆蓋 cache；codegen 要求 operation name 全專案唯一，用它當 key 就不會撞。key 與 `queryFn` 一律寫在同一個 `queryOptions` 裡（TkDodo〈The Query Options API〉、Start 官方指南的做法）。和使用者有關的 query（例如 `GetMyFeedback`）在登出或切換帳號時要從 cache 移除。
+5. **queryKey = `[GraphQL operation name, variables]`**，例如 `['GetArticle', id]`；多個參數的（列表的篩選條件）再用物件，例如 `['ListArticles', filter]`。每個 route 各自定義 `queryOptions`，若用 `['article', id]` 這類自訂 key，兩個 route 選了不同欄位卻用同一個 key 就會互相覆蓋 cache；codegen 要求 operation name 全專案唯一，用它當 key 就不會撞。key 與 `queryFn` 一律寫在同一個 `queryOptions` 裡（TkDodo〈The Query Options API〉、Start 官方指南的做法）。和使用者有關的 query（例如 `GetMyFeedback`）在登出或切換帳號時要從 cache 移除。
 6. **`staleTime` 依 query 設定**。cofacts/ai 現在全域是 `Infinity`，適合 AI 對話，但列表頁回來時會看到舊資料。至少要大於 0，否則瀏覽器拿到 SSR 資料後會立刻重打一次。
 7. （選用）巢狀很深的 `useSuspenseQuery` 想提早開始，可以在 loader 呼叫 `ensureQueryData` 但不 `await`，避免 waterfall，也不擋 SSR。
 
@@ -481,8 +481,8 @@ import { graphql } from '@/server/gql'
 import { ArticlePageView } from './-components/ArticlePageView'
 
 const getArticle = createServerFn({ method: 'GET' })
-  .validator(z.object({ id: z.string() }))
-  .handler(({ data }) =>
+  .validator(z.string())
+  .handler(({ data: id }) =>
     cofactsExec(
       graphql(`
         query GetArticle($id: String!) {
@@ -499,13 +499,13 @@ const getArticle = createServerFn({ method: 'GET' })
           }
         }
       `),
-      data,               // 變數就是 server function 的輸入
+      { id },
     ),
   )
 
 const getMyFeedback = createServerFn({ method: 'GET' })
-  .validator(z.object({ id: z.string() }))
-  .handler(({ data }) =>
+  .validator(z.string())
+  .handler(({ data: id }) =>
     cofactsExec(
       graphql(`
         query GetMyFeedback($id: String!) {
@@ -517,22 +517,17 @@ const getMyFeedback = createServerFn({ method: 'GET' })
           }
         }
       `),
-      data,               // 變數就是 server function 的輸入
+      { id },
     ),
   )
 
-// queryKey = [operation name, variables]，variables 與 server function 的輸入是同一個物件
-const articleQuery = (vars: { id: string }) =>
-  queryOptions({
-    queryKey: ['GetArticle', vars],
-    queryFn: () => getArticle({ data: vars }),
-    staleTime: 60_000,
-  })
+const articleQuery = (id: string) =>
+  queryOptions({ queryKey: ['GetArticle', id], queryFn: () => getArticle({ data: id }), staleTime: 60_000 })
 
 export const Route = createFileRoute('/_site/article/$id/')({
   // head() 要標題、要決定 404，所以寫 loader；只回傳 head 需要的欄位
   loader: async ({ context, params }) => {
-    const { GetArticle: article } = await context.queryClient.ensureQueryData(articleQuery({ id: params.id }))
+    const { GetArticle: article } = await context.queryClient.ensureQueryData(articleQuery(params.id))
     if (!article) throw notFound()
     return { title: article.text.slice(0, 60), image: article.attachmentUrl }
   },
@@ -547,10 +542,10 @@ export const Route = createFileRoute('/_site/article/$id/')({
 
 function ArticlePage() {
   const { id } = Route.useParams()
-  const { data } = useSuspenseQuery(articleQuery({ id }))            // SSR：從 cache 讀，loader 已填好
+  const { data } = useSuspenseQuery(articleQuery(id))            // SSR：從 cache 讀，loader 已填好
   const { data: feedback } = useQuery({                          // client 再取即可
-    queryKey: ['GetMyFeedback', { id }],
-    queryFn: () => getMyFeedback({ data: { id } }),
+    queryKey: ['GetMyFeedback', id],
+    queryFn: () => getMyFeedback({ data: id }),
   })
   return <ArticlePageView article={data.GetArticle!} myFeedback={feedback} />
 }
