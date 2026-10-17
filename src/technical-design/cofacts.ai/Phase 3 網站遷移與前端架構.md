@@ -206,7 +206,7 @@ rumors-site 的問題是 param 名 `types` 看不出是「回應的」分類，�
 > [!NOTE]
 > **「我送出的」需要確認 API 語意**：rumors-api 的 `ListArticleFilter.selfOnly` 只會列出「由目前使用者**建立**」的訊息（第一個回報者）。沒有「我曾回報過（含對既有訊息 +1）」的 filter（2026-09-28 查 `api.cofacts.tw` schema）。若「我送出的」要包含 +1 過的訊息，需要在 rumors-api 補一個依 reply request 的 `userId` 篩選的 filter。
 
-- 實作方式：每個列表 route 用 `validateSearch` + zod schema，放在 `src/features/list/searchParams.ts`。同一份 schema 產生三樣東西：GraphQL filter、篩選 UI 的狀態、canonical URL。
+- 實作方式：每個列表 route 用 `validateSearch` + zod schema，放在 `src/lib/search-params/`。同一份 schema 產生三樣東西：GraphQL filter、篩選 UI 的狀態、canonical URL。
 - 舊 param 由 `normalizeLegacySearch()` 轉換（`filters=NO_REPLY` → `status=no-reply`、`types=NOT_RUMOR` → `replyType=not-rumor`、`start=now-1w/d` → `period=7d`…），轉完用 `replace` redirect。
 
 範例：
@@ -246,7 +246,7 @@ rumors-site 的問題是 param 名 `types` 看不出是「回應的」分類，�
   - 不同 host 的 CDN cache key 本來就分開，不會混到語系。
 - **只翻 UI 文案**：訊息、回應等使用者內容維持原文。
 - 影響工作量的地方：
-  - cofacts/ai 現有的繁中寫死文案要改寫成英文 key（第 0 塊處理 shell 與 L1；其他塊各自處理）。
+  - cofacts/ai 現有的繁中寫死文案要改寫成英文 key（第 0 塊處理 shell 與 ui 元件；其他塊各自處理）。
   - `cofacts-frontend` skill 規定所有 UI 字串都要經過 `t` / `<Trans>`。
   - 日期格式一律依當前 locale，不能寫死 `zh-TW`。
 
@@ -284,13 +284,22 @@ rumors-site 的問題是 param 名 `types` 看不出是「回應的」分類，�
 
 ### 3.2 分層
 
+元件只分三層，加上產生的 token 檔：
+
 | 層 | 目錄 | 內容 | 誰維護 |
 |---|---|---|---|
-| L0 tokens | `src/styles/tokens.css`（產生檔） | Penpot token 轉成的 CSS 變數與 `@theme` | 腳本產生，不手改 |
-| L1 primitives | `src/components/ui/` | shadcn / Base UI：Button、Input、Select、Checkbox、Switch、Toggle、Dialog、Popover、Menu、Tabs… | WG（第 0 塊） |
-| L2 Cofacts 領域元件 | `src/components/cofacts/`、`src/components/layout/` | 對應 Penpot `Content/*`、`Feedback/*`、`Layout/*`：FactCheckReply、ReplyTypeLabel、Nav、Footer… | 首次用到的那一塊負責，其他塊共用（§8.3） |
-| L3 feature 元件 | `src/features/<feature>/` | 只在某頁用的組合：篩選面板、訊息頁側欄、編輯器、AI 對話… | 各塊 |
-| L4 route | `src/routes/` | loader、`validateSearch`、`head()`、組 layout，**盡量薄** | 各塊 |
+| tokens | `src/styles/tokens.css`（產生檔） | Penpot token 轉成的 CSS 變數與 `@theme` | 腳本產生，不手改 |
+| ui | `src/components/ui/` | shadcn / Base UI primitives：Button、Input、Select、Checkbox、Switch、Toggle、Dialog、Popover、Menu、Tabs… | WG（第 0 塊） |
+| 共用元件 | `src/components/`（平鋪） | 兩處以上用到的元件：用 ui 組出來的複合元件（`ReplyTypeLabel`、`FactCheckReply`、`ArticleCard`…），以及重複出現的大元件（`SiteNav`、`SiteFooter`） | 首次用到的那一塊負責，其他塊共用（§8.3） |
+| 頁面 | `src/routes/` | route component（loader、`validateSearch`、`head()`、組版面），以及只有該頁用的元件，放在同目錄的 `-components/` | 各塊 |
+
+**頁面專用元件放 `-components/`**：
+
+- TanStack Router 會忽略 `-` 開頭的檔案與資料夾，不產生 route，這是官方建議的 colocation 做法（[Routing Concepts › Excluding Files and Folders from Routes](https://tanstack.com/router/latest/docs/framework/react/routing/routing-concepts)）。
+- 頁面專用元件一律放進 `-components/`，不放成 `-Foo.tsx` 散檔。這樣 `routes/` 底下 `-components/` 以外的檔案都是 route，目錄一眼看得懂。
+- `-components/` 的範圍是它所在的目錄：`routes/_site/article.$id/-components/` 給 `/article/:id` 底下的 route（訊息頁、兩個編輯器頁）共用。
+- **不跨目錄 import 別人的 `-components/`**。第二個地方要用時，把元件搬到 `src/components/`，並補上 story 與 Penpot 對照。不必事先判斷元件「該放哪一層」。
+- 以上規則要寫進 `cofacts-frontend` skill（§6.3），agent 才會照做，lint 也要擋跨目錄 import。
 
 ### 3.3 Penpot 元件 → 程式元件對照
 
@@ -300,42 +309,42 @@ Penpot 本地元件庫共 **48 個元件**（依 2026-10-08 的 `Cofacts-2026 (2
 
 | Penpot 元件 | Penpot variants（現況） | 程式元件 | 層 | 主要使用頁 |
 |---|---|---|---|---|
-| `Base/Button` | `Size`：Large 44 / Medium 36 / Small 28 / Icon-Touch 32；`Style`：Primary / Outline / Secondary / LINE / OnDark；`Icon`：None / Front / Back / Both / Only | `ui/button`：`size: lg\|md\|sm\|icon-touch`、`variant: primary\|outline\|secondary\|line\|on-dark`、`icon: none\|start\|end\|both\|only`（`only` 必填 `aria-label`） | L1 | 全站 |
-| `Button AI` | `State`：default / hover / loading / icon / Secondary / disable | `cofacts/AiButton`（loading 加 `aria-busy`；黃色漸層框前端用 `brand-500-main` → `brand-300` 重做） | L2 | 訊息頁、AI |
-| `Base/Input` | `Type`：15 個（Basic / Field / Textarea / icon × default / active / disable / Invalid、icon-hover、AI、AI-loading） | `ui/input`、`ui/textarea`、`ui/input-group`、`ui/field`；AI 版是 `ai-chat/ChatInput`（AI-loading 的提示放 `role="status"`） | L1 / L3 | 表單、搜尋、AI |
-| `Base/Select` | `State`：default / open / small | `ui/select`（原生 `<select>` 優先） | L1 | 篩選、排序 |
-| `Base/Checkbox`、`Base/RadioGroup`、`Base/Switch` | Checkbox `State`：default / checked / disable / Description；RadioGroup `Type`：default / disable / Description；Switch `State`：off / on / disable | `ui/checkbox`、`ui/radio-group`、`ui/switch` | L1 | 篩選、編輯器 |
-| `Base/Toggle` | `State`：default / hover / active / outline / outline-hover / outline-active | `ui/toggle`（`aria-pressed`，收藏） | L1 | 訊息頁 |
-| `Base/Badge` | `Type`：icon-default / icon-active / normal / normal-active / disable / fix（例：「還未有效查核」） | 篩選標籤：`ui/toggle-group`（`<button aria-pressed>`，`normal-active` = 已選取）；純顯示：`ui/badge` → `cofacts/ArticleStatusBadge` | L1 / L2 | 列表 |
-| `Base/Flag` | —（例：「從零開始的魔法旋轉花花 \| Lv. 11」；手機共用） | `cofacts/UserFlag`（作者名 + 等級；橘色摺角 `surface-accent-fold`，純裝飾） | L2 | 回應、留言 |
-| `Base/Avatar` | `Type`：default / no-level / Certification / Certification-level | `cofacts/UserAvatar`（整併現有 `UserAvatar` + `OpenPeepsAvatar`；Certification 對應 [Badge System](../badge-system.md)） | L2 | 全站 |
-| `Base/Icon` | `Name`：41 個 icon | `ui/icon`（`aria-hidden`） | L1 | 全站 |
-| `Layout/Nav` | `Type`：Default / AI / login / search | `layout/SiteNav`（`mode="site"\|"ai"`） | L2 | 全站 |
-| `Layout/NavItem` | `State`：hover / default / alert / mobile / mobile-active / mobile-alert | `layout/NavItem`（目前所在頁 = `hover` 的底線樣式，加 `aria-current="page"`；alert = 「等你來答」未解數，例如 99+，要讓螢幕閱讀器唸出） | L2 | 全站 |
-| `Layout/Nav-Mobile`、`Nav-MobileExpanded` | Nav-Mobile `State`：open / default / second-menu / search；Nav-MobileExpanded 只剩 open-full | 合進 `layout/SiteNav` 的 mobile 狀態（漢堡／關閉鈕用 Button `Icon-Touch`，`aria-expanded` + `aria-controls`，Esc 關閉並還焦點） | L2 | 全站 |
-| `Layout/Footer`、`Footer-Mobile` | — | `layout/SiteFooter`（**底色 `surface-dark`，前景只能用 `-on-dark`**，見 R4 案例；頂部 1px `border-on-dark`） | L2 | 全站 |
-| `Layout/Logo` | `Type`：symbol / horizontal / AI / icon | `layout/Logo` | L2 | 全站 |
-| `Layout/ActionPanel` | `Device`：Desktop / Mobile | `features/article/ArticleQuickNav`（桌機 `<nav aria-label="本頁索引">` + 錨點；手機分頁列可橫向捲動，「查核闢謠」是浮動按鈕） | L3 | 訊息頁 |
-| `Content/FactCheckCard`、`FactCheckCard-Original-Mobile` | — | `cofacts/ArticleCard`（列表中的一則訊息 + 回應摘要） | L2 | `/replies`、`/articles`、首頁 |
-| `Content/FactCheckReply`、`ReplyCard-Mobile` | `Type`：default / with-link | `cofacts/FactCheckReply`（回應本文 + 出處 + 作者 + 回饋） | L2 | 列表、訊息頁、回應頁 |
-| `Content/FactCheckReply-Title` | `Type`：Incorrect / Correct / PersonalOpinion / NotVerifiable（含 -mobile） | `cofacts/ReplyTypeLabel`（**R1 的主要實作點**，§6） | L2 | 全站 |
-| `Content/AIFactCheckCard` | `Type`：4 種判定，各有 -active | `features/ai-chat/VerdictPicker`（AI 草稿選分類） | L3 | AI |
-| `Content/AIMessageCard` | default / hover / active / active-hover | `features/ai-chat/SessionListItem` | L3 | AI 側欄 |
-| `Content/AIAnalysisPanel` | — | `features/article/AiAnalysisPanel` | L3 | 訊息頁 |
-| `Content/DisputedMessage`、`-Mobile` | default / read | `cofacts/ArticleListItem`（可疑訊息列表的一則） | L2 | `/articles`、`/hoax-for-you`、搜尋 |
-| `Content/MessageListItem` | — | `cofacts/ReplyRequestItem`（網友回報補充） | L2 | 訊息頁、個人頁留言 tab |
-| `Content/LinkCard` | — | `cofacts/HyperlinkPreview` | L2 | 訊息頁、回應 |
-| `Content/Transcript` | — | `features/article/Transcript`（協作逐字稿，見 §8 第 2 塊的風險） | L3 | 訊息頁 |
-| `Content/FactCheckResultCard` | ExistingResponses / -mobile | `features/editor/ExistingReplyCard`（「直接用此回應」）；回報流程 B-1 也會用到 | L2 | 編輯器、`/report` |
-| `Content/EditorTab`、`EditorTab-Mobile` | `Selected`：撰寫新回應 / 使用既有回應 | `features/editor/EditorTabs`（基於 `ui/tabs`：`tablist` / `tab` / `tabpanel`，左右鍵切換）；兩個分頁對應 `/reply/new`、`/reply/existing` | L3 | 編輯器 |
-| `Content/OriginalMessage`、`-Mobile` | `State`：Collapsed / Expanded | `features/editor/OriginalMessage`（`<button aria-expanded>`；手機展開限高約 240px、內部捲動、`overscroll-behavior: contain`、`tabindex=0`；編輯器取得焦點時自動收合；底部漸層用 `surface-base` → 透明重做） | L3 | 編輯器 |
-| `Content/AIWelcome`、`-Mobile` | — | `features/ai-chat/Welcome` | L3 | `/ai` |
-| `Content/ReportPrompt` | — | `features/report/ReportPrompt`（回報可疑訊息的空狀態提示） | L3 | `/report`、搜尋無結果 |
-| `Content/QACard`、`QACard-Answer` | — | `features/tutorial/QaCard` | L3 | 教學 |
-| `Feedback/ReactionGroup` | `Type`：reason（看理由）/ report（檢舉） | `cofacts/ReplyFeedback`（有幫助 / 沒幫助 + 理由、檢舉） | L2 | 回應 |
-| `Feedback/ReportStatus` | `Device`：Desktop / Mobile（回應 0 · 回報 23） | `cofacts/ArticleStats` | L2 | 列表 |
-| `Feedback/Category` | —（# 分類 · 分類建議） | `cofacts/ArticleCategories` | L2 | 訊息頁 |
-| `Feedback/ViewChart`、`Chart-Mobile` | — | `features/article/ViewChart`（近 30 日瀏覽；線色用 `--chart-1` / `--chart-2`；圖表 `aria-hidden`，另給文字摘要，圖例寫明文字） | L3 | 訊息頁 |
+| `Base/Button` | `Size`：Large 44 / Medium 36 / Small 28 / Icon-Touch 32；`Style`：Primary / Outline / Secondary / LINE / OnDark；`Icon`：None / Front / Back / Both / Only | `ui/button`：`size: lg\|md\|sm\|icon-touch`、`variant: primary\|outline\|secondary\|line\|on-dark`、`icon: none\|start\|end\|both\|only`（`only` 必填 `aria-label`） | ui | 全站 |
+| `Button AI` | `State`：default / hover / loading / icon / Secondary / disable | `AiButton`（loading 加 `aria-busy`；黃色漸層框前端用 `brand-500-main` → `brand-300` 重做） | 共用 | 訊息頁、AI |
+| `Base/Input` | `Type`：15 個（Basic / Field / Textarea / icon × default / active / disable / Invalid、icon-hover、AI、AI-loading） | `ui/input`、`ui/textarea`、`ui/input-group`、`ui/field`；AI 版是 `/ai` 的 `-components/ChatInput`（AI-loading 的提示放 `role="status"`） | ui / 頁面 | 表單、搜尋、AI |
+| `Base/Select` | `State`：default / open / small | `ui/select`（原生 `<select>` 優先） | ui | 篩選、排序 |
+| `Base/Checkbox`、`Base/RadioGroup`、`Base/Switch` | Checkbox `State`：default / checked / disable / Description；RadioGroup `Type`：default / disable / Description；Switch `State`：off / on / disable | `ui/checkbox`、`ui/radio-group`、`ui/switch` | ui | 篩選、編輯器 |
+| `Base/Toggle` | `State`：default / hover / active / outline / outline-hover / outline-active | `ui/toggle`（`aria-pressed`，收藏） | ui | 訊息頁 |
+| `Base/Badge` | `Type`：icon-default / icon-active / normal / normal-active / disable / fix（例：「還未有效查核」） | 篩選標籤：`ui/toggle-group`（`<button aria-pressed>`，`normal-active` = 已選取）；純顯示：`ui/badge` → `ArticleStatusBadge` | ui / 共用 | 列表 |
+| `Base/Flag` | —（例：「從零開始的魔法旋轉花花 \| Lv. 11」；手機共用） | `UserFlag`（作者名 + 等級；橘色摺角 `surface-accent-fold`，純裝飾） | 共用 | 回應、留言 |
+| `Base/Avatar` | `Type`：default / no-level / Certification / Certification-level | `UserAvatar`（整併現有 `UserAvatar` + `OpenPeepsAvatar`；Certification 對應 [Badge System](../badge-system.md)） | 共用 | 全站 |
+| `Base/Icon` | `Name`：41 個 icon | `ui/icon`（`aria-hidden`） | ui | 全站 |
+| `Layout/Nav` | `Type`：Default / AI / login / search | `SiteNav`（`mode="site"\|"ai"`） | 共用 | 全站 |
+| `Layout/NavItem` | `State`：hover / default / alert / mobile / mobile-active / mobile-alert | `NavItem`（目前所在頁 = `hover` 的底線樣式，加 `aria-current="page"`；alert = 「等你來答」未解數，例如 99+，要讓螢幕閱讀器唸出） | 共用 | 全站 |
+| `Layout/Nav-Mobile`、`Nav-MobileExpanded` | Nav-Mobile `State`：open / default / second-menu / search；Nav-MobileExpanded 只剩 open-full | 合進 `SiteNav` 的 mobile 狀態（漢堡／關閉鈕用 Button `Icon-Touch`，`aria-expanded` + `aria-controls`，Esc 關閉並還焦點） | 共用 | 全站 |
+| `Layout/Footer`、`Footer-Mobile` | — | `SiteFooter`（**底色 `surface-dark`，前景只能用 `-on-dark`**，見 R4 案例；頂部 1px `border-on-dark`） | 共用 | 全站 |
+| `Layout/Logo` | `Type`：symbol / horizontal / AI / icon | `Logo` | 共用 | 全站 |
+| `Layout/ActionPanel` | `Device`：Desktop / Mobile | `-components/ArticleQuickNav`（桌機 `<nav aria-label="本頁索引">` + 錨點；手機分頁列可橫向捲動，「查核闢謠」是浮動按鈕） | 頁面 | 訊息頁 |
+| `Content/FactCheckCard`、`FactCheckCard-Original-Mobile` | — | `ArticleCard`（列表中的一則訊息 + 回應摘要） | 共用 | `/replies`、`/articles`、首頁 |
+| `Content/FactCheckReply`、`ReplyCard-Mobile` | `Type`：default / with-link | `FactCheckReply`（回應本文 + 出處 + 作者 + 回饋） | 共用 | 列表、訊息頁、回應頁 |
+| `Content/FactCheckReply-Title` | `Type`：Incorrect / Correct / PersonalOpinion / NotVerifiable（含 -mobile） | `ReplyTypeLabel`（**R1 的主要實作點**，§6） | 共用 | 全站 |
+| `Content/AIFactCheckCard` | `Type`：4 種判定，各有 -active | `-components/VerdictPicker`（AI 草稿選分類） | 頁面 | AI |
+| `Content/AIMessageCard` | default / hover / active / active-hover | `-components/SessionListItem` | 頁面 | AI 側欄 |
+| `Content/AIAnalysisPanel` | — | `-components/AiAnalysisPanel` | 頁面 | 訊息頁 |
+| `Content/DisputedMessage`、`-Mobile` | default / read | `ArticleListItem`（可疑訊息列表的一則） | 共用 | `/articles`、`/hoax-for-you`、搜尋 |
+| `Content/MessageListItem` | — | `ReplyRequestItem`（網友回報補充） | 共用 | 訊息頁、個人頁留言 tab |
+| `Content/LinkCard` | — | `HyperlinkPreview` | 共用 | 訊息頁、回應 |
+| `Content/Transcript` | — | `-components/Transcript`（協作逐字稿，見 §8 第 2 塊的風險） | 頁面 | 訊息頁 |
+| `Content/FactCheckResultCard` | ExistingResponses / -mobile | `-components/ExistingReplyCard`（「直接用此回應」）；回報流程 B-1 也會用到 | 共用 | 編輯器、`/report` |
+| `Content/EditorTab`、`EditorTab-Mobile` | `Selected`：撰寫新回應 / 使用既有回應 | `-components/EditorTabs`（基於 `ui/tabs`：`tablist` / `tab` / `tabpanel`，左右鍵切換）；兩個分頁對應 `/reply/new`、`/reply/existing` | 頁面 | 編輯器 |
+| `Content/OriginalMessage`、`-Mobile` | `State`：Collapsed / Expanded | `-components/OriginalMessage`（`<button aria-expanded>`；手機展開限高約 240px、內部捲動、`overscroll-behavior: contain`、`tabindex=0`；編輯器取得焦點時自動收合；底部漸層用 `surface-base` → 透明重做） | 頁面 | 編輯器 |
+| `Content/AIWelcome`、`-Mobile` | — | `-components/Welcome` | 頁面 | `/ai` |
+| `Content/ReportPrompt` | — | `-components/ReportPrompt`（回報可疑訊息的空狀態提示） | 頁面 | `/report`、搜尋無結果 |
+| `Content/QACard`、`QACard-Answer` | — | `-components/QaCard` | 頁面 | 教學 |
+| `Feedback/ReactionGroup` | `Type`：reason（看理由）/ report（檢舉） | `ReplyFeedback`（有幫助 / 沒幫助 + 理由、檢舉） | 共用 | 回應 |
+| `Feedback/ReportStatus` | `Device`：Desktop / Mobile（回應 0 · 回報 23） | `ArticleStats` | 共用 | 列表 |
+| `Feedback/Category` | —（# 分類 · 分類建議） | `ArticleCategories` | 共用 | 訊息頁 |
+| `Feedback/ViewChart`、`Chart-Mobile` | — | `-components/ViewChart`（近 30 日瀏覽；線色用 `--chart-1` / `--chart-2`；圖表 `aria-hidden`，另給文字摘要，圖例寫明文字） | 頁面 | 訊息頁 |
 
 各頁實際用到的元件（由 Penpot 實例統計）：
 
@@ -351,18 +360,22 @@ Penpot 本地元件庫共 **48 個元件**（依 2026-10-08 的 `Cofacts-2026 (2
 
 ```
 src/
-├── routes/                          # L4：只放 loader / validateSearch / head / 組版面
+├── routes/                          # 頁面層：-components/ 以外都是 route
 │   ├── __root.tsx
 │   ├── _site.tsx                    # 公開站 layout：SiteNav(site) + SiteFooter
 │   ├── _site/
 │   │   ├── index.tsx                # /
+│   │   ├── -components/             # 只有 /articles、/replies、/hoax-for-you、/search 共用的列表元件
+│   │   │   └── FilterPanel.tsx  SortSelect.tsx  LoadMore.tsx
 │   │   ├── articles.tsx             # /articles
 │   │   ├── replies.tsx              # /replies
 │   │   ├── hoax-for-you.tsx
 │   │   ├── search.tsx
-│   │   ├── article.$id.tsx          # /article/:id
-│   │   ├── article.$id.reply.new.tsx
-│   │   ├── article.$id.reply.existing.tsx
+│   │   ├── article.$id/
+│   │   │   ├── index.tsx            # /article/:id
+│   │   │   ├── reply.new.tsx        # /article/:id/reply/new
+│   │   │   ├── reply.existing.tsx
+│   │   │   └── -components/         # 訊息頁與編輯器專用：Transcript、ArticleQuickNav、EditorTabs、OriginalMessage…
 │   │   ├── reply.$id.tsx
 │   │   ├── user.tsx                 # /user?id=
 │   │   ├── user.$slug.tsx
@@ -372,25 +385,21 @@ src/
 │   ├── ai/
 │   │   ├── index.tsx                # /ai
 │   │   ├── session.$sessionId.tsx
-│   │   └── session.$sessionId.tool.$toolCallId.tsx
+│   │   ├── session.$sessionId.tool.$toolCallId.tsx
+│   │   └── -components/             # 現有 ChatArea、AgentMessage、RightDrawer（拆檔）、VerdictPicker…
 │   ├── session.$.tsx                # 舊 cofacts.ai 網址 → 301 /ai/session/*
 │   ├── api/
 │   │   ├── run-sse.ts  auth/callback.ts
 │   │   └── articles.$feed.ts        # RSS 相容
 │   ├── robots[.]txt.ts  sitemap[.]xml.ts
 ├── components/
-│   ├── ui/                          # L1 shadcn/Base UI（已改寫成 Cofacts token）
-│   ├── cofacts/                     # L2 領域元件（ReplyTypeLabel、FactCheckReply、ArticleCard…）
-│   └── layout/                      # L2 SiteNav、SiteFooter、Logo
-├── features/                        # L3，每個 feature 自成一包
-│   ├── list/                        # 篩選器、排序、時間、LoadMore、searchParams.ts（zod）
-│   ├── article/                     # 訊息頁各區塊、article.functions.ts、article.queries.ts
-│   ├── editor/                      # 撰寫 / 使用既有回應
-│   ├── reply/  profile/  report/
-│   ├── ai-chat/                     # 現有 ChatArea、AgentMessage、RightDrawer（拆檔）…
-│   └── landing/  impact/  tutorial/ # 靜態頁，可含 *.module.css 與 images/
-├── server/                          # BFF 共用：api-base、jwt、cofactsExec、gql codegen 產物
-├── lib/  hooks/
+│   ├── ui/                          # shadcn/Base UI（已改寫成 Cofacts token）
+│   └── *.tsx                        # 共用元件，平鋪：SiteNav、SiteFooter、ReplyTypeLabel、FactCheckReply、ArticleCard…
+├── server/                          # BFF：api-base、jwt、cofactsExec、gql codegen 產物
+│   └── <domain>/                    # article.functions.ts、article.queries.ts、list.functions.ts…
+├── lib/
+│   └── search-params/               # 列表 search param 的 zod schema（route 與元件共用）
+├── hooks/
 ├── fixtures/                        # Storybook 與測試共用的 typed 假資料
 └── styles/
     ├── app.css                      # 入口：@import tailwindcss、tokens、base、focus
@@ -402,9 +411,11 @@ docs/design/
 └── accessibility-guide.html         # 設計師的無障礙指南原檔（版本化）
 ```
 
+靜態頁（首頁、`/impact`、教學）的 `*.module.css` 與圖片也放各自的 `-components/`（或 `-assets/`）。
+
 每個元件的檔案 colocate：`Foo.tsx`、`Foo.stories.tsx`、`Foo.module.css`（需要時）、`Foo.test.tsx`（有邏輯時）。
 
-`features/<x>/` 裡的 `*.functions.ts` 是 server functions；`*.queries.ts` 是 GraphQL document（server-only），codegen 的 `documents` 要擴到 `src/features/**`。這跟現有 `src/server/*.functions.ts` 以及 #138 的 `report.queries.ts` 是同一個模式。
+資料邏輯放 `src/server/<domain>/`：`*.functions.ts` 是 server functions，`*.queries.ts` 是 GraphQL document（server-only），codegen 的 `documents` 要擴到 `src/server/**`。這延續現有 `src/server/*.functions.ts` 與 #138 `report.queries.ts` 的模式，只是依 domain 分資料夾。元件仍然不碰資料取得，只吃 typed props。
 
 ### 3.5 GraphQL 與資料
 
@@ -535,7 +546,7 @@ Tailwind v4 的 color utility 會先找「專屬 namespace」，找不到才退�
 **間距採用 1px 單位（`--spacing: 0.0625rem`，已定案）的取捨**：
 
 - 好處：Penpot 的 px 數值（間距、寬高）直接等於 class 數字（`spacing-16` → `p-16`、寬 343 → `w-343`）；用 rem 表示，瀏覽器調整字級時仍會跟著縮放。
-- 代價：Tailwind 社群與 shadcn 範例的 `p-4`（=16px）語意會變成 4px，外部程式碼不能直接貼，必須改寫。L1 primitives 反正要整批改寫（§5.4），影響有限。
+- 代價：Tailwind 社群與 shadcn 範例的 `p-4`（=16px）語意會變成 4px，外部程式碼不能直接貼，必須改寫。ui primitives 反正要整批改寫（§5.4），影響有限。
 - 沒採用的方案：維持 Tailwind 預設 4px 單位，對應規則會變成「`spacing-16` → `p-4`（px ÷ 4）」，比較不直覺。
 
 ### 5.3 Mapping 總表
@@ -682,7 +693,7 @@ flowchart LR
 ```
 
 - **Dark mode**：元件完全不寫 `dark:` variant，換主題時 token 會自己翻轉。**`dark:` 在元件中列為禁用**，由 lint 擋。Phase 3 先跟隨 `prefers-color-scheme`；之後要加切換開關，只要由 JS 設定 `<html data-theme="light|dark">`，並存進 cookie 讓 SSR 輸出同樣的屬性，避免切換時閃一下。
-- **shadcn primitives 的改寫**：L1 的 16 個檔一次改完，不留 shadcn 那層語意變數做橋接。原因是**名字會打架**：shadcn 的 `bg-accent` 是淡灰 hover，Cofacts 的 `bg-accent` 是品牌黃；shadcn 的 `text-primary` 是品牌色字，Cofacts 的 `text-primary` 是主要文字色。
+- **shadcn primitives 的改寫**：ui 的 16 個檔一次改完，不留 shadcn 那層語意變數做橋接。原因是**名字會打架**：shadcn 的 `bg-accent` 是淡灰 hover，Cofacts 的 `bg-accent` 是品牌黃；shadcn 的 `text-primary` 是品牌色字，Cofacts 的 `text-primary` 是主要文字色。
 
   | shadcn class | 改成 |
   |---|---|
@@ -704,7 +715,7 @@ flowchart LR
 
 1. **元件實例優先**：
    - 遇到 `shape.isComponentInstance()`，由 `shape.component()` 的 `path/name` 查 registry（§6.3），直接用程式元件，variant 屬性轉成 props。**不要把元件的內部重新實作一遍**。
-   - registry 查不到：先看是不是應該新增 L2 元件，而不是寫在頁面裡。
+   - registry 查不到：先看是不是應該新增共用元件；只有這一頁用的就放該 route 的 `-components/`。
 2. **有綁 token 就照 token**：讀 `shape.tokens`：
 
    | `shape.tokens` 的 property | shape 類型 | class |
@@ -757,7 +768,7 @@ sequenceDiagram
   A->>A: ① 盤點：用到的元件、有無對應程式元件、未綁 token 清單、R1–R5 預檢
   A->>E: 回報實作計畫與設計疑點
   E-->>D: 設計疑點（Penpot comment 或 issue）
-  A->>A: ② 先補 L1/L2 元件與 story，③ 再做 PageView 與 scenario，④ 最後接 route / loader
+  A->>A: ② 先補 ui 與共用元件及 story，③ 再做 PageView 與 scenario，④ 最後接 route / loader
   A->>A: ⑤ 驗證：lint、axe（light/dark）、Storybook 截圖 vs export_shape PNG（375/1440）、鍵盤走查
   A->>GH: 開 PR：Storybook 連結、Penpot 對照、偏差說明、未綁 token 清單、無障礙檢查表
   GH->>SB: CI build Storybook preview
@@ -879,7 +890,9 @@ description: >
 ## Workflow
 1. Intake: 找到 Penpot board（名稱或 id），跑 scripts/audit-board.js，
    列出：元件實例與 registry 對應、未綁 token 清單、R4 預檢結果、開發 Note。先回報計畫。
-2. Reuse: 先查 references/components.md。缺的 L1/L2 元件先做並補 story。
+2. Reuse: 先查 references/components.md。缺的 ui／共用元件先做並補 story。
+   只有一頁用的元件放該 route 目錄的 -components/；不跨目錄 import 別人的
+   -components/，第二處要用時搬到 src/components/ 並補 story 與 parameters.penpot。
 3. Build: 依 references/mapping-rules.md 把 token 轉成 class。不得使用 arbitrary color、
    dark: variant、階外字級。status 色只能透過 ReplyTypeLabel。
 4. Stories: 每個 Penpot 狀態板一個 scenario。
@@ -935,8 +948,8 @@ description: >
 
 ### 8.3 跨塊協作約定
 
-- **L2 元件由「第一個用到的塊」負責**：做好後放進 Storybook 並登錄到 registry（`parameters.penpot`）；其他塊只能透過 PR 擴充 props，不 fork。`ReplyTypeLabel`、`UserAvatar` / `UserFlag` 在塊 0 先做；`FactCheckReply`、`ArticleCard`、`ReplyFeedback` 由塊 1 負責、塊 2 沿用（Penpot 的 `Latest replies` 與 `MessagePage` 各有 39 個 `FactCheckReply` 子節點）。
-- 要做新 L2 元件前，先查 Storybook 與 `components.md`，避免 A、B 各做一份。
+- **共用元件由「第一個用到的塊」負責**：做好後放進 Storybook 並登錄到 registry（`parameters.penpot`）；其他塊只能透過 PR 擴充 props，不 fork。`ReplyTypeLabel`、`UserAvatar` / `UserFlag` 在塊 0 先做；`FactCheckReply`、`ArticleCard`、`ReplyFeedback` 由塊 1 負責、塊 2 沿用（Penpot 的 `Latest replies` 與 `MessagePage` 各有 39 個 `FactCheckReply` 子節點）。
+- 要做新共用元件前，或把 `-components/` 的元件搬進 `src/components/` 前，先查 Storybook 與 `components.md`，避免 A、B 各做一份。
 - search param 的 schema 工具在塊 0 建立，塊 1 擴充。
 - 無稿頁面由工程師以 Guide 為範例拼湊，PR 附 Storybook 連結請設計師 review。**設計師的主要工作是驗收，不是補稿。**
 
@@ -985,13 +998,13 @@ description: >
 
 | rumors-site | 新架構 |
 |---|---|
-| `AppLayout/*`（header、sidebar、footer、GlobalSearch、LoginModal、UpgradeDialog） | `layout/*` + `features/auth`（第 0 塊）；`UpgradeDialog` 另議 |
-| `ListPageControls/*`、`ListPageDisplays/*`、`Subscribe/*`、`SearchPageJumbotron` | `features/list/*`、L2 卡片（第 1 塊） |
-| `ArticleReply/*`、`CurrentReplies`、`ArticleReplyFeedbackControl/*`、`ArticleCategories/*`、`ReplyRequestReason/*`、`CreateReplyRequestForm/*`、`Hyperlinks`、`TrendPlot`、`CooccurrenceSection`、`AIReplySection`、`ActionMenu` | `features/article/*`、L2（第 2 塊） |
-| `NewReplySection/*`（1,536 LOC） | `features/editor/*`（第 2 塊，依新稿重做） |
-| `Collaborate/*` | `features/article/Transcript`（第 2b 塊） |
-| `ProfilePage/*`、`ContributionChart`、`LevelIcon` | `features/profile/*`（第 1 塊末） |
-| `LandingPage/*`、`ReportPage/*`、`Tutorial/*` | `features/landing`、`features/impact`、`features/tutorial`（第 4 塊） |
+| `AppLayout/*`（header、sidebar、footer、GlobalSearch、LoginModal、UpgradeDialog） | `components/`（SiteNav 等）+ `server/auth`（第 0 塊）；`UpgradeDialog` 另議 |
+| `ListPageControls/*`、`ListPageDisplays/*`、`Subscribe/*`、`SearchPageJumbotron` | `_site/-components/`、共用卡片（第 1 塊） |
+| `ArticleReply/*`、`CurrentReplies`、`ArticleReplyFeedbackControl/*`、`ArticleCategories/*`、`ReplyRequestReason/*`、`CreateReplyRequestForm/*`、`Hyperlinks`、`TrendPlot`、`CooccurrenceSection`、`AIReplySection`、`ActionMenu` | `article.$id/-components/`、共用元件（第 2 塊） |
+| `NewReplySection/*`（1,536 LOC） | `article.$id/-components/`（第 2 塊，依新稿重做） |
+| `Collaborate/*` | `article.$id/-components/Transcript`（第 2b 塊） |
+| `ProfilePage/*`、`ContributionChart`、`LevelIcon` | user route 的 `-components/`（第 1 塊末） |
+| `LandingPage/*`、`ReportPage/*`、`Tutorial/*` | 各靜態頁 route 的 `-components/`（第 4 塊） |
 | `WonderCallEmbed`、`GoogleWebsiteTranslator` | 另議：是否保留 |
 | `lib/gtm.ts`、`data-ga` | `lib/analytics.ts`（第 6 塊） |
 
