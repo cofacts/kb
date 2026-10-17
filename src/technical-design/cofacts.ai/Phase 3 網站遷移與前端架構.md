@@ -452,7 +452,7 @@ docs/design/
 規則：
 
 1. **單一 route 的 server function 直接寫在 route 檔裡**。Start compiler 不看檔名，會把每個 `createServerFn(...).handler(...)` 在 client build 換成 RPC stub，並移除只有 handler 用到的 `*.server` import。
-2. **route 檔太長，或多個 route 共用時，再把整個 server function 抽出來**（query 跟著走，不單獨抽）。抽到哪裡看情況，可以和相關的一般 util 放一起；**整個檔案都是 server function 時，命名為 `*.functions.ts`**（TanStack 文件建議的慣例）。`*.functions.ts` 不能命名成 `*.server.ts`，否則 client 無法 import。
+2. **route 檔太長，或多個 route 共用時，再把整個 server function 連同它的 `queryOptions` factory 抽出來**（query 跟著走，不單獨抽；見「取資料」第 5 點）。抽到哪裡看情況，可以和相關的一般 util 放一起；**整個檔案都是 server function 時，命名為 `*.functions.ts`**（TanStack 文件建議的慣例）。`*.functions.ts` 不能命名成 `*.server.ts`，否則 client 無法 import。
 3. **loader 只能呼叫 server function**。TanStack Start 的 loader 是 isomorphic：SSR 時在 server 跑，client 端換頁時在瀏覽器跑。直接在 loader 呼叫 rumors-api 會把請求和 secret 帶到瀏覽器。
 4. **`*.server` 的 import 只能在 handler 裡用**。handler 以外（例如同檔案的 helper）用到，import 就會留在 client bundle；Start 的 import protection 在 dev 只警告並換成 mock，**production build 才會失敗**。所以 CI 必須跑 build（§7），agent 在 dev 看到 import protection 警告要當成錯誤立刻修。
 5. secret 只能在 `cofacts.server.ts` 讀。import protection 只保護 `*.server.*` 檔（或有 `import '@tanstack/react-start/server-only'` 的檔），寫死在一般檔案的字串或在一般檔案讀 `process.env` 都擋不到。
@@ -552,7 +552,7 @@ function ArticlePage() {
 }
 ```
 
-`graphql()` 寫在 handler 裡：GraphQL 形狀、server function 與使用它的 component 在同一個檔案，codegen 從這裡產生型別，一路推導到 `useSuspenseQuery` 的 `data`；client build 時整個 handler 連同 query 字串一起被換成 RPC stub。多個 route 要用同一份資料時，**把整個 server function（連同裡面的 query）抽出去**，不只抽 query。
+`graphql()` 寫在 handler 裡：GraphQL 形狀、server function 與使用它的 component 在同一個檔案，codegen 從這裡產生型別，一路推導到 `useSuspenseQuery` 的 `data`；client build 時整個 handler 連同 query 字串一起被換成 RPC stub。
 
 block 0 需要的設定：`createRouter({ context: { queryClient } })`、root route 改用 `createRootRouteWithContext<{ queryClient: QueryClient }>()`（官方 [TanStack Query 指南](https://tanstack.com/start/latest/docs/framework/react/guide/tanstack-query) 的做法；cofacts/ai 目前只呼叫了 `setupRouterSsrQueryIntegration`，loader 還拿不到 `queryClient`）。
 
