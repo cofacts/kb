@@ -298,7 +298,7 @@ rumors-site 的問題是 param 名 `types` 看不出是「回應的」分類，�
 - **Icon 統一一套**：Penpot 的 `Base/Icon` 的 `Name` 屬性值就是 Material Symbols 名稱（`Open-In-New`、`Thumb Up`、`Format List Bulleted`…），另外有 Cofacts 自訂的 status 與品牌 icon（`line`、`fb`…）。四種查核狀態的 icon 是四種形狀（八角叉、圓勾、方三點、三角驚嘆號），讓色弱使用者不靠顏色也能分辨（指南 03）。
   - 建議做一個 `<Icon name>` 元件，改成 **SVG import**（例如 `@material-symbols/svg-400` 按需引入），取代 webfont ligature。webfont 會被螢幕閱讀器念出 ligature 文字，也會有 FOUT。
   - shadcn primitives 裡的 lucide 也一併換掉。
-- **元件不碰資料取得**：元件只吃 typed props（由 GraphQL codegen 的 fragment type 產生）。資料由 route loader 呼叫 BFF server function 取得。這樣 Storybook 不需要 mock Apollo 或網路，fixture 餵 props 就能跑（§4）。
+- **元件不碰資料取得**：元件只吃 typed props（由 GraphQL codegen 的 fragment type 產生），資料由 route 負責。讀取：route loader 呼叫 server function，server function 再呼叫 rumors-api；loader 本身是 isomorphic，不直接連 API（§3.5）。寫入與互動（送出回應、回饋、載入更多）：由 route component 呼叫 server function，以 callback props（`onSubmit`、`onLoadMore`）傳給元件。這樣 Storybook 不需要 mock 網路或 server function，fixture 餵 props、callback 用 `fn()` 就能跑（§4）。
 - **一個響應式元件取代 Penpot 的 desktop / mobile 兩個元件**：Penpot 有 `FactCheckCard` 與 `FactCheckCard-Original-Mobile`、`Footer` 與 `Footer-Mobile` 這類成對元件，程式裡合成一個，用斷點切換。
 
 ### 3.2 分層
