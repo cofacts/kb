@@ -275,7 +275,26 @@ rumors-site 的問題是 param 名 `types` 看不出是「回應的」分類，�
 
 - **Tailwind v4 為主**；只有 Tailwind 表達不好的時候才用 **CSS Modules**（`Foo.module.css`）：複雜 keyframes、`::before` 裝飾、捲動動畫、第三方 DOM（ProseMirror）。**禁止任何 CSS-in-JS**。
 - **shadcn（`base-maia` style，建在 `@base-ui/react` 上）** 作為 primitives。shadcn 的程式碼是 repo 自己擁有的，我們直接改成 Cofacts token（§5.4），不保留 shadcn 那層語意變數（`--primary`、`--muted`…）。
-- **變體**用 `class-variance-authority`（cva）；合併 class 用既有的 `cn()`。
+- **變體**用 `class-variance-authority`（cva）。shadcn 官方元件本來就用 cva（cofacts/ai 的 `ui/button.tsx` 等即 CLI 產生），保留它以便和 upstream 對照；Penpot 的具名 variant 屬性也能一對一對應到 cva 的 `variants`。cva 在 runtime 只做查表與字串串接，CSS 仍由 Tailwind 在建構時掃描產生。
+- **合併 class 用 `cn()`（clsx + tailwind-merge），但必須用 `extendTailwindMerge` 設定 Cofacts 的自訂 class**。tailwind-merge 不讀 `@theme`，預設把不認得的 `text-*` 都當成文字色。實測 `tailwind-merge@3.4.1`：
+  | `cn(...)` | 未設定 | 設定後 |
+  |---|---|---|
+  | `text-body-m` + `text-primary` | `text-primary`（字體被吃掉） | 兩個都保留 |
+  | `text-heading-xl` + `text-heading-m` | `text-heading-m` | `text-heading-m` |
+  | `rounded-5` + `rounded-full` | 兩個都保留 | `rounded-full` |
+  | `shadow-btn` + `shadow-none` | 兩個都保留 | `shadow-none` |
+
+  ```ts
+  // src/lib/utils.ts
+  import { clsx, type ClassValue } from 'clsx'
+  import { extendTailwindMerge } from 'tailwind-merge'
+  import { twMergeTheme } from '@/styles/tokens.generated' // 由 token 腳本產生（§5.4）
+
+  const twMerge = extendTailwindMerge({ extend: { theme: twMergeTheme } })
+  export const cn = (...inputs: ClassValue[]) => twMerge(clsx(inputs))
+  ```
+
+  `twMergeTheme` 由 token 腳本和 `tokens.css` 一起產生（`text` 放 17 個字體名、`radius`、`shadow`、`color` 放語意色名），不手寫。`cn()` 另加單元測試涵蓋上表，防止升級或 token 變動時默默壞掉。
 - **Icon 統一一套**：Penpot 的 `Base/Icon` 的 `Name` 屬性值就是 Material Symbols 名稱（`Open-In-New`、`Thumb Up`、`Format List Bulleted`…），另外有 Cofacts 自訂的 status 與品牌 icon（`line`、`fb`…）。四種查核狀態的 icon 是四種形狀（八角叉、圓勾、方三點、三角驚嘆號），讓色弱使用者不靠顏色也能分辨（指南 03）。
   - 建議做一個 `<Icon name>` 元件，改成 **SVG import**（例如 `@material-symbols/svg-400` 按需引入），取代 webfont ligature。webfont 會被螢幕閱讀器念出 ligature 文字，也會有 FOUT。
   - shadcn primitives 裡的 lucide 也一併換掉。
@@ -408,6 +427,7 @@ src/
 └── styles/
     ├── app.css                      # 入口：@import tailwindcss、tokens、base、focus
     ├── tokens.css                   # ⚙️ 由 design/tokens.json 產生
+    ├── tokens.generated.ts          # ⚙️ 同上：給 cn() 的 twMergeTheme
     ├── typography.css  focus.css
 design/
 └── tokens.json                      # Penpot 匯出的 token（DTCG JSON），token 的來源
@@ -657,7 +677,8 @@ flowchart LR
   J -->|pnpm tokens<br/>scripts/build-tokens.ts| C[src/styles/tokens.css]
   C --> T[Tailwind @theme<br/>utilities]
   J -->|同一支腳本| M[skill references/tokens.md<br/>對照表]
-  CI[CI] -->|檢查 tokens.css 與 json 一致| C
+  J -->|同一支腳本| W[src/styles/tokens.generated.ts<br/>twMergeTheme]
+  CI[CI] -->|檢查產生檔與 json 一致| C
 ```
 
 - **`design/tokens.json` 是唯一的 token 來源**，進版控。有了它就不必每次都開 Penpot MCP 才能 build，token 的變更也會出現在 PR diff 裡，看得到、能 review。
