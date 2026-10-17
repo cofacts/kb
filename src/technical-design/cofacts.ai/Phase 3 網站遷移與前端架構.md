@@ -497,7 +497,7 @@ docs/design/
 實測時踩到的坑（寫進 skill）：
 
 1. **沒啟用的 set（Dark）的 `resolvedValue` 會用目前啟用的主題去解析**，所以讀出來會是 Light 的色值。要讀 `value`（例如 `{neutral-100}`），再自己到 Global 查原始色。
-2. **Light 與 Dark 兩個 set 同時啟用時，Dark 會蓋過 Light**，匯出的圖也會變成暗色。MCP 讀色值一律照第 1 點讀 `value`；要匯出圖時先確認只啟用 `Color scheme / Light`。**不要從 MCP 切換 set 或 theme**：啟用狀態存在檔案裡，會改到設計師正在看的畫面。
+2. **主題由 Penpot 目前選的 theme 決定，agent 不要依賴它**：`Color scheme / Light` = Global + Light，`Color scheme / Dark` = Global + Dark，設計師會依需要切換，set 的勾選狀態也可能被誤勾。所以 token 一律分別從 Light、Dark 兩個 set 讀 `value`，再到 Global 解析（同第 1 點），產生 `tokens.css` 時兩組都輸出，不看目前啟用哪個；`export_shape` 匯出的圖則是當下主題的樣子，比對前先確認是哪個主題。**不要從 MCP 切換 set 或 theme**：啟用狀態存在檔案裡，會改到設計師正在看的畫面。
 3. Penpot 漸層不能綁 token，原始訊息展開的底部漸層、Button AI 的黃色漸層框是寫死的色值，前端用 token 重做（指南 07 已知例外）。
 4. 瀏覽器分頁在背景時 Penpot plugin 會被暫停（MCP 回報「no heartbeat」），**做實作時 Penpot 分頁要保持在前景**。
 5. `generateStyle` 對 text 會產生 `font-size: 0` 的外層加內層 span，不要照抄。
