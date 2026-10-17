@@ -504,6 +504,8 @@ const getArticle = createServerFn({ method: 'GET' })
     ),
   )
 
+// 示範 client side query 用。實際上「我的回饋」可以直接併入上方的 GetArticle operation，
+// 和文章一起在 SSR 載入（SSR 本來就是登入後畫面，見下方「其他」）。
 const getMyFeedback = createServerFn({ method: 'GET' })
   .validator(z.string())
   .handler(({ data: id }) =>
@@ -544,7 +546,7 @@ export const Route = createFileRoute('/_site/article/$id/')({
 function ArticlePage() {
   const { id } = Route.useParams()
   const { data } = useSuspenseQuery(articleQuery(id))            // SSR：從 cache 讀，loader 已填好
-  const { data: feedback } = useQuery({                          // client 再取即可
+  const { data: feedback } = useQuery({                          // 示範 client 端取得；見 getMyFeedback 上方註解
     queryKey: ['GetMyFeedback', id],
     queryFn: () => getMyFeedback({ data: id }),
   })
