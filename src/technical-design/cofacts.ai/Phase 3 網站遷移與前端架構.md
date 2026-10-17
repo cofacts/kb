@@ -298,7 +298,7 @@ rumors-site 的問題是 param 名 `types` 看不出是「回應的」分類，�
 - **Icon 統一一套**：Penpot 的 `Base/Icon` 的 `Name` 屬性值就是 Material Symbols 名稱（`Open-In-New`、`Thumb Up`、`Format List Bulleted`…），另外有 Cofacts 自訂的 status 與品牌 icon（`line`、`fb`…）。四種查核狀態的 icon 是四種形狀（八角叉、圓勾、方三點、三角驚嘆號），讓色弱使用者不靠顏色也能分辨（指南 03）。
   - 建議做一個 `<Icon name>` 元件，改成 **SVG import**（例如 `@material-symbols/svg-400` 按需引入），取代 webfont ligature。webfont 會被螢幕閱讀器念出 ligature 文字，也會有 FOUT。
   - shadcn primitives 裡的 lucide 也一併換掉。
-- **元件不碰資料取得**：共用元件與 `-components/` 只吃 typed props（由 GraphQL codegen 的 fragment type 產生），資料由 route component 透過 TanStack Query 取得，寫入則以 callback props（`onSubmit`、`onLoadMore`）傳給元件（§3.5「取資料」）。這樣 Storybook 不需要 mock 網路或 server function，fixture 餵 props、callback 用 `fn()` 就能跑（§4）。
+- **元件不碰資料取得**：共用元件與 `-components/` 只吃 typed props（元件用一般 TypeScript 宣告自己需要的欄位，不用 GraphQL fragment），資料由 route component 透過 TanStack Query 取得，寫入則以 callback props（`onSubmit`、`onLoadMore`）傳給元件（§3.5「取資料」）。這樣 Storybook 不需要 mock 網路或 server function，fixture 餵 props、callback 用 `fn()` 就能跑（§4）。
 - **一個響應式元件取代 Penpot 的 desktop / mobile 兩個元件**：Penpot 有 `FactCheckCard` 與 `FactCheckCard-Original-Mobile`、`Footer` 與 `Footer-Mobile` 這類成對元件，程式裡合成一個，用斷點切換。
 
 ### 3.2 分層
@@ -456,7 +456,7 @@ docs/design/
 3. **loader 只能呼叫 server function**。TanStack Start 的 loader 是 isomorphic：SSR 時在 server 跑，client 端換頁時在瀏覽器跑。直接在 loader 呼叫 rumors-api 會把請求和 secret 帶到瀏覽器。
 4. **`*.server` 的 import 只能在 handler 裡用**。handler 以外（例如同檔案的 helper）用到，import 就會留在 client bundle；Start 的 import protection 在 dev 只警告並換成 mock，**production build 才會失敗**。所以 CI 必須跑 build（§7），agent 在 dev 看到 import protection 警告要當成錯誤立刻修。
 5. secret 只能在 `cofacts.server.ts` 讀。import protection 只保護 `*.server.*` 檔（或有 `import '@tanstack/react-start/server-only'` 的檔），寫死在一般檔案的字串或在一般檔案讀 `process.env` 都擋不到。
-6. 共用元件與 `-components/` 不碰資料取得，只吃 typed props；query hook 只在 route component 呼叫（見下方「取資料」）。props type 由 GraphQL fragment 產生，元件用 `import type` 取得（type-only import 不受 import protection 限制）。
+6. 共用元件與 `-components/` 不碰資料取得，只吃 typed props；query hook 只在 route component 呼叫（見下方「取資料」）。**不用 GraphQL fragment 描述元件需要的欄位**（rumors-site 的 colocated fragments 不延續）：元件用一般 TypeScript 型別宣告 props，route 把 query 結果傳進去，形狀對不上時由 `tsc` 擋下。需要沿用 query 的型別時，從 codegen 產生的 query result type 取子型別即可。
 
 參考：TanStack Start 文件 [Execution Model](https://tanstack.com/start/latest/docs/framework/react/guide/execution-model)、[Server Functions › File Organization](https://tanstack.com/start/latest/docs/framework/react/guide/server-functions)、[Import Protection](https://tanstack.com/start/latest/docs/framework/react/guide/import-protection)。
 
@@ -466,8 +466,9 @@ docs/design/
 2. **SSR 就要有的資料，用 `useSuspenseQuery`**；只需在 client 取得的（例如 AI session 列表、「我是否已回饋」），用 `useQuery`。`useEffect` 與一般 `useQuery` 都不會在 SSR 執行，資料不會出現在 HTML 裡。
 3. **只有 `head()` 需要資料，或要決定頁面是否存在（`notFound()`、`redirect()`）時，才寫 route loader**。loader 裡用 `await context.queryClient.ensureQueryData(...)` 填 cache，**只回傳 `head()` 需要的欄位**：loader 的回傳值也會 serialize 到前端，回傳整份資料會和 query cache 重複。頁面內容一律從 query cache 讀，不用 `useLoaderData()`。在 loader 裡決定 404，SSR 的 HTTP 狀態碼才會正確；元件 streaming 開始後才丟錯，狀態碼已經送出。
 4. **寫入**用 `useMutation` 呼叫 server function，成功後 `invalidateQueries` 對應的 query key。
-5. **`staleTime` 依 query 設定**。cofacts/ai 現在全域是 `Infinity`，適合 AI 對話，但列表頁回來時會看到舊資料。至少要大於 0，否則瀏覽器拿到 SSR 資料後會立刻重打一次。
-6. （選用）巢狀很深的 `useSuspenseQuery` 想提早開始，可以在 loader 呼叫 `ensureQueryData` 但不 `await`，避免 waterfall，也不擋 SSR。
+5. **queryKey = `[GraphQL operation name, variables]`**，例如 `['GetArticle', { id }]`。每個 route 各自定義 `queryOptions`，若用 `['article', id]` 這類自訂 key，兩個 route 選了不同欄位卻用同一個 key 就會互相覆蓋 cache；codegen 要求 operation name 全專案唯一，用它當 key 就不會撞。key 與 `queryFn` 一律寫在同一個 `queryOptions` 裡（TkDodo〈The Query Options API〉、Start 官方指南的做法）。和使用者有關的 query（例如 `GetMyFeedback`）在登出或切換帳號時要從 cache 移除。
+6. **`staleTime` 依 query 設定**。cofacts/ai 現在全域是 `Infinity`，適合 AI 對話，但列表頁回來時會看到舊資料。至少要大於 0，否則瀏覽器拿到 SSR 資料後會立刻重打一次。
+7. （選用）巢狀很深的 `useSuspenseQuery` 想提早開始，可以在 loader 呼叫 `ensureQueryData` 但不 `await`，避免 waterfall，也不擋 SSR。
 
 ```tsx
 // src/routes/_site/article.$id/index.tsx
@@ -521,7 +522,7 @@ const getMyFeedback = createServerFn({ method: 'GET' })
   )
 
 const articleQuery = (id: string) =>
-  queryOptions({ queryKey: ['article', id], queryFn: () => getArticle({ data: id }), staleTime: 60_000 })
+  queryOptions({ queryKey: ['GetArticle', { id }], queryFn: () => getArticle({ data: id }), staleTime: 60_000 })
 
 export const Route = createFileRoute('/_site/article/$id/')({
   // head() 要標題、要決定 404，所以寫 loader；只回傳 head 需要的欄位
@@ -543,7 +544,7 @@ function ArticlePage() {
   const { id } = Route.useParams()
   const { data } = useSuspenseQuery(articleQuery(id))            // SSR：從 cache 讀，loader 已填好
   const { data: feedback } = useQuery({                          // client 再取即可
-    queryKey: ['article', id, 'my-feedback'],
+    queryKey: ['GetMyFeedback', { id }],
     queryFn: () => getMyFeedback({ data: id }),
   })
   return <ArticlePageView article={data.GetArticle!} myFeedback={feedback} />
