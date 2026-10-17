@@ -482,7 +482,7 @@ import { graphql } from '@/server/gql'
 import { ArticlePageView } from './-components/ArticlePageView'
 
 const getArticle = createServerFn({ method: 'GET' })
-  .validator(z.string())
+  .inputValidator(z.string())
   .handler(({ data: id }) =>
     cofactsExec(
       graphql(`
@@ -507,7 +507,7 @@ const getArticle = createServerFn({ method: 'GET' })
 // 示範 client side query 用。實際上「我的回饋」可以直接併入上方的 GetArticle operation，
 // 和文章一起在 SSR 載入（SSR 本來就是登入後畫面，見下方「其他」）。
 const getMyFeedback = createServerFn({ method: 'GET' })
-  .validator(z.string())
+  .inputValidator(z.string())
   .handler(({ data: id }) =>
     cofactsExec(
       graphql(`
