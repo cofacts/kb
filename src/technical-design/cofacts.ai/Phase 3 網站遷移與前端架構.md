@@ -3,7 +3,7 @@ type: DesignDoc
 title: "Cofacts.ai Phase 3：網站遷移與前端架構"
 resource: "https://github.com/cofacts/kb/blob/main/src/technical-design/cofacts.ai/Phase%203%20網站遷移與前端架構.md"
 tags: [cofacts, design-docs, technical-design, cofacts.ai, frontend, design-system, accessibility]
-timestamp: "2026-09-28T12:00:00+08:00"
+timestamp: "2026-10-17T12:00:00+08:00"
 ---
 
 # Cofacts.ai Phase 3：網站遷移與前端架構
@@ -16,7 +16,7 @@ timestamp: "2026-09-28T12:00:00+08:00"
 - Phase 2 登入機制：[Authentication](Authentication.md)（已在 [cofacts/ai](https://github.com/cofacts/ai) 實作）
 - 設計稿：Penpot 檔案「Cofacts-2026 (26-08-25)」（Penpot MCP 可存取）
 - 無障礙指南：設計師提供的「Cofacts 無障礙指南 設計系統 v2（2026.08.27）」，對應 Penpot 檔 Cofacts-2026
-- 本文盤點基準：`cofacts/ai@d00e6be`、`cofacts/rumors-site@4d10bbc`、Penpot 檔 2026-09-28 狀態
+- 本文盤點基準：`cofacts/ai@d00e6be`、`cofacts/rumors-site@4d10bbc`、Penpot 檔 `Cofacts-2026 (26-10-08)`、《Cofacts 無障礙與前端實作指南》2026-10-08 版
 
 ---
 
@@ -276,7 +276,7 @@ rumors-site 的問題是 param 名 `types` 看不出是「回應的」分類，�
 - **Tailwind v4 為主**；只有 Tailwind 表達不好的時候才用 **CSS Modules**（`Foo.module.css`）：複雜 keyframes、`::before` 裝飾、捲動動畫、第三方 DOM（ProseMirror）。**禁止任何 CSS-in-JS**。
 - **shadcn（`base-maia` style，建在 `@base-ui/react` 上）** 作為 primitives。shadcn 的程式碼是 repo 自己擁有的，我們直接改成 Cofacts token（§5.4），不保留 shadcn 那層語意變數（`--primary`、`--muted`…）。
 - **變體**用 `class-variance-authority`（cva）；合併 class 用既有的 `cn()`。
-- **Icon 統一一套**：Penpot 的 `Base/Icon` 41 個 icon 名字就是 Material Symbols 名稱（`Open-In-New`、`Thumb Up`、`Format List Bulleted`…），另外有 Cofacts 自訂的 status 與品牌 icon（`status-correct`、`status-false`、`line`、`fb`…）。
+- **Icon 統一一套**：Penpot 的 `Base/Icon` 的 `Name` 屬性值就是 Material Symbols 名稱（`Open-In-New`、`Thumb Up`、`Format List Bulleted`…），另外有 Cofacts 自訂的 status 與品牌 icon（`line`、`fb`…）。四種查核狀態的 icon 是四種形狀（八角叉、圓勾、方三點、三角驚嘆號），讓色弱使用者不靠顏色也能分辨（指南 03）。
   - 建議做一個 `<Icon name>` 元件，改成 **SVG import**（例如 `@material-symbols/svg-400` 按需引入），取代 webfont ligature。webfont 會被螢幕閱讀器念出 ligature 文字，也會有 FOUT。
   - shadcn primitives 裡的 lucide 也一併換掉。
 - **元件不碰資料取得**：元件只吃 typed props（由 GraphQL codegen 的 fragment type 產生）。資料由 route loader 呼叫 BFF server function 取得。這樣 Storybook 不需要 mock Apollo 或網路，fixture 餵 props 就能跑（§4）。
@@ -294,32 +294,32 @@ rumors-site 的問題是 param 名 `types` 看不出是「回應的」分類，�
 
 ### 3.3 Penpot 元件 → 程式元件對照
 
-Penpot 本地元件庫共 **46 個元件**，其中 29 個有 variants（Button 17、Input 14、Icon 41…）。Penpot 的 variant 屬性名大多還是預設的 `Property 1` / `Value 2`，且把多個維度擠在一個字串裡，例如 `normal-2icon-default`。**請設計師把它們拆成具名的多屬性**（Size / Style / Icon / State）。拆完之後，variant 屬性可以直接對應到 cva 的 prop，agent 也讀得懂。
+Penpot 本地元件庫共 **48 個元件**（依 2026-10-08 的 `Cofacts-2026 (26-10-08)`）。variant 屬性已全部改成具名屬性：`Type`、`State`、`Device`、`Selected`、`Name`，Button 拆成 `Size` / `Style` / `Icon` 三個屬性。**variant 屬性直接對應 cva 的 prop**，值轉成 kebab-case（`Icon-Touch` → `icon-touch`、`OnDark` → `on-dark`）；`Device: Desktop / Mobile` 與 `-Mobile` 後綴的元件合成一個響應式元件，不變成 prop。
+
+2026-10-08 版刪除的元件：`Base/FieldDescription`（`ui/field` 自行實作 description）、`Base/Flag-Mobile`（手機共用 `Base/Flag`）、`Layout/ExitEditor`（編輯器改用底部「取消編輯」按鈕，不做 EditorExitBar）、`Feedback/VoteCounter`、`Content/ReplyEditor-Tabs`（由 `Content/EditorTab` 取代）。
 
 | Penpot 元件 | Penpot variants（現況） | 程式元件 | 層 | 主要使用頁 |
 |---|---|---|---|---|
-| `Base/Button` | 17：size（small/normal/large/icon）× style（default/outline/Secondary/LINE）× icon（front/back/2icon） | `ui/button`：`variant: primary\|outline\|secondary\|line\|ghost`、`size: sm\|md\|lg\|icon`、`iconStart` / `iconEnd` | L1 | 全站 |
-| `Button AI` | thinking / highlight / default | `cofacts/AiButton` | L2 | 訊息頁、AI |
-| `Base/Input` | 14：Basic / Field / Textarea / icon × default / active / disable / Invalid、AI | `ui/input`、`ui/textarea`、`ui/input-group`、`ui/field`；AI 版是 `ai-chat/ChatInput` | L1 / L3 | 表單、搜尋、AI |
-| `Base/FieldDescription` | — | `ui/field` 的 description | L1 | 表單 |
-| `Base/Select` | default / open / small | `ui/select` | L1 | 篩選、排序 |
-| `Base/Checkbox`、`Base/RadioGroup`、`Base/Switch` | default / disable / Description | `ui/checkbox`、`ui/radio-group`、`ui/switch` | L1 | 篩選、編輯器 |
-| `Base/Toggle` | default / hover / active / outline-* | `ui/toggle`、`ui/toggle-group`（篩選 chip） | L1 | 列表篩選 |
-| `Base/Badge` | icon-default / icon-active / normal / normal-active / disable / fix（例：「還未有效查核」） | `ui/badge` → `cofacts/ArticleStatusBadge` | L1 / L2 | 列表 |
-| `Base/Flag`、`Flag-Mobile` | —（例：「從零開始的魔法旋轉花花 \| Lv. 11」） | `cofacts/UserFlag`（作者名 + 等級） | L2 | 回應、留言 |
-| `Base/Avatar` | default / no-level / Certification / Certification-level | `cofacts/UserAvatar`（整併現有 `UserAvatar` + `OpenPeepsAvatar`；Certification 對應 [Badge System](../badge-system.md)） | L2 | 全站 |
-| `Base/Icon` | 41 icon | `ui/icon` | L1 | 全站 |
-| `Layout/Nav` | Default / AI / login / search | `layout/SiteNav`（`mode="site"\|"ai"`） | L2 | 全站 |
-| `Layout/NavItem` | hover / default / alert / mobile / mobile-active / mobile-alert | `layout/NavItem`（alert = 「等你來答」未解數 badge，例如 99+） | L2 | 全站 |
-| `Layout/Nav-Mobile`、`Nav-MobileExpanded` | open / default / second-menu / search | 合進 `layout/SiteNav` 的 mobile 狀態 | L2 | 全站 |
-| `Layout/Footer`、`Footer-Mobile` | — | `layout/SiteFooter`（**底色 `surface-dark`，前景只能用 `-on-dark`**，見 R4 案例） | L2 | 全站 |
-| `Layout/Logo` | symbol / horizontal / AI / icon | `layout/Logo` | L2 | 全站 |
-| `Layout/ActionPanel` | MessagePage-submenu（快速索引）/ -mobile | `features/article/ArticleQuickNav` | L3 | 訊息頁 |
-| `Layout/ExitEditor` | desktop / mobile | `features/editor/EditorExitBar` | L3 | 編輯器 |
+| `Base/Button` | `Size`：Large 44 / Medium 36 / Small 28 / Icon-Touch 32；`Style`：Primary / Outline / Secondary / LINE / OnDark；`Icon`：None / Front / Back / Both / Only | `ui/button`：`size: lg\|md\|sm\|icon-touch`、`variant: primary\|outline\|secondary\|line\|on-dark`、`icon: none\|start\|end\|both\|only`（`only` 必填 `aria-label`） | L1 | 全站 |
+| `Button AI` | `State`：default / hover / loading / icon / Secondary / disable | `cofacts/AiButton`（loading 加 `aria-busy`；黃色漸層框前端用 `brand-500-main` → `brand-300` 重做） | L2 | 訊息頁、AI |
+| `Base/Input` | `Type`：15 個（Basic / Field / Textarea / icon × default / active / disable / Invalid、icon-hover、AI、AI-loading） | `ui/input`、`ui/textarea`、`ui/input-group`、`ui/field`；AI 版是 `ai-chat/ChatInput`（AI-loading 的提示放 `role="status"`） | L1 / L3 | 表單、搜尋、AI |
+| `Base/Select` | `State`：default / open / small | `ui/select`（原生 `<select>` 優先） | L1 | 篩選、排序 |
+| `Base/Checkbox`、`Base/RadioGroup`、`Base/Switch` | Checkbox `State`：default / checked / disable / Description；RadioGroup `Type`：default / disable / Description；Switch `State`：off / on / disable | `ui/checkbox`、`ui/radio-group`、`ui/switch` | L1 | 篩選、編輯器 |
+| `Base/Toggle` | `State`：default / hover / active / outline / outline-hover / outline-active | `ui/toggle`（`aria-pressed`，收藏） | L1 | 訊息頁 |
+| `Base/Badge` | `Type`：icon-default / icon-active / normal / normal-active / disable / fix（例：「還未有效查核」） | 篩選標籤：`ui/toggle-group`（`<button aria-pressed>`，`normal-active` = 已選取）；純顯示：`ui/badge` → `cofacts/ArticleStatusBadge` | L1 / L2 | 列表 |
+| `Base/Flag` | —（例：「從零開始的魔法旋轉花花 \| Lv. 11」；手機共用） | `cofacts/UserFlag`（作者名 + 等級；橘色摺角 `surface-accent-fold`，純裝飾） | L2 | 回應、留言 |
+| `Base/Avatar` | `Type`：default / no-level / Certification / Certification-level | `cofacts/UserAvatar`（整併現有 `UserAvatar` + `OpenPeepsAvatar`；Certification 對應 [Badge System](../badge-system.md)） | L2 | 全站 |
+| `Base/Icon` | `Name`：41 個 icon | `ui/icon`（`aria-hidden`） | L1 | 全站 |
+| `Layout/Nav` | `Type`：Default / AI / login / search | `layout/SiteNav`（`mode="site"\|"ai"`） | L2 | 全站 |
+| `Layout/NavItem` | `State`：hover / default / alert / mobile / mobile-active / mobile-alert | `layout/NavItem`（目前所在頁 = `hover` 的底線樣式，加 `aria-current="page"`；alert = 「等你來答」未解數，例如 99+，要讓螢幕閱讀器唸出） | L2 | 全站 |
+| `Layout/Nav-Mobile`、`Nav-MobileExpanded` | Nav-Mobile `State`：open / default / second-menu / search；Nav-MobileExpanded 只剩 open-full | 合進 `layout/SiteNav` 的 mobile 狀態（漢堡／關閉鈕用 Button `Icon-Touch`，`aria-expanded` + `aria-controls`，Esc 關閉並還焦點） | L2 | 全站 |
+| `Layout/Footer`、`Footer-Mobile` | — | `layout/SiteFooter`（**底色 `surface-dark`，前景只能用 `-on-dark`**，見 R4 案例；頂部 1px `border-on-dark`） | L2 | 全站 |
+| `Layout/Logo` | `Type`：symbol / horizontal / AI / icon | `layout/Logo` | L2 | 全站 |
+| `Layout/ActionPanel` | `Device`：Desktop / Mobile | `features/article/ArticleQuickNav`（桌機 `<nav aria-label="本頁索引">` + 錨點；手機分頁列可橫向捲動，「查核闢謠」是浮動按鈕） | L3 | 訊息頁 |
 | `Content/FactCheckCard`、`FactCheckCard-Original-Mobile` | — | `cofacts/ArticleCard`（列表中的一則訊息 + 回應摘要） | L2 | `/replies`、`/articles`、首頁 |
-| `Content/FactCheckReply`、`ReplyCard-Mobile` | default / with-link | `cofacts/FactCheckReply`（回應本文 + 出處 + 作者 + 回饋） | L2 | 列表、訊息頁、回應頁 |
-| `Content/FactCheckReply-Title` | 4 種判定 × desktop / mobile | `cofacts/ReplyTypeLabel`（**R1 的唯一實作點**，§6） | L2 | 全站 |
-| `Content/AIFactCheckCard` | 4 種判定 × default / active | `features/ai-chat/VerdictPicker`（AI 草稿選分類） | L3 | AI |
+| `Content/FactCheckReply`、`ReplyCard-Mobile` | `Type`：default / with-link | `cofacts/FactCheckReply`（回應本文 + 出處 + 作者 + 回饋） | L2 | 列表、訊息頁、回應頁 |
+| `Content/FactCheckReply-Title` | `Type`：Incorrect / Correct / PersonalOpinion / NotVerifiable（含 -mobile） | `cofacts/ReplyTypeLabel`（**R1 的主要實作點**，§6） | L2 | 全站 |
+| `Content/AIFactCheckCard` | `Type`：4 種判定，各有 -active | `features/ai-chat/VerdictPicker`（AI 草稿選分類） | L3 | AI |
 | `Content/AIMessageCard` | default / hover / active / active-hover | `features/ai-chat/SessionListItem` | L3 | AI 側欄 |
 | `Content/AIAnalysisPanel` | — | `features/article/AiAnalysisPanel` | L3 | 訊息頁 |
 | `Content/DisputedMessage`、`-Mobile` | default / read | `cofacts/ArticleListItem`（可疑訊息列表的一則） | L2 | `/articles`、`/hoax-for-you`、搜尋 |
@@ -327,13 +327,15 @@ Penpot 本地元件庫共 **46 個元件**，其中 29 個有 variants（Button 
 | `Content/LinkCard` | — | `cofacts/HyperlinkPreview` | L2 | 訊息頁、回應 |
 | `Content/Transcript` | — | `features/article/Transcript`（協作逐字稿，見 §8 第 2 塊的風險） | L3 | 訊息頁 |
 | `Content/FactCheckResultCard` | ExistingResponses / -mobile | `features/editor/ExistingReplyCard`（「直接用此回應」）；回報流程 B-1 也會用到 | L2 | 編輯器、`/report` |
-| `Content/ReplyEditor-Tabs` | desktop / mobile | `features/editor/EditorTabs`（基於 `ui/tabs`） | L3 | 編輯器 |
+| `Content/EditorTab`、`EditorTab-Mobile` | `Selected`：撰寫新回應 / 使用既有回應 | `features/editor/EditorTabs`（基於 `ui/tabs`：`tablist` / `tab` / `tabpanel`，左右鍵切換）；兩個分頁對應 `/reply/new`、`/reply/existing` | L3 | 編輯器 |
+| `Content/OriginalMessage`、`-Mobile` | `State`：Collapsed / Expanded | `features/editor/OriginalMessage`（`<button aria-expanded>`；手機展開限高約 240px、內部捲動、`overscroll-behavior: contain`、`tabindex=0`；編輯器取得焦點時自動收合；底部漸層用 `surface-base` → 透明重做） | L3 | 編輯器 |
+| `Content/AIWelcome`、`-Mobile` | — | `features/ai-chat/Welcome` | L3 | `/ai` |
+| `Content/ReportPrompt` | — | `features/report/ReportPrompt`（回報可疑訊息的空狀態提示） | L3 | `/report`、搜尋無結果 |
 | `Content/QACard`、`QACard-Answer` | — | `features/tutorial/QaCard` | L3 | 教學 |
-| `Feedback/ReactionGroup` | 2 | `cofacts/ReplyFeedback`（有幫助 / 沒幫助 + 理由） | L2 | 回應 |
-| `Feedback/VoteCounter` | count / time | `cofacts/VoteCounter` | L2 | 回報理由、分類 |
-| `Feedback/ReportStatus` | default / Mobile（回應 0 · 回報 23） | `cofacts/ArticleStats` | L2 | 列表 |
+| `Feedback/ReactionGroup` | `Type`：reason（看理由）/ report（檢舉） | `cofacts/ReplyFeedback`（有幫助 / 沒幫助 + 理由、檢舉） | L2 | 回應 |
+| `Feedback/ReportStatus` | `Device`：Desktop / Mobile（回應 0 · 回報 23） | `cofacts/ArticleStats` | L2 | 列表 |
 | `Feedback/Category` | —（# 分類 · 分類建議） | `cofacts/ArticleCategories` | L2 | 訊息頁 |
-| `Feedback/ViewChart`、`Chart-Mobile` | — | `features/article/ViewChart`（近 30 日瀏覽；資料本身不綁語意 token，見指南 07） | L3 | 訊息頁 |
+| `Feedback/ViewChart`、`Chart-Mobile` | — | `features/article/ViewChart`（近 30 日瀏覽；線色用 `--chart-1` / `--chart-2`；圖表 `aria-hidden`，另給文字摘要，圖例寫明文字） | L3 | 訊息頁 |
 
 各頁實際用到的元件（由 Penpot 實例統計）：
 
@@ -482,34 +484,21 @@ docs/design/
 
 | 資料 | 怎麼取 | 可用程度 |
 |---|---|---|
-| Token catalog | `penpot.library.local.tokens`：3 個 set（`Global` 64 個、`Light` 40 個、`Dark` 40 個）；2 個 theme（`Color scheme / Light` = Light + Global，`Color scheme / Dark` = Dark + Global） | ✅ 對齊的主要來源 |
-| 每個 shape 綁了哪些 token | `shape.tokens` → `{ fill: "surface-accent", paddingLeft: "spacing-16", fontSize: "16", borderRadiusTopLeft: "RADIUS-5" }` | ✅ **最重要**。實作時優先讀這裡 |
-| 元件庫 | `library.local.components`（46 個，含 `path`、variants） | ✅ |
-| Typography styles | 9 個：H1–H5、P1–P3、Annotation | ⚠️ 與指南不一致（見下） |
+| Token catalog | `penpot.library.local.tokens`：3 個 set（`Global` 82 個：原始色 36、字體 17、間距 11、字級 7、邊框粗細 5、圓角 4、陰影 1、字型 1；`Light` 51 個、`Dark` 51 個）；2 個 theme（`Color scheme / Light` = Light + Global，`Color scheme / Dark` = Dark + Global） | ✅ 對齊的主要來源 |
+| 每個 shape 綁了哪些 token | `shape.tokens` → `{ fill: "surface-accent", paddingLeft: "spacing-16", typography: "type-body-m", borderRadiusTopLeft: "RADIUS-5" }` | ✅ **最重要**。實作時優先讀這裡 |
+| 元件庫 | `library.local.components`（48 個，含 `path`、具名 variant 屬性） | ✅ |
+| 字體 token（typography） | Global set 裡 17 個 `type-*` token；舊的 9 個 typography styles 已刪除，所有文字都綁字體 token | ✅ |
 | `penpot.generateStyle()` | 產出 CSS | ⚠️ **只能參考**：色值是 raw hex（`#ffb600FF`）、定位是 `position:absolute; left:170px`，**token 名稱全部遺失** |
 | `export_shape` | 匯出 PNG / SVG | ✅ 用來做視覺比對 |
 | 開發 Note | 名為「備註」的 board 裡的文字（「開發 Note」「頁面層級標記」） | ✅ 是規格，要讀，**不是畫面，不要實作成 UI** |
 
-設計稿的 token 綁定率（主要頁面 board 的所有子孫節點）：
-
-| board | fill 綁 token | 文字色綁 token | 字級綁 token | flex 間距綁 token |
-|---|---|---|---|---|
-| MessagePage-1440 | 340/344 | 126/126 | 122/126 | 118/144 |
-| Latest replies | 229/231 | 82/82 | 82/82 | 82/114 |
-| AI-main page | 181/183 | 47/48 | 45/48 | 52/74 |
-| Guide how-1440 | 193/195 | 50/50 | **35/50** | 49/71 |
-| Doubious Message-1440 | 192/194 | 74/74 | 74/74 | 69/93 |
-
-沒綁 token 的 fill 幾乎都是 logo（`#c60000`、`#1f1f1f`，屬於指南的豁免項）。**間距約有 25–30% 沒綁 token**，所以 §5.5 需要「沒綁 token 時」的處理規則。
+設計稿的 token 綁定率（2026-10-08 設計師回報）：fill 與文字色幾乎全綁（沒綁的是 logo，屬指南豁免項）；**文字 100% 綁字體 token**；**間距約 92% 綁 token**，剩下的是版面寬度（例如 1440 版面左右各 200），前端用「內容最大寬 1040 置中」處理，不必轉成 class。
 
 實測時踩到的坑（寫進 skill）：
 
 1. **沒啟用的 set（Dark）的 `resolvedValue` 會用目前啟用的主題去解析**，所以讀出來會是 Light 的色值。要讀 `value`（例如 `{neutral-100}`），再自己到 Global 查原始色。
-2. **Typography styles 與無障礙指南不一致**：
-   - library 裡 P2 是 `16/1.75`、H1 是 `36/1.2 w600`；指南規定行高只有三個值（12/14/16 → 1.8、18 → 1.5、24/28/36 → 1.3），字重 H1 900、H2–H4 700。
-   - library 另外多了指南沒有的 H5（16/600）。
-   - **以指南為準**，請設計師更新 library typography（附錄 C）。
-3. `fontFamilies` token 是 `Noto Sans`，文字實際用的是 `Noto Sans TC`，以 `Noto Sans TC` 為準。
+2. **Light 與 Dark 兩個 set 同時啟用時，Dark 會蓋過 Light**，匯出的圖也會變成暗色。MCP 讀色值一律照第 1 點讀 `value`；要匯出圖時先確認只啟用 `Color scheme / Light`。**不要從 MCP 切換 set 或 theme**：啟用狀態存在檔案裡，會改到設計師正在看的畫面。
+3. Penpot 漸層不能綁 token，原始訊息展開的底部漸層、Button AI 的黃色漸層框是寫死的色值，前端用 token 重做（指南 07 已知例外）。
 4. 瀏覽器分頁在背景時 Penpot plugin 會被暫停（MCP 回報「no heartbeat」），**做實作時 Penpot 分頁要保持在前景**。
 5. `generateStyle` 對 text 會產生 `font-size: 0` 的外層加內層 span，不要照抄。
 
@@ -526,13 +515,15 @@ Tailwind v4 的 color utility 會先找「專屬 namespace」，找不到才退�
 | `status-*` | `--status-*` | `--text-color-status-*` | `text-status-{…}`（**只在 `ReplyTypeLabel` 裡用**） | `status-incorrect` → `text-status-incorrect` |
 | `spacing-N` | — | `--spacing: 0.0625rem`（1 單位 = 1px） | `p-N`、`gap-N`、`m-N`… | `spacing-16` → `p-16`、`gap-16` |
 | `RADIUS-N` | — | `--radius-N` | `rounded-N`；`RADIUS-100` → `rounded-full` | `RADIUS-5` → `rounded-5` |
-| fontSizes `N` | — | `--text-N` + `--text-N--line-height` | `text-N`（**行高自動帶入**） | `16` → `text-16`（16px / 1.8） |
-| Typography `H1`…`Annotation` | — | `--text-h1` + `--line-height` + `--font-weight` | `text-h1`、`text-p2`、`text-annotation` | `H1` → `text-h1`（36 / 1.3 / 900） |
+| 字體 `type-*` | — | `--text-{去 type-}` + `--line-height` + `--font-weight` | `text-{去 type-}`（字級、行高、字重一起帶入） | `type-body-m` → `text-body-m`（16 / 28px / 400）、`type-ui-s-bold` → `text-ui-s-bold` |
+| fontSizes `N` | — | 不註冊 | 元件裡不寫單獨的字級，一律寫字體 class | — |
 | borderWidth `N` | — | Tailwind 內建 | `border`（1）、`border-2`、`border-3`、`border-4`、`border-[0.5px]` | |
 | shadow `btn-shadow` | — | `--shadow-btn` | `shadow-btn` | |
+| `overlay-scrim` | `--overlay-scrim` | `--background-color-scrim` | `bg-scrim` | 抽屜、對話框遮罩 |
+| `chart-series-N` | `--chart-series-N` | **不註冊** | 圖表元件直接讀 CSS 變數 `var(--chart-series-1)` | 資料色，不給一般 UI 用 |
 | fontFamilies `noto` | — | `--font-sans` | `font-sans`（預設） | |
 
-**已驗證（Tailwind 4.2.0，與 cofacts/ai 同版）**：在上述 `@theme` 下，`bg-base`、`bg-accent`、`text-primary`、`text-on-accent`、`text-status-incorrect`、`border-control`、`text-16`（含行高）、`text-h1`（含行高與字重）、`p-16`、`gap-8`、`w-343`、`rounded-5`、`shadow-btn` 都能正確產生。另外 **`text-gray-400`、`bg-white`、`text-accent`、`bg-primary`、`text-15`、`fill-primary` 全部不會產生任何 CSS**。
+**已驗證（Tailwind 4.2.0，與 cofacts/ai 同版）**：在上述 `@theme` 下，`bg-base`、`bg-accent`、`text-primary`、`text-on-accent`、`text-status-incorrect`、`border-control`、`text-body-m`、`text-heading-xl`（含行高與字重）、`p-16`、`gap-8`、`w-343`、`rounded-5`、`shadow-btn` 都能正確產生。另外 **`text-gray-400`、`bg-white`、`text-accent`、`bg-primary`、`text-15`、`text-16`、`fill-primary` 全部不會產生任何 CSS（2026-10-08 改版後的字體 token 寫法沿用同一個 `@theme` 機制，實作 tokens 腳本時要重跑這組驗證）**。
 
 這樣的好處：
 
@@ -551,22 +542,24 @@ Tailwind v4 的 color utility 會先找「專屬 namespace」，找不到才退�
 
 | Penpot token 類型 | 數量 | 對應到 | Tailwind class 例 |
 |---|---|---|---|
-| 語意色 `surface-*` | 10 | `--background-color-*` | `bg-base` `bg-raised` `bg-selected` `bg-inverse` `bg-accent` `bg-accent-subtle` `bg-dark` `bg-info` `bg-info-strong` `bg-line` |
-| 語意色 `text-*` | 11 | `--text-color-*` | `text-primary` `text-secondary` `text-tertiary` `text-disabled` `text-inverse` `text-link` `text-on-accent` `text-on-dark` `text-on-dark-muted` `text-on-info` `text-on-line` |
-| 語意色 `border-*` | 8 | `--border-color-*`（`focus` / `focus-outer` 只給全域 focus 規則用） | `border-subtle` `border-control` `border-strong` `border-accent` `border-inverse` `border-on-dark` |
-| 語意色 `icon-*` | 7 | `--text-color-icon-*` | `text-icon-default` `text-icon-muted` `text-icon-inverse` `text-icon-brand` `text-icon-on-accent` `text-icon-on-dark` `text-icon-on-line` |
+| 語意色 `surface-*` | 15 | `--background-color-*` | `bg-base` `bg-raised` `bg-selected` `bg-inverse` `bg-secondary` `bg-accent` `bg-accent-subtle` `bg-accent-fold` `bg-dark` `bg-dark-raised` `bg-on-dark` `bg-info` `bg-info-strong` `bg-line` |
+| 語意色 `text-*` | 13 | `--text-color-*` | `text-primary` `text-secondary` `text-tertiary` `text-disabled` `text-inverse` `text-link` `text-on-accent` `text-on-secondary` `text-on-status` `text-on-dark` `text-on-dark-muted` `text-on-info` `text-on-line` |
+| 語意色 `border-*` | 9 | `--border-color-*`（`focus` / `focus-outer` 只給全域 focus 規則用） | `border-subtle` `border-control` `border-strong` `border-accent` `border-inverse` `border-on-dark` `border-on-dark-strong` |
+| 語意色 `icon-*` | 8 | `--text-color-icon-*` | `text-icon-default` `text-icon-muted` `text-icon-inverse` `text-icon-brand` `text-icon-on-accent` `text-icon-on-secondary` `text-icon-on-dark` `text-icon-on-line` |
 | 語意色 `status-*` | 4 | `--text-color-status-*` | `text-status-incorrect` `text-status-correct` `text-status-opinion` `text-status-outofscope` |
-| **語意色小計** | **40** | Light / Dark 兩組值，以 `[data-theme]` 切換 | |
-| 原始色（Global） | 35 | 只做成 `--neutral-900` 這類 CSS 變數，**不產生 utility** | —（僅 `tokens.css` 內部引用；資料視覺化例外，見指南 07） |
-| fontSizes | 7（36/28/24/18/16/14/12） | `--text-N` + 行高 | `text-36` … `text-12` |
-| Typography styles | 8（依指南：H1–H4、P1–P3、Annotation；H5 待定） | `--text-{name}` + 行高 + 字重 | `text-h1` `text-h4` `text-p1` `text-annotation` |
+| `overlay-scrim` | 1 | `--background-color-scrim` | `bg-scrim` |
+| `chart-series-*` | 2 | 只做 CSS 變數 | — |
+| **語意色小計** | **51** | Light / Dark 兩組值，以 `[data-theme]` 切換 | |
+| 原始色（Global） | 36（2026-10-08 新增 `orange-500`） | 只做成 `--neutral-900` 這類 CSS 變數，**不產生 utility** | —（僅 `tokens.css` 內部引用） |
+| 字體 `type-*` | 17（標題 5、內文 4、介面 8） | `--text-{name}` + 行高 + 字重 | `text-heading-xl` `text-body-m` `text-caption` `text-ui-s-bold` |
+| fontSizes | 7（36/28/24/18/16/14/12） | 不產生 utility，只供字體 token 引用 | — |
 | spacing | 11（2/4/8/12/16/20/24/32/48/64/120） | `--spacing` 1px 單位 | `p-16` `gap-24` `mt-48` `px-120` |
 | borderRadius | 4（2/5/10/100） | `--radius-*` | `rounded-2` `rounded-5` `rounded-10` `rounded-full` |
 | borderWidth | 5（0.5/1/2/3/4） | 內建 | `border` `border-2` `border-[0.5px]` |
 | shadow | 1 | `--shadow-btn` | `shadow-btn` |
 | fontFamilies | 1 | `--font-sans` | `font-sans` |
 
-40 個語意色的完整對照（class 欄位是元件裡該寫的 class）：
+51 個語意色的完整對照（class 欄位是元件裡該寫的 class）：
 
 | 群組 | Penpot token | Tailwind class | Light | Dark |
 |---|---|---|---|---|
@@ -597,7 +590,17 @@ Tailwind v4 的 color utility 會先找「專屬 namespace」，找不到才退�
 | | `status-correct` | `text-status-correct` | green-700 | green-300 |
 | | `status-opinion` | `text-status-opinion` | blue-600 | blue-300 |
 | | `status-outofscope` | `text-status-outofscope` | purple-600 | purple-300 |
+| | `text-on-status` | `text-on-status`（狀態徽章上的符號，跟著狀態色翻轉） | white | neutral-900 |
+| 深色按鈕 | `surface-secondary` | `bg-secondary`（Button `Style = Secondary`、選取中的分頁） | neutral-800 | neutral-700 |
+| | `text-on-secondary` | `text-on-secondary` | white | neutral-100 |
+| | `icon-on-secondary` | `text-icon-on-secondary` | white | neutral-100 |
 | 固定色（兩主題相同） | `surface-dark` | `bg-dark` | neutral-900 | 同左 |
+| | `surface-dark-raised` | `bg-dark-raised`（深色區塊裡亮一階：提示列、Intro 頁首） | neutral-800 | 同左 |
+| | `surface-on-dark` | `bg-on-dark`（深色區塊上的白按鈕，前景 `text-on-accent`） | white | 同左 |
+| | `border-on-dark-strong` | `border-on-dark-strong`（深色區塊上可點元件的框、焦點內圈） | neutral-100 | 同左 |
+| | `surface-accent-fold` | `bg-accent-fold`（Flag 摺角，純裝飾） | orange-500 | 同左 |
+| | `overlay-scrim` | `bg-scrim`（Penpot 寫 `#11182780`，前端寫 `rgb(17 24 39 / 0.5)`） | neutral-900 50% | 同左 |
+| | `chart-series-1` / `-2` | `var(--chart-series-1)` / `-2`（不註冊 utility） | brand-500-main / blue-500 | 同左 |
 | | `text-on-dark` | `text-on-dark` | neutral-100 | 同左 |
 | | `text-on-dark-muted` | `text-on-dark-muted` | neutral-400 | 同左 |
 | | `icon-on-dark` | `text-icon-on-dark` | neutral-100 | 同左 |
@@ -630,7 +633,7 @@ flowchart LR
 :root {
   /* 原始色：只給本檔引用，不註冊成 utility */
   --neutral-900: #111827; --neutral-100: #f3f4f6; --white: #ffffff;
-  --brand-500-main: #ffb600; --red-700: #df3324; /* … 35 個 */
+  --brand-500-main: #ffb600; --red-700: #df3324; /* … 36 個 */
 }
 :root, [data-theme='light'] {
   --surface-base: var(--white);
@@ -638,7 +641,7 @@ flowchart LR
   --text-primary: var(--neutral-900);
   --text-on-accent: var(--neutral-900);
   --status-incorrect: var(--red-700);
-  /* … 40 個 */
+  /* … 51 個 */
 }
 [data-theme='dark'] {
   --surface-base: var(--neutral-900);
@@ -652,7 +655,7 @@ flowchart LR
 
 @theme {
   --color-*: initial;          /* 關掉 Tailwind 預設色盤（R3） */
-  --text-*: initial;           /* 只留 7 階字級 */
+  --text-*: initial;           /* 只留 17 個字體 token */
   --radius-*: initial;
   --shadow-*: initial;
   --spacing: 0.0625rem;        /* 1 單位 = 1px */
@@ -665,10 +668,13 @@ flowchart LR
   --border-color-control: var(--border-control);
   /* … */
 
-  --text-16: 1rem;      --text-16--line-height: 1.8;
-  --text-18: 1.125rem;  --text-18--line-height: 1.5;
-  --text-36: 2.25rem;   --text-36--line-height: 1.3;
-  --text-h1: 2.25rem;   --text-h1--line-height: 1.3; --text-h1--font-weight: 900;
+  --background-color-scrim: var(--overlay-scrim);
+
+  /* 字體 token：字級、行高（4 的倍數 px）、字重一起定義 */
+  --text-heading-xl: 2.25rem; --text-heading-xl--line-height: 2.75rem; --text-heading-xl--font-weight: 700;
+  --text-body-m: 1rem;        --text-body-m--line-height: 1.75rem;     --text-body-m--font-weight: 400;
+  --text-caption: 0.75rem;    --text-caption--line-height: 1.25rem;    --text-caption--font-weight: 400;
+  --text-ui-s-bold: 0.875rem; --text-ui-s-bold--line-height: 1;        --text-ui-s-bold--font-weight: 700;
   --radius-5: 5px;      --radius-full: 9999px;
   --shadow-btn: 2px 2px 6px rgb(0 0 0 / 0.15);
   --font-sans: 'Noto Sans TC', system-ui, sans-serif;
@@ -687,9 +693,10 @@ flowchart LR
   | `bg-popover`、`bg-card` | `bg-base` + `border-subtle` |
   | `border-border` / `border-input` | `border-subtle` / `border-control` |
   | `ring-ring`、`focus-visible:ring-*`、`outline-ring/50` | 刪除，改用全域 focus 規則（§6.1） |
-  | `text-destructive` / `bg-destructive` | 依情境改 `text-status-incorrect`，或等設計師定 danger token（附錄 C #6） |
+  | `text-destructive` / `bg-destructive` | `text-status-incorrect`（錯誤與刪除類操作沿用，不另設 danger token） |
   | `rounded-4xl` 等 | `rounded-5`、`rounded-10`、`rounded-full`（依 Penpot） |
-  | `h-9 px-3 gap-2`（4px 單位） | `min-h-36 px-16 gap-8`（1px 單位，依 Penpot） |
+  | `h-9 px-3 gap-2`（4px 單位） | 依 Button `Size`：`min-h-44` / `min-h-36` / `min-h-28` / `size-32`（Icon-Touch），`px-16 gap-8`（1px 單位，依 Penpot） |
+  | `disabled:opacity-50`、各種 disabled 灰色 | 統一 `disabled:opacity-50`，不換色（R5） |
 
 ### 5.5 MCP 資料 → Tailwind 的實作規則（給 agent）
 
@@ -710,14 +717,13 @@ flowchart LR
    | `paddingTop/Right/Bottom/Left` | flex / grid board | `pt-N` …；四邊相同合併成 `p-N`，兩兩相同合併成 `px-N` / `py-N` |
    | `rowGap` / `columnGap` | flex board | `dir=column` 時 `gap-{rowGap}`，`dir=row` 時 `gap-{columnGap}`；grid 用 `gap-x-N` / `gap-y-N` |
    | `borderRadius*` | 任何 | 四角相同合併成 `rounded-N`，否則 `rounded-tl-N` … |
-   | `fontSize` | text | `text-N` |
-   | `typography` | text | `text-h1` … |
+   | `typography` | text | `text-{去 type-}`，例 `type-body-m` → `text-body-m` |
    | `shadow` | 任何 | `shadow-btn` |
 
 3. **沒綁 token（raw value）**：
    - 色值：hex → 反查原始色 → 找「目前主題下指向該原始色、且角色相符」的語意 token（例如文字就找 `text-*`）。**唯一解才採用**，並列入 PR 的「未綁定 token 清單」請設計師補綁。0 個或多個候選時**停下來問**，絕不寫 `bg-[#xxxxxx]`。
    - 間距：等於某個 spacing token 就用；不在 11 階內，則四捨五入到最近的一階，並列入清單。
-   - 字級：不在 7 階內 → 列入清單（指南：「不要用階外的尺寸」）。
+   - 文字沒綁字體 token：依字級、字重和「會不會換行」選 `heading` / `body` / `ui` 組的 token，並列入清單。
 4. **Layout**：
    - flex board → `flex`，`dir` → `flex-row` / `flex-col`，`justifyContent` / `alignItems` → `justify-*` / `items-*`。
    - `layoutChild.horizontalSizing = fill` → `flex-1` 或 `w-full`；`auto` → 不設寬（hug）；`fix` 只在真的固定尺寸（icon、avatar）時才寫 `w-N`。
@@ -725,12 +731,13 @@ flowchart LR
    - **忽略 `generateStyle` 的 `position:absolute` 與 `left/top`**。
 5. **文字**：
    - `characters` 多是示意文案，實際內容來自資料或既有文案。
-   - 行高**不讀 shape 的 lineHeight**，由字級決定（指南 04）。
-   - 字重對應 `font-normal` / `font-medium` / `font-semibold` / `font-bold` / `font-black`。
+   - 字級、行高、字重都從 `shape.tokens.typography` 來，**不讀 shape 的 fontSize、lineHeight、fontWeight**，也不另寫 `leading-*`、`font-*`。
+   - 字重只有 400 與 700。
+   - 按鈕、徽章、分頁這類單行文字用 `ui` 組；會換行的文字不能用 `ui` 組（行高 1）。
 6. **Desktop / Mobile 成對**：
    - 找同名的 `-1440` / `-Mobile` board，或 `X` / `X-Mobile` 元件，合成一個響應式元件。
    - mobile-first：mobile 的值寫在基本 class，desktop 的值加斷點前綴（兩級斷點，切換寬度見附錄 C #11）。
-7. **Icon**：`Base/Icon` 的 `icon` 屬性值轉成 snake_case 餵給 `<Icon name>`（`Open-In-New` → `open_in_new`）；`status-*`、`fb`、`line` 用自訂 SVG。
+7. **Icon**：`Base/Icon` 的 `Name` 屬性值轉成 snake_case 餵給 `<Icon name>`（`Open-In-New` → `open_in_new`）；`status-*`、`fb`、`line` 用自訂 SVG。
 8. **狀態板**（`A-…`、`B-1-…`、`回報可疑訊息-未登入`）：每個對應一個 story scenario，不要只做預設狀態。
 9. **備註 board**：「開發 Note」是需求，要逐條落實或在 PR 說明為何不做；「頁面層級標記」是頁面 / route 的名稱。
 
@@ -744,10 +751,10 @@ sequenceDiagram
   participant A as Coding agent（cofacts-frontend skill + Penpot MCP）
   participant SB as Storybook preview
 
-  D->>D: 用元件與 token 完稿；狀態各一個 board；寫「開發 Note」；跑指南檢查清單
+  D->>D: 用元件與 token 完稿；狀態各一個 board；寫「開發 Note」；依 R1–R5 自查
   D->>GH: 開 issue「Ready for dev」：Penpot 連結、board 名稱與 id
   E->>A: 開 Penpot 分頁、接 MCP plugin，指定 board
-  A->>A: ① 盤點：用到的元件、有無對應程式元件、未綁 token 清單、R1–R4 預檢
+  A->>A: ① 盤點：用到的元件、有無對應程式元件、未綁 token 清單、R1–R5 預檢
   A->>E: 回報實作計畫與設計疑點
   E-->>D: 設計疑點（Penpot comment 或 issue）
   A->>A: ② 先補 L1/L2 元件與 story，③ 再做 PageView 與 scenario，④ 最後接 route / loader
@@ -769,35 +776,59 @@ sequenceDiagram
 
 ### 6.1 指南規則 → 在程式裡怎麼擋
 
+依設計師 2026-10-08 版《Cofacts 無障礙與前端實作指南》（以下稱「指南」）。指南有五條規則 R1–R5，第 06 節是給前端的元件說明，第 07 節是已知例外。
+
 | 指南規則 | 擋在哪一層 | 做法 |
 |---|---|---|
-| **R1** 狀態要有文字，不能只用顏色 | 元件 | `ReplyTypeLabel` 是唯一可以用 `text-status-*` 的元件，必定輸出「符號 + 文字」（✕ 含有錯誤訊息 / ✓ 含有正確訊息 / ＝ 含有個人意見 / ？ 不在查證範圍）。lint 禁止其他檔案使用 `text-status-*` |
-| **R2** 品牌黃只當底色 | 建構 | 不存在 `text-accent` 這個 utility；品牌黃前景只剩裝飾邊框 `border-accent` 與 logo 用的 `text-icon-brand`（皆為指南豁免項）；`bg-accent` 上面只能放 `text-on-accent` |
-| **R3** 只用語意名 | 建構 + lint | `--color-*: initial`，原始色不產生 utility；`eslint-plugin-better-tailwindcss` 開啟 `no-unregistered-classes`（不存在的 class 會被**靜默忽略**，必須靠 lint 抓）以及禁止 arbitrary color（`[#…]`、`[rgb(…)]`） |
-| **R4** 會翻轉的配會翻轉的，固定的配固定的 | 命名 + 測試 | class 名稱對得上才對（`bg-dark` 配 `text-on-dark`）；Storybook **dark 主題的 axe 對比測試**會把「footer 文字消失（對比 1.00）」這類錯誤抓出來 |
-| 字級七階、行高三值 | 建構 | `--text-*: initial` 之後只定義 7 階，行高內建在 `text-N` 裡；`text-15`、`leading-[1.2]` 由 lint 擋 |
-| 狀態文字用 700 階紅綠 | token | `status-incorrect` / `status-correct` 已指向 red-700 / green-700 |
-| 焦點樣式是**一條全域規則** | `styles/focus.css` | 見下方程式碼；刪除 primitives 裡所有 `focus-visible:ring-*` |
-| 輸入框底色為白，作用中用邊框表示 | `ui/input` | `bg-base border-control`，focus-within 時 `border-strong`；placeholder 用 `text-tertiary` |
+| **R1** 狀態要有文字，不能只用顏色 | 元件 | 四種查核結果用「文字 + 形狀不同的圖示 + 顏色」三層表達（含有不實訊息／八角叉、含有正確訊息／圓勾、含有個人意見／方三點、不在查證範圍／三角驚嘆號）。圖示 `aria-hidden`，文字是內容。用詞一律「含有不實訊息」。`text-status-*` / `bg-status-*` 只允許出現在白名單元件：`ReplyTypeLabel`、`VerdictPicker`（AI 草稿選分類）、帶狀態圖示的 `ArticleStatusBadge`，由 lint 擋 |
+| **R2** 品牌黃只當底色 | 建構 | 不存在 `text-accent` 這個 utility；品牌黃前景只剩 `border-accent`（輸入框作用中，輔助用）與 logo 用的 `text-icon-brand`；`bg-accent` 上面只能放 `text-on-accent` |
+| **R3** 只用語意名 | 建構 + lint | `--color-*: initial`，原始色不產生 utility；`eslint-plugin-better-tailwindcss` 開啟 `no-unregistered-classes`（不存在的 class 會被**靜默忽略**，必須靠 lint 抓）以及禁止 arbitrary color（`[#…]`、`[rgb(…)]`）。例外只有 UI system 色票牆（不實作） |
+| **R4** 會翻轉的配會翻轉的，固定的配固定的 | 命名 + 測試 | class 名稱對得上才對（`bg-dark` 配 `text-on-dark`、`bg-secondary` 配 `text-on-secondary`）；狀態徽章上的符號用會翻轉的 `text-on-status`；Storybook **dark 主題的 axe 對比測試**抓漏網之魚 |
+| **R5** 停用 = 預設配色 + 50% 透明度 | 元件 | 所有 primitives 一律 `disabled:opacity-50` / `aria-disabled:opacity-50`，不換灰色；同時輸出 `disabled` 或 `aria-disabled="true"`。`text-disabled` token 只留給非互動的弱化文字 |
+| 字體 token | 建構 + lint | 只註冊 17 個字體 class（`text-heading-*`、`text-body-*`、`text-caption`、`text-ui-*`），字級、行高、字重一起帶入；`text-16`、`text-15`、`leading-*`、`font-semibold` 由 lint 擋。會換行的文字不可用 `text-ui-*` |
+| 中文在按鈕裡偏低 1px | `styles/base.css` | `.btn, .badge, .tab`（實作上是 `ui/button`、`ui/badge`、`ui/tabs` 的根元素）加 `text-box-trim: trim-both; text-box-edge: ideographic ideographic;`，不支援的瀏覽器不受影響 |
+| 焦點樣式是**一條全域規則** | `styles/focus.css` | 見下方程式碼；刪除 primitives 裡所有 `focus-visible:ring-*`。深色區塊（Footer、Intro 頁首、ActionPanel、手機選單）加 `data-surface="dark"`，內圈改用 `--border-on-dark-strong` |
+| 輸入框 | `ui/input` | 白底 `bg-base border-control`；作用中（focus-within）改 `border-accent`，不換底色，焦點環照常顯示；placeholder 用 `text-tertiary`。Invalid：`aria-invalid="true"`，紅框用 `status-incorrect`，另有文字說明以 `aria-describedby` 連結 |
+| 錯誤與破壞性操作色 | token | 沿用 `status-incorrect`，不另設 danger token |
 | 不用 placeholder 當說明（[20260910 會議](../../meetings/2026/20260910.md)） | `ui/field` | 表單一律有 `<label>` 與 description；placeholder 只放範例 |
-| 可點區域 36px（理想 44px） | 元件 | `ui/button` 最小 `min-h-36`；手機版主要動作用 44 |
-| 品牌 logo 與 LINE 綠 | 豁免 | `text-on-line` 為**已知未達標**，照指南記錄在案 |
+| 可點區域 | 元件 | Button 四種高度：Large 44、Medium 36、Small 28、Icon-Touch 32（手機頂列漢堡、關閉）。例外：桌機導覽列「回報可疑訊息」40（撐滿導覽列）、手機選單滿版按鈕 44。小於 44 的可用透明 padding 或 `::after` 擴大點擊範圍，外觀不變 |
+| 只有圖示的按鈕 | 元件 | Button `Icon = Only` 時 `aria-label` 為必填 prop（型別擋） |
+| 已知例外 | 不擋 | LINE 綠底白字（2.26）、GOV 標誌紅色、品牌標誌、圖表品牌黃線、Flag 摺角，照指南 07 記錄在案 |
 
 ```css
-/* styles/focus.css — 依指南 05 的示範 CSS */
+/* styles/focus.css — 指南 05：間隔 2px → 深色內圈 2px → 品牌黃外圈 4px，共 8px；圓角跟著元件 */
 :focus-visible {
   outline: 2px solid var(--border-focus);
   outline-offset: 2px;
-  box-shadow: 0 0 0 6px var(--border-focus-outer);
+  box-shadow: 0 0 0 2px var(--surface-base), 0 0 0 8px var(--border-focus-outer);
+}
+[data-surface='dark'] :focus-visible {
+  outline-color: var(--border-on-dark-strong);
+  box-shadow: 0 0 0 2px var(--surface-dark), 0 0 0 8px var(--border-focus-outer);
 }
 ```
 
-> 指南文字寫「外圈品牌黃 4px」，但示範 CSS 是 `box-shadow: 0 0 0 6px`（扣掉 2px 間隔與 2px 內圈後，外露的黃色只有 2px），另外「圓角 = 元件圓角 + 4」也要確認是否要逐元件處理。實作先以示範 CSS 為準，並請設計師確認（附錄 C #5）。
+> 第二段是本文補的：指南只寫「深色區塊內圈改用 `--border-on-dark-strong`」，間隔那層若沿用 `--surface-base`，在 Light 主題會在深底上露出一圈白，所以改填 `--surface-dark`。請設計師在 Focus states 板確認。
 
-**指南管不到、要在寫程式時確認的**（指南 07）：
+**指南 06 的特殊互動規格**（實作時逐條對照，skill 的 `a11y.md` 會收錄）：
 
-- **Tab 順序**：訊息頁的「快速索引」、AI 右側抽屜、mobile bottom sheet 的焦點管理（開啟時焦點移進去，關閉時回到觸發按鈕）。
-- **螢幕閱讀器**：只有 icon 的按鈕一律要有 `aria-label`（cofacts/ai 現有的漢堡選單、送出、附件、通知按鈕都缺）；裝飾用 icon 加 `aria-hidden`；可點的 backdrop 改用 `<button>` 或 Base UI 的 Dialog。
+| 元件 | 規格 |
+|---|---|
+| `SiteNav` | `<nav aria-label="主選單">`；目前所在頁 `aria-current="page"`；「99+」要唸出，例如「最新查核，99 則以上新訊息」。頁首底部 1px `border-subtle`（會翻轉），Footer 頂部 1px `border-on-dark`（固定） |
+| 手機選單 | 漢堡鈕 `aria-expanded` + `aria-controls`；打開後焦點移到第一項，Esc 關閉並還焦點給漢堡鈕 |
+| `EditorTabs` | tabs 模式（`tablist` / `tab` / `tabpanel`），左右鍵切換，`aria-selected` |
+| `ArticleQuickNav` | 桌機 `<nav aria-label="本頁索引">` + 錨點；手機分頁列橫向捲動，「查核闢謠」是浮動按鈕 |
+| `OriginalMessage` | B 方案：折疊列 `<button aria-expanded aria-controls>`；手機展開限高約 240px、內部捲動、`overscroll-behavior: contain`、`tabindex="0"`；編輯器取得焦點時自動收合；底部漸層 `surface-base` → 透明 |
+| 手機篩選面板、草稿抽屜 | `<dialog>` 或 `role="dialog" aria-modal="true"`，焦點鎖在面板內，Esc 關閉並還焦點；遮罩 `bg-scrim`。篩選面板底部固定「清除」與「顯示 N 則結果」，**按下才套用**（才改 URL params）；N 變動時 `aria-live="polite"`；選項區底部留 68px。桌機篩選列維持點了即套用 |
+| `ChatInput`（AI-loading） | 「正在查看有沒有人回報過…」放 `role="status"` |
+| `ViewChart` | 圖表 `aria-hidden`，另給文字摘要（「近 30 日網頁瀏覽 43 次、LINE 詢問 2 次」）；圖例寫明文字 |
+| 「閱讀全文」 | `<button aria-expanded>`，不用無 `href` 的 `<a>`；文字與箭頭都用 `text-link` |
+| 長網址 | 參考連結加 `overflow-wrap: anywhere` |
+
+**指南沒寫、要在寫程式時確認的**（新指南移除了舊版第 07 節「指南管不到的」，以下由本文維護）：
+
+- **Tab 順序**：AI 右側抽屜、bottom sheet 的焦點管理（同上方 dialog 規則）。
+- **螢幕閱讀器**：cofacts/ai 現有的漢堡選單、送出、附件、通知按鈕都缺 `aria-label`；可點的 backdrop 改用 `<button>` 或 Base UI 的 Dialog。
 - **狀態變動通知**：AI 串流用 `aria-live="polite"`，但只宣告「開始 / 完成 / 錯誤」，不逐字念；回報、送出成功的結果畫面要把焦點移到標題。
 - **減少動態效果**：landing 動畫、view transition 抽屜、typing indicator 都要支援 `prefers-reduced-motion`。
 - **文字壓在圖片或漸層上**：首頁 hero、impact banner 要實際量對比。
@@ -806,11 +837,11 @@ sequenceDiagram
 
 | 層 | 誰 / 什麼 | 抓得到什麼 |
 |---|---|---|
-| 設計 | 設計師跑指南 06 檢查清單；agent 做設計預檢（token 名稱配對） | R1、R4、字級、行高 |
+| 設計 | 設計師依 R1–R5 自查；agent 做設計預檢（token 名稱配對、文字是否綁字體 token） | R1、R4、字體 |
 | 建構 | `tokens.css` 的 `@theme` 設計 | R2、R3、字級（根本寫不出來） |
-| Lint | `better-tailwindcss`、自訂規則（`text-status-*` 白名單、禁 `dark:`、禁 arbitrary color） | 手寫的違規 |
+| Lint | `better-tailwindcss`、自訂規則（`*-status-*` 白名單、禁 `dark:`、禁 arbitrary color、禁 `leading-*` 與單獨字級、Icon-only 按鈕必填 `aria-label`） | 手寫的違規 |
 | 測試 | Storybook + addon-a11y + addon-vitest，light 與 dark 都跑 | 對比、名稱、role、R4 |
-| Agent | `cofacts-frontend` skill 的完成條件 | 流程遺漏、指南 07 的項目 |
+| Agent | `cofacts-frontend` skill 的完成條件 | 流程遺漏、指南 06 的互動規格、§6.1 程式階段清單 |
 | 人 | PR 模板的無障礙檢查表、設計師在 Storybook 驗收 | 其餘項目 |
 
 ### 6.3 `cofacts-frontend` skill 設計
@@ -825,12 +856,12 @@ sequenceDiagram
 │   ├── penpot-mcp.md           # MCP 食譜：列 board 的 token 綁定、元件盤點、未綁值稽核、匯出 PNG；§5.1 的坑
 │   ├── components.md           # ⚙️ 由 stories 的 parameters.penpot 產生：Penpot 元件 → 程式元件 registry
 │   ├── mapping-rules.md        # §5.5 的規則
-│   └── a11y.md                 # 指南 R1–R4、字級、焦點、06 檢查清單、07 程式階段清單，轉成可逐條勾選的形式
+│   └── a11y.md                 # 指南 R1–R5、字體、焦點、06 元件說明、07 已知例外，加上 §6.1 的程式階段清單，轉成可逐條勾選的形式
 └── scripts/
     ├── audit-board.js          # 給 Penpot execute_code 用：一次輸出某 board 的元件、token 綁定、未綁值、R4 預檢
     └── compare-screenshot.ts   # Storybook 截圖與 Penpot 匯出圖並排（可選）
 .claude/skills/cofacts-frontend -> ../../.agents/skills/cofacts-frontend
-docs/design/accessibility-guide.html   # 指南原檔，a11y.md 註明對應版本（2026.08.27）
+docs/design/accessibility-guide.html   # 指南原檔，a11y.md 註明對應版本（2026-10-08）
 ```
 
 **SKILL.md 草稿要點**：
@@ -929,7 +960,7 @@ description: >
 
 ### 9.2 待辦
 
-- **與設計師 sync 設計系統的差異**：見附錄 C（WG 負責）。
+- **與設計師 sync 設計系統的差異**：附錄 C 已大致處理完，剩斷點（#11）與深色區塊焦點環的間隔色（#5）。
 - **「我送出的」的語意**：只算第一個回報者，還是包含 +1；若包含，需要 rumors-api 補 filter（§2.3）。
 - **Cloudflare cache rule**：切換前要排除 `cofacts_session` cookie（§2.6，塊 6）。
 
@@ -966,20 +997,20 @@ description: >
 
 ## 附錄 C：與設計師 sync 的差異清單
 
-依 2026-09-28 從 Penpot MCP 讀到的狀態整理。
+依 2026-09-28 從 Penpot MCP 讀到的狀態整理；處理結果依設計師 2026-10-08 的回覆，並在 2026-10-17 用 Penpot MCP 確認（token 數、字體 token、元件數、Button 屬性、新增色值皆相符）。
 
-| # | 項目 | Penpot 現況 | 無障礙指南或實作需求 | 需要設計師決定或修改 |
-|---|---|---|---|---|
-| 1 | Typography 行高 | library styles：H1 36/1.2、H2 28/1.25、H3 24/1.3、H4 18/1.4、H5 16/1.4、P1 18/1.75、P2 16/1.75、P3 14/1.7、Annotation 12/1.5 | 行高只有三個值，由字級決定：12/14/16 → 1.8、18 → 1.5、24/28/36 → 1.3 | 更新 library typography |
-| 2 | Typography 字重 | 所有標題都是 600 | 指南的字級表：H1 900、H2–H4 700 | 以哪個為準 |
-| 3 | H5 | library 有 H5（16 / 600） | 指南沒有 H5 | 保留或移除 |
-| 4 | 字型 token | `fontFamilies` token 是 `Noto Sans` | 實際文字用 `Noto Sans TC` | 把 token 改成 `Noto Sans TC` |
-| 5 | Focus 外圈 | 指南文字：「外圈品牌黃 4px」 | 指南示範 CSS 是 `box-shadow: 0 0 0 6px`，扣掉 2px 間隔與 2px 內圈，外露只有 2px | 確認外圈寬度，以及「圓角 = 元件圓角 + 4」是否要逐元件處理 |
-| 6 | danger / destructive 色 | 沒有對應 token | 刪除按鈕、表單錯誤訊息需要用色（`Base/Input` 有 `Invalid` variant） | 新增語意 token，或明訂沿用 `status-incorrect` |
-| 7 | 間距綁定 | 主要頁面的 flex 間距約 25–30% 沒綁 token（例如 MessagePage 118/144、Latest replies 82/114） | agent 靠 `shape.tokens` 對應 class | 補綁 token |
-| 8 | 字級綁定 | `Guide how-1440` 只有 35/50 的文字綁了字級 token | 同上 | 補綁 token |
-| 9 | Variant 屬性命名 | 多數還是 `Property 1` / `Value 2`，或把多個維度擠成一個字串（Button 的 `normal-2icon-default`） | 具名的多屬性（Size / Style / Icon / State）才能直接對應到元件 props | 重新命名 variant 屬性 |
-| 10 | 元件名稱錯字 | `Inorrect`（應為 Incorrect）、Nav-Mobile 的 `serch` | — | 修正 |
-| 11 | 斷點 | 只有 375 與 1440 兩種 board | 需要一個 mobile → desktop 的切換寬度，以及 1024–1440 之間怎麼排版（例如內容最大寬 1040 置中） | 決定切換寬度 |
-| 12 | Dark mode 開關 | 沒有切換 UI 的設計 | 先跟隨系統設定 | 之後是否設計開關 |
-| 13 | LINE 綠底白字 | `text-on-line` 對比 2.26，指南已記錄為已知未達標 | — | 維持現狀（僅確認） |
+| # | 項目 | 處理結果 |
+|---|---|---|
+| 1 | Typography 行高 | ✅ 舊 typography styles 刪除，改用 17 個字體 token，行高對齊 4px；「三個值」規則廢止（§5.2） |
+| 2 | Typography 字重 | ✅ 標題一律 700，只有 400 與 700 |
+| 3 | H5 | ✅ 保留為 `type-heading-xs`（16／700） |
+| 4 | 字型 token | ✅ 改成 `Noto Sans TC` |
+| 5 | Focus 外圈 | ✅ 黃圈 4px，從元件往外共 8px，圓角跟著元件（§6.1）。深色區塊的間隔色由本文補上，待確認 |
+| 6 | danger 色 | ✅ 沿用 `status-incorrect` |
+| 7 | 間距綁定 | ✅ 約 92%，剩下的是版面寬度，前端用內容最大寬處理 |
+| 8 | 字級綁定 | ✅ 全檔文字 100% 綁字體 token |
+| 9 | Variant 屬性命名 | ✅ 全部具名（§3.3） |
+| 10 | 元件名稱錯字 | ✅ 已修 |
+| 11 | 斷點 | ⏸ 暫不處理，仍只有 375 與 1440；前端先用 Tailwind `md`（768px）切換、內容最大寬 1040 置中，有問題再回報 |
+| 12 | Dark mode 開關 | ⏸ 暫不處理，跟隨系統設定 |
+| 13 | LINE 綠底白字 | ✅ 維持，已知未達標 |
