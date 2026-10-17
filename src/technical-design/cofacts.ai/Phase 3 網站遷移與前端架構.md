@@ -372,9 +372,10 @@ src/
 │   │   ├── hoax-for-you.tsx
 │   │   ├── search.tsx
 │   │   ├── article.$id/
-│   │   │   ├── index.tsx            # /article/:id
+│   │   │   ├── index.tsx            # /article/:id（route component + 本頁的 createServerFn）
 │   │   │   ├── reply.new.tsx        # /article/:id/reply/new
 │   │   │   ├── reply.existing.tsx
+│   │   │   ├── -queries.server.ts   # 本目錄 route 用的 GraphQL document
 │   │   │   └── -components/         # 訊息頁與編輯器專用：Transcript、ArticleQuickNav、EditorTabs、OriginalMessage…
 │   │   ├── reply.$id.tsx
 │   │   ├── user.tsx                 # /user?id=
@@ -395,8 +396,11 @@ src/
 ├── components/
 │   ├── ui/                          # shadcn/Base UI（已改寫成 Cofacts token）
 │   └── *.tsx                        # 共用元件，平鋪：SiteNav、SiteFooter、ReplyTypeLabel、FactCheckReply、ArticleCard…
-├── server/                          # BFF：api-base、jwt、cofactsExec、gql codegen 產物
-│   └── <domain>/                    # article.functions.ts、article.queries.ts、list.functions.ts…
+├── server/                          # BFF 共用
+│   ├── cofacts.server.ts            # cofactsExec、rumors-api secret（唯一讀 secret 的地方）
+│   ├── jwt.server.ts  api-base.server.ts …  # 既有 server-only utility 一律改名 *.server.ts
+│   ├── gql/                         # codegen 產物
+│   └── <domain>/                    # 多個 route 共用的 server function，例如 article.functions.ts
 ├── lib/
 │   └── search-params/               # 列表 search param 的 zod schema（route 與元件共用）
 ├── hooks/
@@ -415,13 +419,33 @@ docs/design/
 
 每個元件的檔案 colocate：`Foo.tsx`、`Foo.stories.tsx`、`Foo.module.css`（需要時）、`Foo.test.tsx`（有邏輯時）。
 
-資料邏輯放 `src/server/<domain>/`：`*.functions.ts` 是 server functions，`*.queries.ts` 是 GraphQL document（server-only），codegen 的 `documents` 要擴到 `src/server/**`。這延續現有 `src/server/*.functions.ts` 與 #138 `report.queries.ts` 的模式，只是依 domain 分資料夾。元件仍然不碰資料取得，只吃 typed props。
+### 3.5 資料層：server to server
 
-### 3.5 GraphQL 與資料
+前端不寫 GraphQL、不直接連 rumors-api。之後 rumors-api 會用 secret（Cloudflare token）保護，只接受 server to server 的請求；資料一律經 TanStack Start 的 server function 送到 UI。
 
-- 延續 cofacts/ai 現行做法：BFF 的 `cofactsExec` 搭配 codegen client preset（`fragmentMasking: false`）。
-- rumors-site 的「colocated fragment 掛在 `Component.fragments`」概念保留：fragment 定義在 feature 的 `*.queries.ts`，元件的 props type 用 fragment 產生的 type。
-- SSR 預設是**登入後**的畫面（rumors-site 的 SSR 一律是未登入畫面，登入資訊之後才在 client 補）：BFF 能讀 cookie，loader 直接帶 user context 查。CDN cache 的必要調整見 §2.6。
+| 放什麼 | 放哪裡 | 誰可以 import |
+|---|---|---|
+| server-only utility：`cofactsExec`、secret、JWT 處理 | `*.server.ts`（`src/server/cofacts.server.ts` 等） | 只在 server function 的 handler 裡用 |
+| GraphQL document | `*.server.ts`（route 目錄的 `-queries.server.ts`，或 `src/server/<domain>/`） | 同上 |
+| server function（`createServerFn`） | **預設 inline 在 route 檔裡**，寫在 module 最上層 | 任何地方 |
+| 型別、zod schema、常數 | 一般 `.ts` | 任何地方 |
+
+規則：
+
+1. **單一 route 的 server function 直接寫在 route 檔裡**。Start compiler 不看檔名，會把每個 `createServerFn(...).handler(...)` 在 client build 換成 RPC stub，並移除只有 handler 用到的 `*.server` import。
+2. **route 檔太長，或多個 route 共用時，再抽出來**。抽到哪裡看情況，可以和相關的一般 util 放一起；**整個檔案都是 server function 時，命名為 `*.functions.ts`**（TanStack 文件建議的慣例）。`*.functions.ts` 不能命名成 `*.server.ts`，否則 client 無法 import。
+3. **loader 只能呼叫 server function**。TanStack Start 的 loader 是 isomorphic：SSR 時在 server 跑，client 端換頁時在瀏覽器跑。直接在 loader 呼叫 rumors-api 會把請求和 secret 帶到瀏覽器。
+4. **`*.server` 的 import 只能在 handler 裡用**。handler 以外（例如同檔案的 helper）用到，import 就會留在 client bundle；Start 的 import protection 在 dev 只警告並換成 mock，**production build 才會失敗**。所以 CI 必須跑 build（§7），agent 在 dev 看到 import protection 警告要當成錯誤立刻修。
+5. secret 只能在 `cofacts.server.ts` 讀。import protection 只保護 `*.server.*` 檔（或有 `import '@tanstack/react-start/server-only'` 的檔），寫死在一般檔案的字串或在一般檔案讀 `process.env` 都擋不到。
+6. 元件不碰資料取得，只吃 typed props。props type 由 GraphQL fragment 產生，元件用 `import type` 取得（type-only import 不受 import protection 限制）。
+
+參考：TanStack Start 文件 [Execution Model](https://tanstack.com/start/latest/docs/framework/react/guide/execution-model)、[Server Functions › File Organization](https://tanstack.com/start/latest/docs/framework/react/guide/server-functions)、[Import Protection](https://tanstack.com/start/latest/docs/framework/react/guide/import-protection)。
+
+其他：
+
+- 延續 cofacts/ai 現行做法：`cofactsExec` 搭配 codegen client preset（`fragmentMasking: false`），codegen 的 `documents` 要涵蓋 `src/routes/**` 與 `src/server/**`。
+- SSR 預設是**登入後**的畫面（rumors-site 的 SSR 一律是未登入畫面，登入資訊之後才在 client 補）：server function 能讀 cookie，直接帶 user context 查。CDN cache 的必要調整見 §2.6。
+- 現有的 `src/server/api-base.ts`、`jwt.ts`、`sessionCookie.ts` 等 server-only 檔在第 0 塊改名為 `*.server.ts`，讓 import protection 生效。
 
 ### 3.6 首頁、教學、影響力報告、條款（靜態頁）
 
@@ -894,7 +918,10 @@ description: >
    只有一頁用的元件放該 route 目錄的 -components/；不跨目錄 import 別人的
    -components/，第二處要用時搬到 src/components/ 並補 story 與 parameters.penpot。
 3. Build: 依 references/mapping-rules.md 把 token 轉成 class。不得使用 arbitrary color、
-   dark: variant、階外字級。status 色只能透過 ReplyTypeLabel。
+   dark: variant、單獨字級。status 色只能透過白名單元件。
+   Data: 不寫 client 端 GraphQL。單一 route 的 createServerFn inline 在 route 檔；
+   loader 只呼叫 server function；*.server import 只在 handler 裡用；
+   dev 出現 import protection 警告視同錯誤。
 4. Stories: 每個 Penpot 狀態板一個 scenario。
 5. Verify（完成條件，全部要過）:
    - pnpm lint && pnpm test（含 storybook a11y，light + dark）
@@ -909,7 +936,7 @@ description: >
 
 ## 7. 品質與 CI
 
-- 目前 CI 只跑 lint、prettier、`tsc`，**沒跑 vitest**。Phase 3 要加上：vitest、Storybook test（a11y）、`tokens.css` 是否與 json 一致、build-storybook。
+- 目前 CI 只跑 lint、prettier、`tsc`，**沒跑 vitest，也沒跑 production build**。Phase 3 要加上：`pnpm build`（import protection 只在 build 時讓違規失敗，§3.5）、vitest、Storybook test（a11y）、`tokens.css` 是否與 json 一致、build-storybook。
 - PR 模板新增「設計對照」與「無障礙檢查」兩段。
 - 視覺回歸（Chromatic 或 Playwright 截圖）列為加分項，先靠設計師在 Storybook preview 驗收。
 
