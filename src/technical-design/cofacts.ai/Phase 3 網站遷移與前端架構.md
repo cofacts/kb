@@ -554,7 +554,7 @@ function ArticlePage() {
 
 `graphql()` 寫在 handler 裡：GraphQL 形狀、server function 與使用它的 component 在同一個檔案，codegen 從這裡產生型別，一路推導到 `useSuspenseQuery` 的 `data`；client build 時整個 handler 連同 query 字串一起被換成 RPC stub。
 
-block 0 需要的設定：`createRouter({ context: { queryClient } })`、root route 改用 `createRootRouteWithContext<{ queryClient: QueryClient }>()`（官方 [TanStack Query 指南](https://tanstack.com/start/latest/docs/framework/react/guide/tanstack-query) 的做法；cofacts/ai 目前只呼叫了 `setupRouterSsrQueryIntegration`，loader 還拿不到 `queryClient`）。
+塊 0（WG 基礎，§2.2、§8）要完成的設定：`createRouter({ context: { queryClient } })`、root route 改用 `createRootRouteWithContext<{ queryClient: QueryClient }>()`（官方 [TanStack Query 指南](https://tanstack.com/start/latest/docs/framework/react/guide/tanstack-query) 的做法；cofacts/ai 目前只呼叫了 `setupRouterSsrQueryIntegration`，loader 還拿不到 `queryClient`）。
 
 其他：
 
