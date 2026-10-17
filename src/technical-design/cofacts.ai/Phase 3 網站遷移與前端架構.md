@@ -26,7 +26,7 @@ timestamp: "2026-10-17T12:00:00+08:00"
 
 本文提出：
 
-1. **網址（§2）**：URL 總表依分工區塊分組。rumors-site 既有 path 全部沿用；AI 功能收進 `/ai/*`；列表頁的 search param 改成小寫、可讀、有白名單的新格式，舊格式照收並 redirect 到新格式。語系用 lingui，依 host 切換。
+1. **網址（§2）**：URL 總表依分工 track 分組。rumors-site 既有 path 全部沿用；AI 功能收進 `/ai/*`；列表頁的 search param 改成小寫、可讀、有白名單的新格式，舊格式照收並 redirect 到新格式。語系用 lingui，依 host 切換。
 2. **元件（§3）**：分四層，由下而上是 shadcn（Base UI）primitives、Cofacts 領域元件、feature 元件、route。**Penpot 元件路徑 = 程式元件 = Storybook title**，三邊名字一致。
 3. **Storybook（§4）**：元件層每個 Penpot variant 一個 story，頁面層每個 Penpot board（含狀態板）一個 scenario。light/dark × 375/1440 全跑 axe。
 4. **Penpot ↔ Tailwind（§5）**：規則是「**Penpot token 去掉角色前綴就是 Tailwind class**」，例如 `surface-raised` → `bg-raised`、`text-secondary` → `text-secondary`、`border-control` → `border-control`、`spacing-16` → `p-16`、`RADIUS-5` → `rounded-5`、font size `16` → `text-16`。Tailwind 預設色盤整個關掉，原始色不做成 utility，所以 `text-gray-400`、`text-accent`（品牌黃當字）、`text-15` 這類 class **根本編譯不出來**。已用 Tailwind 4.2.0 實測。
@@ -84,25 +84,25 @@ cofacts/ai 目前的前端狀況（Phase 3 要一併處理）：
 7. **不加 locale 前綴**，語系由 host 決定（§2.5）。
 8. 預留的頂層 namespace：`/ai`、`/api`、`/report`、`/storybook`（若要自架）。
 
-### 2.2 URL 總表（依分工區塊）
+### 2.2 URL 總表（依分工 track）
 
 圖例：
 - 狀態：🟢 沿用；🔵 新增；🟠 沿用 path 但 query 改版；🔴 退場或 redirect。
 - **❌ 無稿**：Penpot 沒有這頁的設計。**工程師以 Penpot `Guide` 頁為範例**（它示範了既有頁面怎麼套上新元件與新 token），用新元件自行拼湊，不等新稿。
 
-各塊的規模觀察與人力建議見 §8。
+各 track的規模觀察與人力建議見 §8。
 
-#### 塊 0　基礎（WG）：全站共用與系統路由
+#### Track 0　基礎（WG）：全站共用與系統路由
 
 | URL | 頁面 / 用途 | Penpot | 狀態 | 備註 |
 |---|---|---|---|---|
-| （全站） | App shell：`Layout/Nav`（Default / login / search / AI 四種）、mobile 選單、`Layout/Footer`、登入 modal、header 搜尋 | ✅ UI system | 🔵 | 各塊都依賴它 |
+| （全站） | App shell：`Layout/Nav`（Default / login / search / AI 四種）、mobile 選單、`Layout/Footer`、登入 modal、header 搜尋 | ✅ UI system | 🔵 | 各 track都依賴它 |
 | （全站） | 語系判定（§2.5） | — | 🔵 | server 依 host 決定 locale |
 | `/api/auth/callback?code&state` | OAuth callback（Phase 2） | — | 🟢 | |
 | `/api/run-sse` | ADK 串流 proxy | — | 🟢 | |
 | 404 / 500 | 錯誤頁（rumors-site 沒有自訂頁） | ❌ 無稿 | 🔵 | |
 
-#### 塊 1　列表：列表、篩選與 URL params
+#### Track 1　列表：列表、篩選與 URL params
 
 | URL | 頁面 | Penpot | 狀態 | 備註 |
 |---|---|---|---|---|
@@ -115,7 +115,7 @@ cofacts/ai 目前的前端狀況（Phase 3 要一併處理）：
 
 - 個人頁**不**新增「送過的訊息」tab。使用者送過的訊息改由列表的「我送出的」篩選呈現（`status=reported-by-me`，§2.3）。
 
-#### 塊 2　單一訊息與回應
+#### Track 2　單一訊息與回應
 
 | URL | 頁面 | Penpot | 狀態 | 備註 |
 |---|---|---|---|---|
@@ -124,13 +124,13 @@ cofacts/ai 目前的前端狀況（Phase 3 要一併處理）：
 | `/article/:id/reply/existing` | 使用既有回應 | ✅ `Message-editor-Use Existing Response` ×2 | 🔵 | |
 | `/reply/:id` | 單一回應 | ❌ 無稿 | 🟢 | |
 
-#### 塊 3　回報可疑訊息（只收網址）
+#### Track 3　回報可疑訊息（只收網址）
 
 | URL | 頁面 | Penpot | 狀態 | 備註 |
 |---|---|---|---|---|
 | `/report?url=&text=&title=` | 回報可疑訊息 | ✅ `AI` 頁的「回報可疑訊息流程」6 個狀態板 | 🔵（[cofacts/ai#138](https://github.com/cofacts/ai/pull/138)） | 參數沿用 Web Share Target 的形狀，維持寬鬆解析；[cofacts/ai#139](https://github.com/cofacts/ai/pull/139) 讓 Android 分享選單可直達 |
 
-#### 塊 4　Infographics（靜態頁）
+#### Track 4　Infographics（靜態頁）
 
 | URL | 頁面 | Penpot | 狀態 | 備註 |
 |---|---|---|---|---|
@@ -141,7 +141,7 @@ cofacts/ai 目前的前端狀況（Phase 3 要一併處理）：
 | `/terms` | 使用者條款 | ❌ 無稿 | 🟢 | 由 `LEGAL.md` 轉換（build-time 即可） |
 | `/instant` | 已退役的 stub | — | 🔴 | 302 到 community builder |
 
-#### 塊 5　AI chat
+#### Track 5　AI chat
 
 | URL | 頁面 | Penpot | 狀態 | 備註 |
 |---|---|---|---|---|
@@ -149,7 +149,7 @@ cofacts/ai 目前的前端狀況（Phase 3 要一併處理）：
 | `/ai/session/:sessionId` | 查核對話 | ✅ `AI-main page` / `-Mobile` / `-Mobile-Draft` | 🔵 | 預留 `/ai/settings` 等子頁 |
 | `/ai/session/:sessionId/tool/:toolCallId` | 對話加右側工具抽屜 | 同上 | 🔵 | 保留「抽屜狀態在 URL 裡」的現行設計 |
 
-#### 塊 6　上線切換：redirect、相容與 infra（WG）
+#### Track 6　上線切換：redirect、相容與 infra（WG）
 
 | URL | 用途 | 狀態 | 備註 |
 |---|---|---|---|
@@ -246,7 +246,7 @@ rumors-site 的問題是 param 名 `types` 看不出是「回應的」分類，�
   - 不同 host 的 CDN cache key 本來就分開，不會混到語系。
 - **只翻 UI 文案**：訊息、回應等使用者內容維持原文。
 - 影響工作量的地方：
-  - cofacts/ai 現有的繁中寫死文案要改寫成英文 key（第 0 塊處理 shell 與 ui 元件；其他塊各自處理）。
+  - cofacts/ai 現有的繁中寫死文案要改寫成英文 key（Track 0處理 shell 與 ui 元件；其他 track各自處理）。
   - `cofacts-frontend` skill 規定所有 UI 字串都要經過 `t` / `<Trans>`。
   - 日期格式一律依當前 locale，不能寫死 `zh-TW`。
 
@@ -308,9 +308,9 @@ rumors-site 的問題是 param 名 `types` 看不出是「回應的」分類，�
 | 層 | 目錄 | 內容 | 誰維護 |
 |---|---|---|---|
 | tokens | `src/styles/tokens.css`（產生檔） | Penpot token 轉成的 CSS 變數與 `@theme` | 腳本產生，不手改 |
-| ui | `src/components/ui/` | shadcn / Base UI primitives：Button、Input、Select、Checkbox、Switch、Toggle、Dialog、Popover、Menu、Tabs… | WG（第 0 塊） |
-| 共用元件 | `src/components/`（平鋪） | 兩處以上用到的元件：用 ui 組出來的複合元件（`ReplyTypeLabel`、`FactCheckReply`、`ArticleCard`…），以及重複出現的大元件（`SiteNav`、`SiteFooter`） | 首次用到的那一塊負責，其他塊共用（§8.3） |
-| 頁面 | `src/routes/` | route component（loader、`validateSearch`、`head()`、組版面），以及只有該頁用的元件，放在同目錄的 `-components/` | 各塊 |
+| ui | `src/components/ui/` | shadcn / Base UI primitives：Button、Input、Select、Checkbox、Switch、Toggle、Dialog、Popover、Menu、Tabs… | WG（Track 0） |
+| 共用元件 | `src/components/`（平鋪） | 兩處以上用到的元件：用 ui 組出來的複合元件（`ReplyTypeLabel`、`FactCheckReply`、`ArticleCard`…），以及重複出現的大元件（`SiteNav`、`SiteFooter`） | 首次用到的 track 負責，其他 track共用（§8.3） |
+| 頁面 | `src/routes/` | route component（loader、`validateSearch`、`head()`、組版面），以及只有該頁用的元件，放在同目錄的 `-components/` | 各 track |
 
 **頁面專用元件放 `-components/`**：
 
@@ -353,7 +353,7 @@ Penpot 本地元件庫共 **48 個元件**（依 2026-10-08 的 `Cofacts-2026 (2
 | `Content/DisputedMessage`、`-Mobile` | default / read | `ArticleListItem`（可疑訊息列表的一則） | 共用 | `/articles`、`/hoax-for-you`、搜尋 |
 | `Content/MessageListItem` | — | `ReplyRequestItem`（網友回報補充） | 共用 | 訊息頁、個人頁留言 tab |
 | `Content/LinkCard` | — | `HyperlinkPreview` | 共用 | 訊息頁、回應 |
-| `Content/Transcript` | — | `-components/Transcript`（協作逐字稿，見 §8 第 2 塊的風險） | 頁面 | 訊息頁 |
+| `Content/Transcript` | — | `-components/Transcript`（協作逐字稿，見 §8 Track 2的風險） | 頁面 | 訊息頁 |
 | `Content/FactCheckResultCard` | ExistingResponses / -mobile | `-components/ExistingReplyCard`（「直接用此回應」）；回報流程 B-1 也會用到 | 共用 | 編輯器、`/report` |
 | `Content/EditorTab`、`EditorTab-Mobile` | `Selected`：撰寫新回應 / 使用既有回應 | `-components/EditorTabs`（基於 `ui/tabs`：`tablist` / `tab` / `tabpanel`，左右鍵切換）；兩個分頁對應 `/reply/new`、`/reply/existing` | 頁面 | 編輯器 |
 | `Content/OriginalMessage`、`-Mobile` | `State`：Collapsed / Expanded | `-components/OriginalMessage`（`<button aria-expanded>`；手機展開限高約 240px、內部捲動、`overscroll-behavior: contain`、`tabindex=0`；編輯器取得焦點時自動收合；底部漸層用 `surface-base` → 透明重做） | 頁面 | 編輯器 |
@@ -554,13 +554,13 @@ function ArticlePage() {
 
 `graphql()` 寫在 handler 裡：GraphQL 形狀、server function 與使用它的 component 在同一個檔案，codegen 從這裡產生型別，一路推導到 `useSuspenseQuery` 的 `data`；client build 時整個 handler 連同 query 字串一起被換成 RPC stub。
 
-塊 0（WG 基礎，§2.2、§8）要完成的設定：`createRouter({ context: { queryClient } })`、root route 改用 `createRootRouteWithContext<{ queryClient: QueryClient }>()`（官方 [TanStack Query 指南](https://tanstack.com/start/latest/docs/framework/react/guide/tanstack-query) 的做法；cofacts/ai 目前只呼叫了 `setupRouterSsrQueryIntegration`，loader 還拿不到 `queryClient`）。
+Track 0（WG 基礎，§2.2、§8）要完成的設定：`createRouter({ context: { queryClient } })`、root route 改用 `createRootRouteWithContext<{ queryClient: QueryClient }>()`（官方 [TanStack Query 指南](https://tanstack.com/start/latest/docs/framework/react/guide/tanstack-query) 的做法；cofacts/ai 目前只呼叫了 `setupRouterSsrQueryIntegration`，loader 還拿不到 `queryClient`）。
 
 其他：
 
 - 延續 cofacts/ai 現行做法：`cofactsExec` 搭配 codegen client preset（`fragmentMasking: false`），codegen 的 `documents` 要涵蓋 `src/routes/**` 與 `src/server/**`。
 - SSR 預設是**登入後**的畫面（rumors-site 的 SSR 一律是未登入畫面，登入資訊之後才在 client 補）：server function 能讀 cookie，直接帶 user context 查。CDN cache 的必要調整見 §2.6。
-- 現有的 `src/server/api-base.ts`、`jwt.ts`、`sessionCookie.ts` 等 server-only 檔在第 0 塊改名為 `*.server.ts`，讓 import protection 生效。
+- 現有的 `src/server/api-base.ts`、`jwt.ts`、`sessionCookie.ts` 等 server-only 檔在Track 0改名為 `*.server.ts`，讓 import protection 生效。
 
 ### 3.6 首頁、教學、影響力報告、條款（靜態頁）
 
@@ -1062,24 +1062,24 @@ description: >
 
 ## 8. 分工：規模觀察與建議
 
-各塊涵蓋哪些 URL 見 §2.2。
+各 track涵蓋哪些 URL 見 §2.2。
 
-### 8.1 各塊規模與注意事項
+### 8.1 各 track規模與注意事項
 
-| 塊 | 規模 | 觀察與建議 |
+| Track | 規模 | 觀察與建議 |
 |---|---|---|
-| **0 基礎** | 中 | 除了 tokens、Storybook、skill，**App shell 也放這裡**。其他塊都依賴 Nav、Footer、登入 modal、header 搜尋；不先做好，A、B 會各做一個 header。i18n（lingui）的 setup 與 host 判定也在這塊。依 [20260901 會議](../../meetings/2026/20260901.md)的待辦，skill 與 Storybook 由 MrOrz 打底，之後交給 yutin |
+| **0 基礎** | 中 | 除了 tokens、Storybook、skill，**App shell 也放這裡**。其他 track都依賴 Nav、Footer、登入 modal、header 搜尋；不先做好，A、B 會各做一個 header。i18n（lingui）的 setup 與 host 判定也在這個 track。依 [20260901 會議](../../meetings/2026/20260901.md)的待辦，skill 與 Storybook 由 MrOrz 打底，之後交給 yutin |
 | **1 列表** | 大 | 5 頁共用一套 URL param 與篩選系統，交給同一人才不會做出兩套。有 3 頁**無稿**（`/search`、`/hoax-for-you`、個人頁），要以 Guide 為範例自行拼湊。個人頁除了兩個列表 tab，還有 header（名字、簡介、等級、徽章）、編輯個人資料與頭像的 dialog、貢獻 heatmap，建議排在最後。「我送出的」篩選可能需要 rumors-api 補 filter（§2.3） |
 | **2 單一訊息與回應** | **最大** | 訊息頁用到近 20 種 Penpot 元件，外加全新的全頁編輯器。其中兩個特別重：**協作逐字稿**（ProseMirror + yjs + Hocuspocus，713 LOC，要接 WebSocket 服務）與 d3 瀏覽趨勢圖。**建議把逐字稿拆成 2b**，第一階段先唯讀顯示 |
 | **2b 協作逐字稿** | 中 | 可以晚一點做，或另外排人 |
-| **3 回報** | **最小** | [cofacts/ai#138](https://github.com/cofacts/ai/pull/138)、[#139](https://github.com/cofacts/ai/pull/139) 已完成主要功能，剩下套用設計系統、對齊 6 個狀態板，以及和訊息頁、AI 的銜接。它和塊 5 在 Penpot 同一頁，回報的結束畫面也導向 AI，**建議兩塊交給同一人** |
+| **3 回報** | **最小** | [cofacts/ai#138](https://github.com/cofacts/ai/pull/138)、[#139](https://github.com/cofacts/ai/pull/139) 已完成主要功能，剩下套用設計系統、對齊 6 個狀態板，以及和訊息頁、AI 的銜接。它和Track 5 在 Penpot 同一頁，回報的結束畫面也導向 AI，**建議兩個 track交給同一人** |
 | **4 Infographics** | 中（體力活） | JSS 行數最多（landing 2,458、impact 2,132、tutorial 1,175），但只有教學與 about 有新稿，其他頁照舊移植、換 token。依賴很少（只需 Nav / Footer），**適合在 A、B 空檔插隊**。動畫要支援 reduced-motion，首頁 hero 的文字壓圖要量對比 |
 | **5 AI chat** | 小至中 | 主要是換皮加搬家：從 `/` 搬到 `/ai`、依 `AI-main page` / `AI-open page` 重新套設計、拆 `RightDrawer.tsx`（856 行）、補無障礙債。SSE 與 session 邏輯不動。建議由最熟這份程式的 WG 來做，或當作 contractor 的熱身 |
 | **6 上線切換** | 中 | 不屬於任何一頁，但少一件就不能切換：Cloudflare 分流與 **cache rule 排除 session cookie**（§2.6）、各種 redirect、`ALLOWED_CALLBACK_URLS`、`COFACTS_SITE_URL`、RSS 原樣移植、GTM dataLayer 與 `data-ga` 事件、Rollbar 與 request log、SEO（meta、OG、robots、sitemap，可順便加 ClaimReview JSON-LD）、rumors-site 退場。由 WG 負責 |
 
 ### 8.2 建議的人力與順序
 
-| 塊 | 建議負責 | 依賴 |
+| Track | 建議負責 | 依賴 |
 |---|---|---|
 | 0 基礎 | WG | — |
 | 1 列表 | Contractor A | 0 |
@@ -1091,11 +1091,11 @@ description: >
 
 順序：**0 → (1 ∥ 2) → 3、5 → 4 穿插 → 6**。
 
-### 8.3 跨塊協作約定
+### 8.3 跨 track協作約定
 
-- **共用元件由「第一個用到的塊」負責**：做好後放進 Storybook 並登錄到 registry（`parameters.penpot`）；其他塊只能透過 PR 擴充 props，不 fork。`ReplyTypeLabel`、`UserAvatar` / `UserFlag` 在塊 0 先做；`FactCheckReply`、`ArticleCard`、`ReplyFeedback` 由塊 1 負責、塊 2 沿用（Penpot 的 `Latest replies` 與 `MessagePage` 各有 39 個 `FactCheckReply` 子節點）。
+- **共用元件由「第一個用到的 track」負責**：做好後放進 Storybook 並登錄到 registry（`parameters.penpot`）；其他 track只能透過 PR 擴充 props，不 fork。`ReplyTypeLabel`、`UserAvatar` / `UserFlag` 在Track 0 先做；`FactCheckReply`、`ArticleCard`、`ReplyFeedback` 由Track 1 負責、Track 2 沿用（Penpot 的 `Latest replies` 與 `MessagePage` 各有 39 個 `FactCheckReply` 子節點）。
 - 要做新共用元件前，或把 `-components/` 的元件搬進 `src/components/` 前，先查 Storybook 與 `components.md`，避免 A、B 各做一份。
-- search param 的 schema 工具在塊 0 建立，塊 1 擴充。
+- search param 的 schema 工具在Track 0 建立，Track 1 擴充。
 - 無稿頁面由工程師以 Guide 為範例拼湊，PR 附 Storybook 連結請設計師 review。**設計師的主要工作是驗收，不是補稿。**
 
 ---
@@ -1120,7 +1120,7 @@ description: >
 
 - **與設計師 sync 設計系統的差異**：附錄 C 已大致處理完，剩斷點（#11）與深色區塊焦點環的間隔色（#5）。
 - **「我送出的」的語意**：只算第一個回報者，還是包含 +1；若包含，需要 rumors-api 補 filter（§2.3）。
-- **Cloudflare cache rule**：切換前要排除 `cofacts_session` cookie（§2.6，塊 6）。
+- **Cloudflare cache rule**：切換前要排除 `cofacts_session` cookie（§2.6，Track 6）。
 
 ---
 
@@ -1143,15 +1143,15 @@ description: >
 
 | rumors-site | 新架構 |
 |---|---|
-| `AppLayout/*`（header、sidebar、footer、GlobalSearch、LoginModal、UpgradeDialog） | `components/`（SiteNav 等）+ `server/auth`（第 0 塊）；`UpgradeDialog` 另議 |
-| `ListPageControls/*`、`ListPageDisplays/*`、`Subscribe/*`、`SearchPageJumbotron` | `_site/-components/`、共用卡片（第 1 塊） |
-| `ArticleReply/*`、`CurrentReplies`、`ArticleReplyFeedbackControl/*`、`ArticleCategories/*`、`ReplyRequestReason/*`、`CreateReplyRequestForm/*`、`Hyperlinks`、`TrendPlot`、`CooccurrenceSection`、`AIReplySection`、`ActionMenu` | `article.$id/-components/`、共用元件（第 2 塊） |
-| `NewReplySection/*`（1,536 LOC） | `article.$id/-components/`（第 2 塊，依新稿重做） |
-| `Collaborate/*` | `article.$id/-components/Transcript`（第 2b 塊） |
-| `ProfilePage/*`、`ContributionChart`、`LevelIcon` | user route 的 `-components/`（第 1 塊末） |
-| `LandingPage/*`、`ReportPage/*`、`Tutorial/*` | 各靜態頁 route 的 `-components/`（第 4 塊） |
+| `AppLayout/*`（header、sidebar、footer、GlobalSearch、LoginModal、UpgradeDialog） | `components/`（SiteNav 等）+ `server/auth`（Track 0）；`UpgradeDialog` 另議 |
+| `ListPageControls/*`、`ListPageDisplays/*`、`Subscribe/*`、`SearchPageJumbotron` | `_site/-components/`、共用卡片（Track 1） |
+| `ArticleReply/*`、`CurrentReplies`、`ArticleReplyFeedbackControl/*`、`ArticleCategories/*`、`ReplyRequestReason/*`、`CreateReplyRequestForm/*`、`Hyperlinks`、`TrendPlot`、`CooccurrenceSection`、`AIReplySection`、`ActionMenu` | `article.$id/-components/`、共用元件（Track 2） |
+| `NewReplySection/*`（1,536 LOC） | `article.$id/-components/`（Track 2，依新稿重做） |
+| `Collaborate/*` | `article.$id/-components/Transcript`（Track 2b） |
+| `ProfilePage/*`、`ContributionChart`、`LevelIcon` | user route 的 `-components/`（Track 1 末） |
+| `LandingPage/*`、`ReportPage/*`、`Tutorial/*` | 各靜態頁 route 的 `-components/`（Track 4） |
 | `WonderCallEmbed`、`GoogleWebsiteTranslator` | 另議：是否保留 |
-| `lib/gtm.ts`、`data-ga` | `lib/analytics.ts`（第 6 塊） |
+| `lib/gtm.ts`、`data-ga` | `lib/analytics.ts`（Track 6） |
 
 ## 附錄 C：與設計師 sync 的差異清單
 
