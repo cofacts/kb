@@ -481,8 +481,8 @@ import { graphql } from '@/server/gql'
 import { ArticlePageView } from './-components/ArticlePageView'
 
 const getArticle = createServerFn({ method: 'GET' })
-  .validator(z.string())
-  .handler(({ data: id }) =>
+  .validator(z.object({ id: z.string() }))
+  .handler(({ data }) =>
     cofactsExec(
       graphql(`
         query GetArticle($id: String!) {
@@ -499,13 +499,13 @@ const getArticle = createServerFn({ method: 'GET' })
           }
         }
       `),
-      { id },
+      data,               // 變數就是 server function 的輸入
     ),
   )
 
 const getMyFeedback = createServerFn({ method: 'GET' })
-  .validator(z.string())
-  .handler(({ data: id }) =>
+  .validator(z.object({ id: z.string() }))
+  .handler(({ data }) =>
     cofactsExec(
       graphql(`
         query GetMyFeedback($id: String!) {
@@ -517,17 +517,22 @@ const getMyFeedback = createServerFn({ method: 'GET' })
           }
         }
       `),
-      { id },
+      data,               // 變數就是 server function 的輸入
     ),
   )
 
-const articleQuery = (id: string) =>
-  queryOptions({ queryKey: ['GetArticle', { id }], queryFn: () => getArticle({ data: id }), staleTime: 60_000 })
+// queryKey = [operation name, variables]，variables 與 server function 的輸入是同一個物件
+const articleQuery = (vars: { id: string }) =>
+  queryOptions({
+    queryKey: ['GetArticle', vars],
+    queryFn: () => getArticle({ data: vars }),
+    staleTime: 60_000,
+  })
 
 export const Route = createFileRoute('/_site/article/$id/')({
   // head() 要標題、要決定 404，所以寫 loader；只回傳 head 需要的欄位
   loader: async ({ context, params }) => {
-    const { GetArticle: article } = await context.queryClient.ensureQueryData(articleQuery(params.id))
+    const { GetArticle: article } = await context.queryClient.ensureQueryData(articleQuery({ id: params.id }))
     if (!article) throw notFound()
     return { title: article.text.slice(0, 60), image: article.attachmentUrl }
   },
@@ -542,10 +547,10 @@ export const Route = createFileRoute('/_site/article/$id/')({
 
 function ArticlePage() {
   const { id } = Route.useParams()
-  const { data } = useSuspenseQuery(articleQuery(id))            // SSR：從 cache 讀，loader 已填好
+  const { data } = useSuspenseQuery(articleQuery({ id }))            // SSR：從 cache 讀，loader 已填好
   const { data: feedback } = useQuery({                          // client 再取即可
     queryKey: ['GetMyFeedback', { id }],
-    queryFn: () => getMyFeedback({ data: id }),
+    queryFn: () => getMyFeedback({ data: { id } }),
   })
   return <ArticlePageView article={data.GetArticle!} myFeedback={feedback} />
 }
