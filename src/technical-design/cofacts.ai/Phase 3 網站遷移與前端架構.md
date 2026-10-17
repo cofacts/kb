@@ -394,7 +394,7 @@ src/
 │   │   │   ├── index.tsx            # /article/:id（route component + 本頁的 createServerFn）
 │   │   │   ├── reply.new.tsx        # /article/:id/reply/new
 │   │   │   ├── reply.existing.tsx
-│   │   │   ├── -queries.server.ts   # 本目錄 route 用的 GraphQL document
+│   │   │   ├── -queries.server.ts   # （需要時）本目錄多個 route 共用的 GraphQL document
 │   │   │   └── -components/         # 訊息頁與編輯器專用：Transcript、ArticleQuickNav、EditorTabs、OriginalMessage…
 │   │   ├── reply.$id.tsx
 │   │   ├── user.tsx                 # /user?id=
@@ -446,7 +446,7 @@ docs/design/
 | 放什麼 | 放哪裡 | 誰可以 import |
 |---|---|---|
 | server-only utility：`cofactsExec`、secret、JWT 處理 | `*.server.ts`（`src/server/cofacts.server.ts` 等） | 只在 server function 的 handler 裡用 |
-| GraphQL document | `*.server.ts`（route 目錄的 `-queries.server.ts`，或 `src/server/<domain>/`） | 同上 |
+| GraphQL document | **預設 inline 在 handler 裡**（`graphql()`）；多個 route 共用時抽到 `-queries.server.ts` 或 `src/server/<domain>/` | 只在 handler 裡用 |
 | server function（`createServerFn`） | **預設 inline 在 route 檔裡**，寫在 module 最上層 | 任何地方 |
 | 型別、zod schema、常數 | 一般 `.ts` | 任何地方 |
 
@@ -477,16 +477,49 @@ import { createServerFn } from '@tanstack/react-start'
 import { queryOptions, useSuspenseQuery, useQuery } from '@tanstack/react-query'
 import { z } from 'zod'
 import { cofactsExec } from '@/server/cofacts.server'
-import { GetArticle, GetMyFeedback } from './-queries.server'
+import { graphql } from '@/server/gql'
 import { ArticlePageView } from './-components/ArticlePageView'
 
 const getArticle = createServerFn({ method: 'GET' })
   .validator(z.string())
-  .handler(({ data: id }) => cofactsExec(GetArticle, { id }))
+  .handler(({ data: id }) =>
+    cofactsExec(
+      graphql(`
+        query GetArticle($id: String!) {
+          GetArticle(id: $id) {
+            id
+            text
+            attachmentUrl(variant: THUMBNAIL)
+            createdAt
+            articleReplies(status: NORMAL) {
+              reply { id type text reference }
+              positiveFeedbackCount
+              negativeFeedbackCount
+            }
+          }
+        }
+      `),
+      { id },
+    ),
+  )
 
 const getMyFeedback = createServerFn({ method: 'GET' })
   .validator(z.string())
-  .handler(({ data: id }) => cofactsExec(GetMyFeedback, { id }))
+  .handler(({ data: id }) =>
+    cofactsExec(
+      graphql(`
+        query GetMyFeedback($id: String!) {
+          GetArticle(id: $id) {
+            articleReplies(status: NORMAL) {
+              replyId
+              ownArticleReplyFeedback { score }
+            }
+          }
+        }
+      `),
+      { id },
+    ),
+  )
 
 const articleQuery = (id: string) =>
   queryOptions({ queryKey: ['article', id], queryFn: () => getArticle({ data: id }), staleTime: 60_000 })
@@ -517,6 +550,8 @@ function ArticlePage() {
   return <ArticlePageView article={data.GetArticle!} myFeedback={feedback} />
 }
 ```
+
+`graphql()` 寫在 handler 裡：GraphQL 形狀、server function 與使用它的 component 在同一個檔案，codegen 從這裡產生型別，一路推導到 `useSuspenseQuery` 的 `data`；client build 時整個 handler 連同 query 字串一起被換成 RPC stub。同一份 query 被多個 route 使用時，再抽到 `*.functions.ts` 或 `-queries.server.ts`。
 
 block 0 需要的設定：`createRouter({ context: { queryClient } })`、root route 改用 `createRootRouteWithContext<{ queryClient: QueryClient }>()`（官方 [TanStack Query 指南](https://tanstack.com/start/latest/docs/framework/react/guide/tanstack-query) 的做法；cofacts/ai 目前只呼叫了 `setupRouterSsrQueryIntegration`，loader 還拿不到 `queryClient`）。
 
