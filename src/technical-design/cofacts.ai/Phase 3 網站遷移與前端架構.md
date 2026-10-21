@@ -496,12 +496,12 @@ export const Route = createFileRoute('/ai/session/$sessionId')({
 
 1. **資料原則上都進 TanStack Query cache**。SSR 期間累積的 query cache 由 `setupRouterSsrQueryIntegration` serialize 到前端，瀏覽器 hydrate 後直接使用，不重打 server function。每個 request 各自建立 `QueryClient`（cofacts/ai 的 `getRouter()` 已如此），避免使用者之間的 cache 混用。
 2. **SSR 就要有的資料，用 `useSuspenseQuery`**；只需在 client 取得的（例如 AI session 列表、「我是否已回饋」），用 `useQuery`。`useEffect` 與一般 `useQuery` 都不會在 SSR 執行，資料不會出現在 HTML 裡。
-3. **只有 `head()` 需要資料，或要決定頁面是否存在（`notFound()`、`redirect()`）時，才寫 route loader**。loader 裡用 `await context.queryClient.ensureQueryData(...)` 填 cache，**只回傳 `head()` 需要的欄位**：loader 的回傳值也會 serialize 到前端，回傳整份資料會和 query cache 重複。頁面內容一律從 query cache 讀，不用 `useLoaderData()`。在 loader 裡決定 404，SSR 的 HTTP 狀態碼才會正確；元件 streaming 開始後才丟錯，狀態碼已經送出。
+3. **每個 route 都在 loader 裡 `await` SSR HTML 需要的 query**（`await context.queryClient.ensureQueryData(...)`），即使 `head()` 不需要資料也一樣。這樣 query 失敗會進到 router：回 HTTP 500，並在 site nav 裡顯示 error component。只靠元件裡的 `useSuspenseQuery` 時，SSR 失敗會退回 root 的 Suspense boundary，結果是 **HTTP 200 加上空白 `<body>`**，對公開頁是最糟的結果。loader **只回傳 `head()` 需要的欄位**（常常什麼都不回傳）：loader 的回傳值也會 serialize 到前端，回傳整份資料會和 query cache 重複。頁面內容一律從 query cache 讀，不用 `useLoaderData()`。`notFound()`、`redirect()` 也在 loader 丟，HTTP 狀態碼才會正確。
 4. **寫入**用 `useMutation` 呼叫 server function，成功後 `invalidateQueries` 對應的 query key。
 5. **queryKey = `[GraphQL operation name, variables]`**，例如 `['GetArticle', id]`；多個參數的（列表的篩選條件）再用物件，例如 `['ListArticles', filter]`。每個 route 各自定義 `queryOptions`，若用 `['article', id]` 這類自訂 key，兩個 route 選了不同欄位卻用同一個 key 就會互相覆蓋 cache；codegen 要求 operation name 全專案唯一，用它當 key 就不會撞。key 與 `queryFn` 一律寫在同一個 `queryOptions` 裡（TkDodo〈The Query Options API〉、Start 官方指南的做法）。
    **`articleQuery(id)` 這種 `queryOptions` factory 是共用資料取得的首選封裝**：它把彼此直接相關的 queryKey 與 queryFn 包在一起，同一個呼叫既能給 loader 的 `ensureQueryData` 用，也能給元件的 `useSuspenseQuery` / `useQuery` 用。資料要跨 route 共用時，優先把 server function 連同它的 `queryOptions` factory 一起抽出、export，而不是只 export server function 再讓各處自己拼 key。和使用者有關的 query（例如 `GetMyFeedback`）在登出或切換帳號時要從 cache 移除。
 6. **`staleTime` 依 query 設定**。cofacts/ai 現在全域是 `Infinity`，適合 AI 對話，但列表頁回來時會看到舊資料。至少要大於 0，否則瀏覽器拿到 SSR 資料後會立刻重打一次。
-7. （選用）巢狀很深的 `useSuspenseQuery` 想提早開始，可以在 loader 呼叫 `ensureQueryData` 但不 `await`，避免 waterfall，也不擋 SSR。
+7. 頁面沒有也能成立的資料（側欄小工具、頁面下方的延伸內容）改用 `useQuery` 或巢狀的 Suspense boundary，失敗時不拖垮整頁。想提早開始抓，可以在 loader 呼叫 `ensureQueryData` 但不 `await`。
 
 ```tsx
 // src/routes/article.$id/index.tsx
@@ -560,7 +560,7 @@ const articleQuery = (id: string) =>
   queryOptions({ queryKey: ['GetArticle', id], queryFn: () => getArticle({ data: id }), staleTime: 60_000 })
 
 export const Route = createFileRoute('/article/$id/')({
-  // head() 要標題、要決定 404，所以寫 loader；只回傳 head 需要的欄位
+  // await SSR 需要的資料；只回傳 head 需要的欄位
   loader: async ({ context, params }) => {
     const { GetArticle: article } = await context.queryClient.ensureQueryData(articleQuery(params.id))
     if (!article) throw notFound()
@@ -1071,7 +1071,7 @@ description: >
    dark: variant、單獨字級。status 色只能透過白名單元件。
    Data: 不寫 client 端 GraphQL。單一 route 的 createServerFn inline 在 route 檔；
    資料進 TanStack Query cache：SSR 要的用 useSuspenseQuery，其餘 useQuery；
-   loader 只在 head() 或 404/redirect 需要時寫，且只回傳 head 需要的欄位；
+   每個 route 都在 loader await SSR 需要的 query，且只回傳 head 需要的欄位；
    loader 只呼叫 server function；*.server import 只在 handler 裡用；
    dev 出現 import protection 警告視同錯誤。
 4. Stories: 每個 Penpot 狀態板一個 scenario。
