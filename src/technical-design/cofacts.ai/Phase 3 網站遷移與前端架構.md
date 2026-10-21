@@ -316,7 +316,7 @@ rumors-site 的問題是 param 名 `types` 看不出是「回應的」分類，�
 
 - TanStack Router 會忽略 `-` 開頭的檔案與資料夾，不產生 route，這是官方建議的 colocation 做法（[Routing Concepts › Excluding Files and Folders from Routes](https://tanstack.com/router/latest/docs/framework/react/routing/routing-concepts)）。
 - 頁面專用元件一律放進 `-components/`，不放成 `-Foo.tsx` 散檔。這樣 `routes/` 底下 `-components/` 以外的檔案都是 route，目錄一眼看得懂。
-- `-components/` 的範圍是它所在的目錄：`routes/_site/article.$id/-components/` 給 `/article/:id` 底下的 route（訊息頁、兩個編輯器頁）共用。
+- `-components/` 的範圍是它所在的目錄：`routes/article.$id/-components/` 給 `/article/:id` 底下的 route（訊息頁、兩個編輯器頁）共用。
 - **不跨目錄 import 別人的 `-components/`**。第二個地方要用時，把元件搬到 `src/components/`，並補上 story 與 Penpot 對照。不必事先判斷元件「該放哪一層」。
 - 以上規則要寫進 `cofacts-frontend` skill（§6.3），agent 才會照做，lint 也要擋跨目錄 import。
 
@@ -380,32 +380,27 @@ Penpot 本地元件庫共 **48 個元件**（依 2026-10-08 的 `Cofacts-2026 (2
 ```
 src/
 ├── routes/                          # 頁面層：-components/ 以外都是 route
-│   ├── __root.tsx
-│   ├── _site.tsx                    # 公開站 layout：SiteNav(site) + SiteFooter
-│   ├── _site/
-│   │   ├── index.tsx                # /
-│   │   ├── -components/             # 只有 /articles、/replies、/hoax-for-you、/search 共用的列表元件
-│   │   │   └── FilterPanel.tsx  SortSelect.tsx  LoadMore.tsx
+│   ├── __root.tsx                   # 全站 shell：GlobalNav + <Outlet> + GlobalFooter（各 route 可用 staticData 關掉）
+│   ├── index.tsx                    # /
+│   ├── (lists)/                     # route group：不影響 URL，只為了讓列表頁共用 -components/
+│   │   ├── -components/             # /articles、/replies、/hoax-for-you、/search 共用：FilterPanel、SortSelect、LoadMore
 │   │   ├── articles.tsx             # /articles
-│   │   ├── replies.tsx              # /replies
-│   │   ├── hoax-for-you.tsx
-│   │   ├── search.tsx
-│   │   ├── article.$id/
-│   │   │   ├── index.tsx            # /article/:id（route component + 本頁的 createServerFn）
-│   │   │   ├── reply.new.tsx        # /article/:id/reply/new
-│   │   │   ├── reply.existing.tsx
-│   │   │   └── -components/         # 訊息頁與編輯器專用：Transcript、ArticleQuickNav、EditorTabs、OriginalMessage…
-│   │   ├── reply.$id.tsx
-│   │   ├── user.tsx                 # /user?id=
-│   │   ├── user.$slug.tsx
-│   │   ├── tutorial.tsx  about.tsx  impact.tsx  terms.tsx
-│   │   └── report.tsx               # /report（#138 移入）
-│   ├── ai.tsx                       # AI layout：SiteNav(ai) + Sidebar
+│   │   ├── replies.tsx  hoax-for-you.tsx  search.tsx
+│   ├── article.$id/
+│   │   ├── index.tsx                # /article/:id（route component + 本頁的 createServerFn）
+│   │   ├── reply.new.tsx            # /article/:id/reply/new
+│   │   ├── reply.existing.tsx
+│   │   └── -components/             # 訊息頁與編輯器專用：Transcript、ArticleQuickNav、EditorTabs、OriginalMessage…
+│   ├── reply.$id.tsx
+│   ├── user.tsx                     # /user?id=
+│   ├── user.$slug.tsx
+│   ├── tutorial.tsx  about.tsx  impact.tsx  terms.tsx
+│   ├── report.tsx                   # /report（#138 移入）
 │   ├── ai/
-│   │   ├── index.tsx                # /ai
-│   │   ├── session.$sessionId.tsx
+│   │   ├── index.tsx                # /ai（有 footer）
+│   │   ├── session.$sessionId.tsx   # 有 side panel：staticData.hideGlobalFooter
 │   │   ├── session.$sessionId.tool.$toolCallId.tsx
-│   │   └── -components/             # 現有 ChatArea、AgentMessage、RightDrawer（拆檔）、VerdictPicker…
+│   │   └── -components/             # 現有 ChatArea、AgentMessage、RightDrawer（拆檔）、VerdictPicker、SessionSidebar…
 │   ├── session.$.tsx                # 舊 cofacts.ai 網址 → 301 /ai/session/*
 │   ├── api/
 │   │   ├── run-sse.ts  auth/callback.ts
@@ -424,15 +419,52 @@ src/
 ├── hooks/
 ├── fixtures/                        # Storybook 與測試共用的 typed 假資料
 └── styles/
-    ├── app.css                      # 入口：@import tailwindcss、tokens、base、focus
+    ├── global.css                   # 入口：@import tailwindcss、tokens，加上全站規則（焦點環等）
     ├── tokens.css                   # ⚙️ 由 design/tokens.json 產生
-    ├── tokens.generated.ts          # ⚙️ 同上：給 cn() 的 twMergeTheme
-    ├── typography.css  focus.css
+    └── tokens.generated.ts          # ⚙️ 同上：給 cn() 的 twMergeTheme
 design/
 └── tokens.json                      # Penpot 匯出的 token（DTCG JSON），token 的來源
-docs/design/
-└── accessibility-guide.html         # 設計師的無障礙指南原檔（版本化）
 ```
+
+**全站 shell 放在 `__root.tsx`，各 route 用 `staticData` 關掉不要的部分。** Penpot 裡所有頁面（含 AI 首頁）共用同一組 Nav 與 Footer，只有進入有 side panel 的畫面（AI 對話、編輯器）時不放 footer。所以不另設 `_site` 這類 pathless layout，route 直接放在 `routes/` 下：
+
+```tsx
+// src/routes/__root.tsx（節錄）
+declare module '@tanstack/react-router' {
+  interface StaticDataRouteOption {
+    /** 這個 route 自己畫 nav（或不要 nav）時設 true */
+    hideGlobalNav?: boolean
+    /** 有 side panel 等不適合放 footer 的畫面設 true；畫面會改成滿版高度 */
+    hideGlobalFooter?: boolean
+  }
+}
+
+function RootLayout() {
+  const { hideGlobalNav, hideGlobalFooter } = useMatches({
+    select: (matches) => ({
+      hideGlobalNav: matches.some((m) => m.staticData.hideGlobalNav),
+      hideGlobalFooter: matches.some((m) => m.staticData.hideGlobalFooter),
+    }),
+  })
+  return (
+    <div className="flex min-h-dvh flex-col">
+      {!hideGlobalNav && <GlobalNav />}
+      <Outlet />
+      {!hideGlobalFooter && <GlobalFooter />}
+    </div>
+  )
+}
+
+// src/routes/ai/session.$sessionId.tsx
+export const Route = createFileRoute('/ai/session/$sessionId')({
+  staticData: { hideGlobalFooter: true },
+  …
+})
+```
+
+- 任一層 route 設了旗標就生效，所以設在父 route（例如 `ai/session.$sessionId`）會連子 route 一起套用。
+- 要自訂 nav 或 footer 的頁面，設 `hideGlobalNav` / `hideGlobalFooter` 後自己畫。
+- 只服務某一區的 UI（例如 AI 的對話列表側欄）放在該區的 route 或 `-components/`，不放進 root。
 
 靜態頁（首頁、`/impact`、教學）的 `*.module.css` 與圖片也放各自的 `-components/`（或 `-assets/`）。
 
@@ -472,7 +504,7 @@ docs/design/
 7. （選用）巢狀很深的 `useSuspenseQuery` 想提早開始，可以在 loader 呼叫 `ensureQueryData` 但不 `await`，避免 waterfall，也不擋 SSR。
 
 ```tsx
-// src/routes/_site/article.$id/index.tsx
+// src/routes/article.$id/index.tsx
 import { createFileRoute, notFound } from '@tanstack/react-router'
 import { createServerFn } from '@tanstack/react-start'
 import { queryOptions, useSuspenseQuery, useQuery } from '@tanstack/react-query'
@@ -527,7 +559,7 @@ const getMyFeedback = createServerFn({ method: 'GET' })
 const articleQuery = (id: string) =>
   queryOptions({ queryKey: ['GetArticle', id], queryFn: () => getArticle({ data: id }), staleTime: 60_000 })
 
-export const Route = createFileRoute('/_site/article/$id/')({
+export const Route = createFileRoute('/article/$id/')({
   // head() 要標題、要決定 404，所以寫 loader；只回傳 head 需要的欄位
   loader: async ({ context, params }) => {
     const { GetArticle: article } = await context.queryClient.ensureQueryData(articleQuery(params.id))
@@ -1146,7 +1178,7 @@ description: >
 | rumors-site | 新架構 |
 |---|---|
 | `AppLayout/*`（header、sidebar、footer、GlobalSearch、LoginModal、UpgradeDialog） | `components/`（SiteNav 等）+ `server/auth`（Track 0）；`UpgradeDialog` 另議 |
-| `ListPageControls/*`、`ListPageDisplays/*`、`Subscribe/*`、`SearchPageJumbotron` | `_site/-components/`、共用卡片（Track 1） |
+| `ListPageControls/*`、`ListPageDisplays/*`、`Subscribe/*`、`SearchPageJumbotron` | `(lists)/-components/`、共用卡片（Track 1） |
 | `ArticleReply/*`、`CurrentReplies`、`ArticleReplyFeedbackControl/*`、`ArticleCategories/*`、`ReplyRequestReason/*`、`CreateReplyRequestForm/*`、`Hyperlinks`、`TrendPlot`、`CooccurrenceSection`、`AIReplySection`、`ActionMenu` | `article.$id/-components/`、共用元件（Track 2） |
 | `NewReplySection/*`（1,536 LOC） | `article.$id/-components/`（Track 2，依新稿重做） |
 | `Collaborate/*` | `article.$id/-components/Transcript`（Track 2b） |
