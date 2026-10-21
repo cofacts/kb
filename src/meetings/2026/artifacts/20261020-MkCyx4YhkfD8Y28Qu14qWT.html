@@ -1,0 +1,574 @@
+<!doctype html><html><head><meta name="robots" content="noindex, nofollow"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>維基來源評級命中評估</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single reading column (~46rem) with full-width data tables; findings first, method last. */
+:root {
+  --bg: #f6f8f9;
+  --surface: #ffffff;
+  --fg: #17222b;
+  --muted: #56646f;
+  --line: #d9e0e5;
+  --accent: #0f6f78;
+  --accent-soft: #e2f0f1;
+  --bar: #2f8a93;
+  --bar-dim: #b8cfd2;
+  --gr: #1f7a3f; --gr-bg: #e3f3e8;
+  --sr: #8a5a00; --sr-bg: #fbefd6;
+  --gu: #b23a1a; --gu-bg: #fbe4dc;
+  --d:  #8f1530; --d-bg: #f8dde3;
+  --nc: #4e5a66; --nc-bg: #e8ecef;
+  --font-display: "Noto Serif TC", "Songti TC", serif;
+  --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11181d; --surface: #182229; --fg: #e3e9ed; --muted: #9aa8b2; --line: #2b3842;
+    --accent: #5cc3cc; --accent-soft: #17343a; --bar: #4fb3bc; --bar-dim: #2f4a50;
+    --gr: #7fd39a; --gr-bg: #173524; --sr: #f0c46b; --sr-bg: #3a2e12;
+    --gu: #f29a7f; --gu-bg: #3e2119; --d: #f58ea4; --d-bg: #3d1922; --nc: #b4c0c9; --nc-bg: #26323a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11181d; --surface: #182229; --fg: #e3e9ed; --muted: #9aa8b2; --line: #2b3842;
+  --accent: #5cc3cc; --accent-soft: #17343a; --bar: #4fb3bc; --bar-dim: #2f4a50;
+  --gr: #7fd39a; --gr-bg: #173524; --sr: #f0c46b; --sr-bg: #3a2e12;
+  --gu: #f29a7f; --gu-bg: #3e2119; --d: #f58ea4; --d-bg: #3d1922; --nc: #b4c0c9; --nc-bg: #26323a;
+  color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 16px; line-height: 1.75; }
+.wrap { max-width: 48rem; margin: 0 auto; padding-inline: 20px; padding-block: 48px 80px; display: grid; gap: 56px; }
+header { display: grid; gap: 12px; }
+.eyebrow { font-size: 13px; letter-spacing: .08em; color: var(--accent); font-weight: 500; }
+h1 { font-family: var(--font-display); font-size: clamp(28px, 5vw, 38px); line-height: 1.3; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--font-display); font-size: 24px; line-height: 1.4; margin: 0; text-wrap: balance; }
+h3 { font-size: 17px; margin: 0; }
+p { margin: 0; }
+.lede { color: var(--muted); max-width: 40rem; }
+.meta { font-family: var(--font-data); font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 18px; }
+section { display: grid; gap: 18px; min-width: 0; }
+.sec-head { display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 20px; }
+.sec-head .tag { font-family: var(--font-data); font-size: 12px; color: var(--muted); }
+
+.verdict { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 22px 24px; display: grid; gap: 14px; }
+.verdict ul { margin: 0; padding-left: 1.2em; display: grid; gap: 10px; }
+.verdict b { color: var(--accent); }
+
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 12px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; display: grid; gap: 4px; align-content: start; }
+.stat .num { font-family: var(--font-data); font-size: 30px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.stat .lbl { font-size: 14px; color: var(--muted); line-height: 1.5; }
+
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 13px; color: var(--muted); font-weight: 500; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.n { font-family: var(--font-data); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+th.n { text-align: right; }
+.caption { font-size: 13.5px; color: var(--muted); }
+
+.chip { display: inline-block; font-size: 12.5px; font-weight: 500; padding: 1px 8px; border-radius: 4px; white-space: nowrap; line-height: 1.6; }
+.c-gr { color: var(--gr); background: var(--gr-bg); }
+.c-sr { color: var(--sr); background: var(--sr-bg); }
+.c-gu { color: var(--gu); background: var(--gu-bg); }
+.c-d  { color: var(--d);  background: var(--d-bg); }
+.c-nc { color: var(--nc); background: var(--nc-bg); }
+
+/* bar chart */
+.bars { display: grid; gap: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px 18px 14px; }
+.bar-row { display: grid; grid-template-columns: minmax(8rem, 13rem) 1fr 3.4rem; gap: 12px; align-items: center; font-size: 14px; position: relative; }
+.bar-row .name { min-width: 0; line-height: 1.4; }
+.bar-row .track { height: 14px; position: relative; }
+.bar-row .fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--bar); border-radius: 0 4px 4px 0; }
+.bar-row.dim .fill { background: var(--bar-dim); }
+.bar-row .val { font-family: var(--font-data); font-variant-numeric: tabular-nums; text-align: right; font-size: 13.5px; }
+.bar-row:hover .fill, .bar-row:focus-within .fill { filter: brightness(1.12); }
+.bar-row .tip { display: none; position: absolute; right: 0; top: -30px; background: var(--fg); color: var(--bg); font-size: 12.5px; padding: 3px 8px; border-radius: 4px; white-space: nowrap; z-index: 2; font-family: var(--font-data); }
+.bar-row:hover .tip { display: block; }
+.axis { display: grid; grid-template-columns: minmax(8rem, 13rem) 1fr 3.4rem; gap: 12px; font-family: var(--font-data); font-size: 11.5px; color: var(--muted); }
+.axis .ticks { display: flex; justify-content: space-between; border-top: 1px solid var(--line); padding-top: 4px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -1px; margin-right: 6px; }
+
+.quote { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 12px 16px; border-radius: 0 8px 8px 0; font-size: 15px; display: grid; gap: 6px; }
+.quote .src { font-size: 12.5px; color: var(--muted); }
+
+.qs { counter-reset: q; display: grid; gap: 14px; padding: 0; margin: 0; list-style: none; }
+.qs li { counter-increment: q; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px 16px 52px; position: relative; display: grid; gap: 6px; }
+.qs li::before { content: counter(q); position: absolute; left: 18px; top: 15px; font-family: var(--font-data); font-weight: 500; color: var(--accent); font-size: 15px; }
+.qs .opt { font-size: 14.5px; color: var(--muted); }
+
+.method { font-size: 14.5px; color: var(--muted); display: grid; gap: 10px; }
+.method ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+code { font-family: var(--font-data); font-size: .88em; background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.parts { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 10px; margin-top: 8px; }
+.parts a { display: grid; gap: 2px; text-decoration: none; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; font-weight: 500; }
+.parts a:hover { border-color: var(--accent); }
+.pn { font-family: var(--font-data); font-size: 12px; color: var(--accent); font-weight: 400; letter-spacing: .04em; }
+.part { display: grid; gap: 8px; padding-block: 28px 4px; border-top: 3px solid var(--accent); }
+.part h2 { font-size: 30px; }
+.diagram { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+.diagram pre.mermaid { margin: 0; background: transparent; text-align: center; }
+pre.code { margin: 0; overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; font-family: var(--font-data); font-size: 13px; line-height: 1.6; }
+.alts { display: grid; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); gap: 12px; }
+.alt { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; display: grid; gap: 8px; align-content: start; min-width: 0; font-size: 15px; }
+.alt h3 { display: flex; gap: 10px; align-items: baseline; line-height: 1.45; }
+.alt .k { font-family: var(--font-data); color: var(--accent); font-weight: 500; flex: none; }
+.alt .pc { font-size: 14px; color: var(--muted); }
+.alt .pc b { color: var(--fg); font-weight: 500; margin-right: 4px; }
+.note { background: var(--accent-soft); border-radius: 10px; padding: 16px 18px; display: grid; gap: 8px; }
+@media (max-width: 560px) {
+  .bar-row, .axis { grid-template-columns: 7.5rem 1fr 3rem; gap: 8px; }
+  .verdict { padding: 18px; }
+}
+</style>
+
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">COFACTS.AI 出處品質｜下週討論用</div>
+  <h1>維基百科來源評級，能幫 Cofacts.ai 挑出處嗎？</h1>
+  <p class="lede">把 Cofacts.ai 近五個月實際用過的出處，拿去比對中文維基《來源評級/列表》與英文 WP:RSP，看列表涵蓋多少、評級回傳給 writer 之後可能改變什麼。</p>
+  <div class="meta">
+    <span>資料期間 2026-05-13 – 2026-10-13</span>
+    <span>來源 Langfuse traces</span>
+    <span>維基快照 2026-10-13</span>
+    <span>ADK 1.26.0</span>
+  </div>
+  <nav class="parts" aria-label="報告分頁">
+    <a href="#research"><span class="pn">第一部分</span>研究：列表命中度與影響</a>
+    <a href="#tech"><span class="pn">第二部分</span>技術討論：怎麼接進 agent 流程</a>
+  </nav>
+</header>
+
+<div class="part" id="research">
+  <span class="pn">第一部分</span>
+  <h2>研究</h2>
+</div>
+
+<section>
+  <div class="verdict">
+    <h2>結論</h2>
+    <ul>
+      <li>中文列表命中約 <b>四成</b>出處（草稿 41%）。英文列表只再多 <b>2–3 個百分點</b>，可以晚點再做。</li>
+      <li>最大的影響是<b>維基百科本身</b>：23% 的草稿引用維基，而兩個列表都把維基評為「通常不可靠」。</li>
+      <li>約<b>一半</b>的命中落在「依主題分評級」的條目，而且分歧點正好是<b>政治報導</b>。只回傳基準評級會誤導，必須回傳摘要讓模型依主題判斷。</li>
+      <li>writer 現在已經會避開「應停用」來源（入選率 5%），所以評級對這類來源的邊際效果不大。</li>
+      <li>沒被列表涵蓋的約 56%，大宗是政府網站、查核組織、學術期刊，需要另訂規則。</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <span class="tag">命中度</span>
+    <h2>列表涵蓋了多少出處</h2>
+  </div>
+  <div class="stats">
+    <div class="stat"><span class="num">41.2%</span><span class="lbl">草稿出處命中中文列表</span></div>
+    <div class="stat"><span class="num">+2.8</span><span class="lbl">再加英文列表只多這幾個百分點（合計 44.0%）</span></div>
+    <div class="stat"><span class="num">588 / 765</span><span class="lbl">至少有一個出處命中的草稿</span></div>
+  </div>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>階段</th><th class="n">呼叫數</th><th class="n">出處 URL</th><th class="n">中文列表</th><th class="n">英文列表</th><th class="n">合計</th><th class="n">命中網域</th></tr></thead>
+      <tbody>
+        <tr><td>investigator 搜尋結果</td><td class="n">1,023</td><td class="n">9,653</td><td class="n">39.8%</td><td class="n">14.4%</td><td class="n">41.9%</td><td class="n">297 / 2,572</td></tr>
+        <tr><td>verifier 讀過的頁面</td><td class="n">809</td><td class="n">2,347</td><td class="n">44.4%</td><td class="n">11.1%</td><td class="n">46.2%</td><td class="n">142 / 742</td></tr>
+        <tr><td>草稿 <code>references</code></td><td class="n">765</td><td class="n">3,252</td><td class="n">41.2%</td><td class="n">13.2%</td><td class="n">44.0%</td><td class="n">125 / 655</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="caption">草稿只計成功送出的 <code>draft_factcheck_response</code>。investigator 另有 321 筆未解析的 Vertex 轉址網址不計入。命中率以 URL 筆數計，熱門媒體權重較高。</p>
+</section>
+
+<section>
+  <div class="sec-head">
+    <span class="tag">影響一</span>
+    <h2>草稿大量引用維基百科</h2>
+  </div>
+  <div class="stats">
+    <div class="stat"><span class="num">176 / 765</span><span class="lbl">草稿引用了維基百科（23%）</span></div>
+    <div class="stat"><span class="num">193</span><span class="lbl">個逐項主張以維基頁面為佐證（<code>claim_sources</code>）</span></div>
+    <div class="stat"><span class="num">239</span><span class="lbl">筆 references 指向 zh / en / ja 維基</span></div>
+  </div>
+  <div class="quote">
+    <p>維基百科本身並非可靠來源，因為開放維基是個人出版物……經驗不足的編者有時可能會無意中引用關於某個出版物的維基百科條目，而不是該出版物本身；在這種情況下，應修正引用，而不是刪除它。</p>
+    <span class="src">中文維基《來源評級/列表/維基百科》，評級 <span class="chip c-gu">通常不可靠</span>（WP:CIRCULAR）</span>
+  </div>
+  <p>維基條目通常附有原始出處。回傳評級後，writer 比較可能改引條目背後的報導或文件，這是這次評估中最直接、量也最大的改變。</p>
+</section>
+
+<section>
+  <div class="sec-head">
+    <span class="tag">影響二</span>
+    <h2>評級依主題而定，政治報導最常被降級</h2>
+  </div>
+  <p>中文列表 363 筆中有 86 筆在摘要裡依主題給出不同評級。Cofacts.ai 的命中有一半落在這類條目（investigator 52%、verifier 54%、草稿 45%）。台灣主流媒體的分歧點幾乎都是政治報導，也就是 Cofacts 訊息的大宗。</p>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>來源</th><th>基準評級</th><th>摘要中的主題評級</th><th class="n">草稿引用</th></tr></thead>
+      <tbody>
+        <tr><td>聯合報系</td><td><span class="chip c-sr">半可靠</span></td><td>政治 <span class="chip c-sr">半可靠</span>、其他 <span class="chip c-gr">通常可靠</span>、轉角國際 <span class="chip c-gr">通常可靠</span>、udn 部落格 <span class="chip c-gu">通常不可靠</span></td><td class="n">103</td></tr>
+        <tr><td>旺旺中時媒體集團</td><td><span class="chip c-sr">半可靠</span></td><td>政治 <span class="chip c-gu">通常不可靠</span>、非政治 <span class="chip c-sr">半可靠</span></td><td class="n">58</td></tr>
+        <tr><td>自由時報</td><td><span class="chip c-sr">半可靠</span></td><td>政治與兩岸 <span class="chip c-sr">半可靠</span>、報導自家事務 <span class="chip c-gu">通常不可靠</span>、其他 <span class="chip c-gr">通常可靠</span></td><td class="n">159</td></tr>
+        <tr><td>精鏡傳媒（鏡週刊、鏡新聞）</td><td><span class="chip c-sr">半可靠</span></td><td>政治 <span class="chip c-sr">半可靠</span>、其他 <span class="chip c-gr">通常可靠</span>、READr <span class="chip c-gr">通常可靠</span></td><td class="n">48</td></tr>
+        <tr><td>三立電視</td><td><span class="chip c-gu">應替代</span></td><td>陰謀論、社群轉述 <span class="chip c-gu">通常不可靠</span>、其他 <span class="chip c-gu">應替代</span></td><td class="n">27</td></tr>
+        <tr><td>Google（YouTube）</td><td><span class="chip c-sr">半可靠</span></td><td>YouTube 屬用戶生成內容；媒體官方帳號依該媒體評級</td><td class="n">35</td></tr>
+        <tr><td>中央通訊社</td><td><span class="chip c-gr">通常可靠</span></td><td>留意親執政黨傾向</td><td class="n">70</td></tr>
+        <tr><td>公共電視台</td><td><span class="chip c-gr">通常可靠</span></td><td>—</td><td class="n">84</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="caption">「應替代」與「通常不可靠」同色是因為兩者都表示不宜作為主要佐證。自由時報草稿引用數含 news / def / health 等子網域。</p>
+  <p>所以工具不能只回傳 <code>sr</code> 這類代碼。需要把整段摘要交給模型，並請它依這則訊息的主題判斷適用哪一條。</p>
+</section>
+
+<section>
+  <div class="sec-head">
+    <span class="tag">影響三</span>
+    <h2>writer 已經在篩，評級的增量在哪裡</h2>
+  </div>
+  <p>在同一個 trace 裡，investigator 找到的候選出處有多少比例最後被寫進草稿：</p>
+  <div class="bars" role="img" aria-label="各類來源從候選到入選草稿的比例">
+    <div class="bar-row"><span class="name">英文列表獨有・通常可靠</span><span class="track"><span class="fill" style="width:88.25%"></span></span><span class="val">35.3%</span><span class="tip">18 / 51</span></div>
+    <div class="bar-row"><span class="name">中文・通常可靠</span><span class="track"><span class="fill" style="width:66.25%"></span></span><span class="val">26.5%</span><span class="tip">129 / 486</span></div>
+    <div class="bar-row"><span class="name">未列・政府網站</span><span class="track"><span class="fill" style="width:66.25%"></span></span><span class="val">26.5%</span><span class="tip">197 / 743</span></div>
+    <div class="bar-row"><span class="name">未列・查核組織</span><span class="track"><span class="fill" style="width:58%"></span></span><span class="val">23.2%</span><span class="tip">67 / 289</span></div>
+    <div class="bar-row"><span class="name">未列・學術</span><span class="track"><span class="fill" style="width:48.75%"></span></span><span class="val">19.5%</span><span class="tip">26 / 133</span></div>
+    <div class="bar-row"><span class="name">中文・半可靠</span><span class="track"><span class="fill" style="width:46%"></span></span><span class="val">18.4%</span><span class="tip">232 / 1,258</span></div>
+    <div class="bar-row dim"><span class="name">中文・通常不可靠</span><span class="track"><span class="fill" style="width:42.25%"></span></span><span class="val">16.9%</span><span class="tip">85 / 503（多為維基、FB、YouTube）</span></div>
+    <div class="bar-row"><span class="name">未列・其他</span><span class="track"><span class="fill" style="width:39.25%"></span></span><span class="val">15.7%</span><span class="tip">362 / 2,305</span></div>
+    <div class="bar-row dim"><span class="name">中文・應替代</span><span class="track"><span class="fill" style="width:30%"></span></span><span class="val">12.0%</span><span class="tip">17 / 142</span></div>
+    <div class="bar-row dim"><span class="name">未列・轉載平台</span><span class="track"><span class="fill" style="width:15.75%"></span></span><span class="val">6.3%</span><span class="tip">15 / 237（LINE Today 等）</span></div>
+    <div class="bar-row dim"><span class="name">中文・應停用</span><span class="track"><span class="fill" style="width:12.5%"></span></span><span class="val">5.0%</span><span class="tip">5 / 101</span></div>
+    <div class="axis"><span></span><span class="ticks"><span>0%</span><span>10%</span><span>20%</span><span>30%</span><span>40%</span></span><span></span></div>
+  </div>
+  <div class="legend"><span><i style="background:var(--bar)"></i>可作為佐證的類別</span><span><i style="background:var(--bar-dim)"></i>不宜作為主要佐證的類別</span></div>
+  <p class="caption">只計有成功草稿的 trace。滑鼠移到長條上可看筆數。</p>
+  <p>可靠來源與政府網站的入選率本來就最高，「應停用」只有 5%。評級真正的增量集中在三類：</p>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>目前仍進入草稿的</th><th class="n">草稿引用</th><th>評級會帶來的提示</th></tr></thead>
+      <tbody>
+        <tr><td>維基百科（zh / en / ja）</td><td class="n">239</td><td>改引條目背後的原始出處</td></tr>
+        <tr><td>中時、聯合、三立的政治報導</td><td class="n">188</td><td>政治議題降級，找其他來源交叉佐證</td></tr>
+        <tr><td>Facebook、YouTube</td><td class="n">71</td><td>只能證明「誰說過」，不能證明內容為真</td></tr>
+        <tr><td>中國官媒與大紀元系（人民日報、新華社、環球時報、大紀元、新唐人）</td><td class="n">17</td><td>依用途區分：引述官方立場可以，作為事實依據不行</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="caption">中時、聯合、三立一列是這三家所有草稿引用的總數，沒有逐篇判斷是否為政治議題。</p>
+</section>
+
+<section>
+  <div class="sec-head">
+    <span class="tag">涵蓋缺口</span>
+    <h2>沒被列表涵蓋的 56%</h2>
+  </div>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>類別</th><th class="n">佔草稿出處</th><th>常見網域</th></tr></thead>
+      <tbody>
+        <tr><td>政府網站</td><td class="n">18.9%</td><td>mohw.gov.tw、fda.gov.tw、cdc.gov.tw、law.moj.gov.tw、wra.gov.tw、gov.taipei</td></tr>
+        <tr><td>查核組織</td><td class="n">4.7%</td><td>mygopen.com、tfc-taiwan.org.tw、cofacts.tw、165 反詐騙</td></tr>
+        <tr><td>學術</td><td class="n">2.8%</td><td>pmc / pubmed.ncbi.nlm.nih.gov、大學網站</td></tr>
+        <tr><td>轉載平台</td><td class="n">1.8%</td><td>today.line.me、n.yam.com、share.google</td></tr>
+        <tr><td>其他未列</td><td class="n">27.9%</td><td>Taipei Times、Focus Taiwan、Taiwan News、上報、食力、ntl.edu.tw、openbook.org.tw</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>WP:RSP 自己也說明，沒列在表上只代表沒被反覆討論過，不代表不可靠。政府、查核組織、學術期刊需要另訂規則，例如比照維基的醫學來源準則（WP:MEDRS）處理健康類訊息。LINE Today 這類轉載平台則要先追到原始媒體才能判斷。</p>
+</section>
+
+<section>
+  <div class="sec-head">
+    <span class="tag">英文列表</span>
+    <h2>英文 WP:RSP 值得接嗎</h2>
+  </div>
+  <p>英文列表 497 筆。它的 13% 命中大多和中文列表重疊，主要也是維基、Facebook、YouTube。只有英文列表才命中的出處，在草稿中佔 2.8%，其中「通常可靠」1.8%，包括 Guardian、Reuters、SCMP、海峽時報、Al Jazeera、JAMA。</p>
+  <p>它的優點是結構整齊：依主題分評級時直接拆成多列，例如 Fox News 的政治與非政治分開，不用解析內文。適合當國際媒體的補充，優先順序可以放後面。</p>
+</section>
+
+<section>
+  <div class="sec-head">
+    <span class="tag">研究面待決</span>
+    <h2>內容上要決定的事</h2>
+  </div>
+  <ol class="qs">
+    <li><h3>維基百科出處怎麼處理？</h3><p class="opt">只提示、要求改引原始出處，或由 <code>draft_factcheck_response</code> 驗證時擋下。</p></li>
+    <li><h3>如何區分「佐證」和「說法的出處」？</h3><p class="opt">FB、YouTube、官媒在 Cofacts 常是被查核的對象，提示內容需要能表達這個差別。</p></li>
+    <li><h3>未列來源的備援規則</h3><p class="opt">政府網站、查核組織、學術期刊、轉載平台各自怎麼處理。</p></li>
+    <li><h3>要不要接英文列表？</h3><p class="opt">增量約 2.8 個百分點，以國際媒體為主。</p></li>
+  </ol>
+</section>
+
+<section class="method">
+  <div class="sec-head">
+    <span class="tag">方法與限制</span>
+    <h2>這份數字怎麼來的</h2>
+  </div>
+  <ul>
+    <li>出處取自 Langfuse 的 TOOL observation：investigator 與 verifier 取輸出的 <code>sources[].url</code>，草稿取 <code>draft_factcheck_response</code> 輸入的 <code>references</code>。</li>
+    <li>中文列表逐頁讀取《Wikipedia:來源評級/列表/*》共 363 / 364 頁，只缺「看中國」（持續被限流）。基準評級取 infobox 的 <code>status</code>，主題評級取摘要中的 <code>{{通常不可靠}}</code>、<code>{{RSNG|…}}</code> 等模板。</li>
+    <li>網址比對採網域或其子網域；條目若宣告了路徑（例如 <code>facebook.com/taipeibo</code>），則要求網址路徑也相符。</li>
+    <li>入選率以同一 trace 內的 URL 完全比對計算，同一則報導若換了網址形式（例如加了追蹤參數）會被算成未入選。</li>
+    <li>從雲端 IP 呼叫 MediaWiki API 會被回 429，這次改用 <code>action=raw</code> 慢速抓取。正式同步需要固定主機與帶聯絡資訊的 User-Agent。</li>
+  </ul>
+</section>
+
+<div class="part" id="tech">
+  <span class="pn">第二部分</span>
+  <h2>技術討論</h2>
+  <p class="lede">目前的提案是在 investigator 與 verifier 之後加一個便宜模型，替 <code>sources</code> 中的每個來源補上一段給 writer 看的評級提示。以下是這個做法的結構、在 ADK 1.26.0 上要注意的細節，以及其他可行的設計。</p>
+</div>
+
+<section>
+  <div class="sec-head">
+    <span class="tag">現況</span>
+    <h2>Before：sources 只有標題和網址</h2>
+  </div>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  W["writer"] -->|"request"| INV
+  subgraph INV["AgentTool: investigator"]
+    direction LR
+    I1["LlmAgent investigator&lt;br/&gt;google_search"] --> C1["after_model_callback&lt;br/&gt;append_grounding_sources"]
+  end
+  C1 -->|"{content, sources: [title, url]}"| N["writer after_tool&lt;br/&gt;_normalized_response"]
+  N --> W
+  W -->|"claims + URLs"| VER
+  subgraph VER["AgentTool: verifier"]
+    direction LR
+    V1["LlmAgent verifier&lt;br/&gt;url_context"] --> C2["after_model_callback&lt;br/&gt;append_url_context_sources"]
+  end
+  C2 -->|"{content, sources: [title, url]}"| N
+</pre>
+  </div>
+  <p class="caption">writer 可以在同一輪平行呼叫多個 investigator。每次 AgentTool 呼叫都是獨立的 in-memory session。</p>
+</section>
+
+<section>
+  <div class="sec-head">
+    <span class="tag">提案 A</span>
+    <h2>After：SequentialAgent 後接評級模型</h2>
+  </div>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  SYNC["每週同步工作&lt;br/&gt;MediaWiki API"] --> DB[("評級資料&lt;br/&gt;363 筆 + 摘要全文")]
+  W["writer"] -->|"request"| SEQ
+  subgraph SEQ["AgentTool: investigator（SequentialAgent，沿用原名）"]
+    direction LR
+    I1["LlmAgent investigator_search&lt;br/&gt;google_search&lt;br/&gt;output_key"] --> R0{"before_agent_callback&lt;br/&gt;網域比對"}
+    R0 -->|"沒命中或只有單一評級"| P["直接輸出&lt;br/&gt;不呼叫模型"]
+    R0 -->|"命中依主題分評級的條目"| R1["LlmAgent source_rater&lt;br/&gt;便宜模型"]
+    R1 --> M["merge&lt;br/&gt;寫回 sources[].rating_hint"]
+  end
+  DB -.-> R0
+  P -->|"{content, sources: [title, url, rating_hint]}"| N["writer after_tool&lt;br/&gt;_normalized_response"]
+  M --> N
+  N --> W
+</pre>
+  </div>
+  <p>verifier 用同樣的結構包裝。rater 的輸入有三樣：上一個 agent 的 sources、這些來源在維基的評級全文，以及 request 原文（用來判斷主題）。輸出則是要替哪幾個來源加上提示。合併後的 sources 長這樣：</p>
+<pre class="code">{
+  "title": "中時新聞網",
+  "url": "https://www.chinatimes.com/realtimenews/...",
+  "rating_hint": {
+    "source": "旺旺中時媒體集團",
+    "wiki_url": "https://zh.wikipedia.org/wiki/Wikipedia:來源評級/列表/旺旺中時媒體集團",
+    "hint": "這則是兩岸政治議題，維基社群認定旺中的政治報導通常不可靠。請改用中央社或官方文件佐證，或只用來說明某方的說法。"
+  }
+}</pre>
+  <div class="stats">
+    <div class="stat"><span class="num">69%</span><span class="lbl">investigator 呼叫命中依主題分評級的條目，需要 rater</span></div>
+    <div class="stat"><span class="num">31%</span><span class="lbl">沒命中（13%）或只命中單一評級（18%），可直接略過模型</span></div>
+    <div class="stat"><span class="num">~700 字</span><span class="lbl">每次呼叫需附的評級摘要中位數（p90 約 1,700 字）</span></div>
+  </div>
+  <p class="caption">verifier 的對應比例為 52% 需要 rater、48% 可略過，摘要中位數約 270 字。依歷史 trace 估算。</p>
+</section>
+
+<section>
+  <div class="sec-head">
+    <span class="tag">ADK 1.26.0 細節</span>
+    <h2>提案 A 實作時要注意的地方</h2>
+  </div>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>項目</th><th>ADK 的行為</th><th>對設計的影響</th></tr></thead>
+      <tbody>
+        <tr><td>工具結果取哪一段</td><td><code>AgentTool</code> 取子 session 中最後一個有內容的 event</td><td>最後一步必須輸出完整的 <code>{content, sources}</code> JSON，包含 <code>_search_widget_html</code></td></tr>
+        <tr><td>rater 不能設 <code>output_schema</code></td><td><code>AgentTool</code> 會沿 <code>sub_agents[-1]</code> 找 <code>output_schema</code>，並用它驗證最後的輸出；<code>generate_content_config</code> 也不允許另設 <code>response_schema</code></td><td>rater 改用提示要求 JSON 並寬鬆解析，或在最後加一個沒有 schema 的自訂 merge agent</td></tr>
+        <tr><td>略過 rater</td><td><code>before_agent_callback</code> 回傳 Content 時，會略過該 agent 並把 Content 當成輸出</td><td>沒命中時直接輸出原 JSON，加上單一評級的固定提示，不需要模型</td></tr>
+        <tr><td><code>output_key</code> 存什麼</td><td><code>after_model_callback</code> 改寫後才產生 event，所以存的是改寫後的 JSON</td><td>rater 可直接從 state 讀到 investigator 的 sources</td></tr>
+        <tr><td>state 會流回 writer</td><td>子 session 的 <code>state_delta</code> 會同步寫回 writer 的 session</td><td>中間結果的 key 加 <code>temp:</code> 前綴，避免寫進 writer 的 session，也避免平行呼叫互相覆蓋。要寫測試確認</td></tr>
+        <tr><td>名稱綁定</td><td>工具名稱等於最外層 agent 的名稱</td><td>SequentialAgent 要沿用 <code>investigator</code> / <code>verifier</code>，內層 LlmAgent 改名；<code>_normalized_response</code>、<code>_EMPTY_RETRY_HINTS</code>、<code>writer_citations</code> 才不用改</td></tr>
+        <tr><td>非 JSON 輸出</td><td>investigator 可能回 <code>[SYSTEM]</code> 重試字串；verifier 沒有 grounding 時回原始文字</td><td>這些情況 rater 原樣放行</td></tr>
+        <tr><td>用 Haiku 5.5</td><td>ADK 內建 <code>Claude</code> model class，透過 <code>AsyncAnthropicVertex</code> 走 Vertex AI</td><td>需要新增 <code>anthropic[vertex]</code> 依賴、在 Model Garden 啟用模型。<code>instrumentation.py</code> 的 usage 對應是依 Gemini 寫的，Langfuse 計價要另外確認。也可考慮同一個 stack 內的輕量 Gemini 模型</td></tr>
+        <tr><td>延遲</td><td>rater 在 investigator 之後依序執行</td><td>只有 69% 的呼叫多一次小模型往返；rater 失敗或逾時就退回不加提示，不阻擋流程</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="caption">「state 會流回 writer」這一列中，<code>temp:</code> 前綴在 AgentTool 之間的轉發行為還沒實測。其餘各列已對照 google-adk 1.26.0 原始碼（<code>tools/agent_tool.py</code>、<code>agents/base_agent.py</code>、<code>agents/llm_agent.py</code>）。</p>
+</section>
+
+<section>
+  <div class="sec-head">
+    <span class="tag">其他做法</span>
+    <h2>Design alternatives</h2>
+  </div>
+  <div class="alts">
+    <article class="alt">
+      <h3><span class="k">B</span>離線先寫好提示，callback 直接附上</h3>
+      <p>每週同步時，用模型一次把每個條目的摘要壓成「主題 → 評級 → 一句提示」，例如「政治：通常不可靠｜其他：半可靠」。執行時由現有的 <code>append_grounding_sources</code> / <code>append_url_context_sources</code> 查表附上，判斷主題的工作交給 writer。</p>
+      <p class="pc"><b>優點</b> 不改 agent 結構，不增加執行時的模型呼叫，延遲為零，也最好測試。</p>
+      <p class="pc"><b>缺點</b> writer 要自己對照主題；每個命中的來源都會附上提示，writer 的 context 會變長。</p>
+    </article>
+    <article class="alt">
+      <h3><span class="k">C</span>在 writer 的 after_tool_callback 裡呼叫便宜模型</h3>
+      <p>不包成 SequentialAgent，而是在 <code>_normalized_response</code> 之後直接呼叫 rater 模型（genai client 或 Claude client），合併回 tool result。</p>
+      <p class="pc"><b>優點</b> 工具名稱、測試、引用機制都不用動；同一輪的多個工具結果可以合併成一次 rater 呼叫。</p>
+      <p class="pc"><b>缺點</b> rater 不是 ADK agent，Langfuse 上要手動加 span；callback 裡呼叫模型比較不直觀。</p>
+    </article>
+    <article class="alt">
+      <h3><span class="k">D</span>交給 verifier 自己判斷</h3>
+      <p>verifier 本來就逐項判斷主張，request 裡也有主張原文。用 <code>before_model_callback</code> 把 request 中 URL 的評級注入，由 verifier 在報告中直接說明。</p>
+      <p class="pc"><b>優點</b> 不增加 agent 或模型呼叫。verifier 手上有主張原文，也讀過頁面內容，看得出是政治新聞、評論專欄還是官方帳號，判斷主題的條件最好。進入草稿的 <code>claim_sources</code> 都要求 <code>verifier_confirmed</code>，所以實際被引用的來源都會經過這一關。</p>
+      <p class="pc"><b>缺點</b> 「內容是否支持主張」和「來源是否可信」要分開輸出，否則 verifier 可能把有支持但來源弱的主張打 ✗，連帶讓「誰說過」這類合理引用被丟掉。investigator 階段沒有提示，writer 可能先拿弱來源跑一輪 verifier 才知道要換。提示寫在報告文字裡，較難統計和強制。另外 <code>verifier_confirmed</code> 是 writer 自己填的布林值，覆蓋率取決於 writer 有沒有真的呼叫 verifier。</p>
+    </article>
+    <article class="alt">
+      <h3><span class="k">E</span>writer 主動查詢的工具</h3>
+      <p>新增 <code>check_source_reliability(urls)</code> function tool，由 writer 自己決定何時查。</p>
+      <p class="pc"><b>優點</b> 實作最簡單，只在需要時花 token。</p>
+      <p class="pc"><b>缺點</b> writer 可能不查；多一輪工具呼叫。</p>
+    </article>
+    <article class="alt">
+      <h3><span class="k">F</span>草稿送出時的硬性檢查</h3>
+      <p>在 <code>draft_factcheck_response</code> 的驗證中加規則，例如 <code>claim_sources</code> 若指向維基百科，就退回並要求改引原始出處。</p>
+      <p class="pc"><b>優點</b> 確定會生效，可以和其他任何方案疊加。</p>
+      <p class="pc"><b>缺點</b> 只適合規則明確的情況，處理不了依主題判斷的評級。</p>
+    </article>
+  </div>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>方案</th><th>執行時多的模型呼叫</th><th>依主題判斷</th><th>結構變動</th><th>trace 可見度</th></tr></thead>
+      <tbody>
+        <tr><td>A SequentialAgent + rater</td><td>69% 的 investigator 呼叫多一次</td><td>rater 依 request 判斷</td><td>大：包裝、改名、改測試</td><td>好：rater 是獨立 agent</td></tr>
+        <tr><td>B 離線提示 + callback</td><td>無</td><td>writer 判斷</td><td>小：改兩個 callback</td><td>提示寫在 tool output 裡</td></tr>
+        <tr><td>C writer callback 呼叫 rater</td><td>每輪最多一次</td><td>rater 判斷</td><td>中：改 writer 的 callback</td><td>需手動加 span</td></tr>
+        <tr><td>D verifier 判斷</td><td>無（verifier 輸入多約 270 字）</td><td>verifier 依主張與頁面內容判斷</td><td>小：改 verifier 指令與 callback</td><td>寫在 verifier 報告裡，可另由 callback 標註命中的條目</td></tr>
+        <tr><td>E 查詢工具</td><td>writer 決定</td><td>writer 判斷</td><td>小</td><td>獨立工具呼叫</td></tr>
+        <tr><td>F 送出時檢查</td><td>無</td><td>不處理</td><td>小</td><td>驗證錯誤訊息</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note">
+    <h3>一種分階段的路線</h3>
+    <p>先做 B + F。B 的離線提示本來就是 A 和 C 也需要的資料，F 直接處理量最大的維基引用。上線後用 Langfuse 觀察兩項指標：草稿引用維基的比例，以及政治類主張只靠「政治報導通常不可靠」來源佐證的比例。如果 writer 常套錯主題，再升級到 A 或 C，B 的資料可以沿用為 rater 的輸入。A 和 C 之間的取捨，在於 trace 是否清楚、結構變動能否接受。</p>
+    <p>另一條同樣不需要新模型的路線是 D + F：由 verifier 依主張判斷評級，F 擋下維基引用。前提是 verifier 的報告把「是否支持」和「來源可信度」分成兩欄。investigator 階段可以再用 B 的查表結果附上簡短提示，減少 writer 拿弱來源去驗證的來回。</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <span class="tag">技術面待決</span>
+    <h2>架構上要決定的事</h2>
+  </div>
+  <ol class="qs">
+    <li><h3>評級在哪一段加入？</h3><p class="opt">A 包裝成 SequentialAgent、B 在現有 callback 查表、C 在 writer callback 呼叫 rater，或分階段進行。</p></li>
+    <li><h3>依主題的判斷由誰做？</h3><p class="opt">rater 小模型、writer，或 verifier。</p></li>
+    <li><h3>rater 用哪個模型？</h3><p class="opt">Haiku 5.5（需接 Vertex 上的 Anthropic 與 Langfuse 計價），或 stack 內的輕量 Gemini 模型。</p></li>
+    <li><h3>評級資料放哪裡、怎麼同步？</h3><p class="opt">打包進容器、放 GCS，或寫進資料庫；由哪台機器每週同步，以符合 Wikimedia 的流量規範。</p></li>
+    <li><h3>怎麼驗證效果？</h3><p class="opt">用這次的歷史 trace 建 Langfuse dataset，比較改動前後的引用分布。</p></li>
+  </ol>
+  <p class="caption">這屬於 agent 協作流程（<code>adk/</code>）的變動。決定後依專案慣例另寫一份決策紀錄（<code>docs/decisions/</code>）。</p>
+</section>
+
+</div>
+
+<!--claude-mermaid-runtime-begin:3477-->
+<style>.mermaid-diagram{margin-block:4px}.mermaid-diagram svg{display:block;margin:0 auto;max-width:100%;height:auto}</style>
+<script src="/_runtime/mermaid-11.16.1.min.js"></script>
+<script>(function(){
+var CFG={"palettes":{"light":{"surface":"#f4efe4","text":"#42392e","line":"#8a7f6d","border":"#7a6c52","bg":"#fffdf8"},"dark":{"surface":"#262b34","text":"#f2f3f5","line":"#a8adb8","border":"#9aa4b8","bg":"#1f232b"}}};
+if(typeof mermaid==='undefined')return;
+var pres=Array.prototype.slice.call(document.querySelectorAll('pre.mermaid')).filter(function(p){if(p.hasAttribute('data-claude-mermaid-claimed'))return false;p.setAttribute('data-claude-mermaid-claimed','1');return true;});
+if(!pres.length)return;
+var mq=window.matchMedia?window.matchMedia('(prefers-color-scheme: dark)'):null;
+var root=document.documentElement;
+var items=pres.map(function(pre){
+var mount=document.createElement('div');mount.className='mermaid-diagram';
+return {pre:pre,mount:mount,src:pre.textContent||''};
+});
+var seq=0;
+var renderGen=0;
+var lastKey='';
+function pageBg(fallback){
+var els=[document.body,document.documentElement];
+for(var i=0;i<els.length;i++){
+var c=els[i]&&getComputedStyle(els[i]).backgroundColor;
+if(c&&c!=='transparent'&&c!=='rgba(0, 0, 0, 0)')return c;
+}
+return fallback;
+}
+function render(){
+var theme=root.getAttribute('data-theme');
+var dark=theme==='dark'||(!!(mq&&mq.matches)&&theme!=='light');
+var pal=dark?CFG.palettes.dark:CFG.palettes.light;
+var bg=pageBg(pal.bg);
+var key=(dark?'d':'l')+'|'+bg;
+if(key===lastKey)return;
+lastKey=key;
+var gen=++renderGen;
+var font=getComputedStyle(document.body).fontFamily||'sans-serif';
+var nat={useMaxWidth:false};
+mermaid.initialize({
+startOnLoad:false,securityLevel:'strict',theme:'base',
+flowchart:nat,sequence:nat,er:nat,state:nat,class:nat,pie:nat,
+gantt:nat,journey:nat,timeline:nat,gitGraph:nat,mindmap:nat,xyChart:nat,
+quadrantChart:nat,sankey:nat,c4:nat,requirement:nat,block:nat,
+packet:nat,kanban:nat,architecture:nat,radar:nat,
+themeVariables:{background:bg,mainBkg:pal.surface,primaryColor:pal.surface,
+primaryTextColor:pal.text,lineColor:pal.line,primaryBorderColor:pal.border,
+nodeBorder:pal.border,clusterBorder:pal.border,edgeLabelBackground:bg,
+clusterBkg:'rgba(127,127,127,0.07)',titleColor:pal.text,
+darkMode:dark,rowOdd:bg,rowEven:'rgba(127,127,127,0.07)',
+attributeBackgroundColorOdd:bg,attributeBackgroundColorEven:'rgba(127,127,127,0.07)',
+fontSize:'16px',fontFamily:font},
+themeCSS:'.node rect, .node circle, .node polygon, .node path, .cluster rect { stroke-width: 2px; }'
+});
+items.forEach(function(it){
+var id='claude-mermaid-'+seq++;
+mermaid.render(id,it.src).then(function(r){
+if(gen!==renderGen)return;
+var prev=it.pre.previousElementSibling;
+if(prev&&prev.className==='mermaid-diagram'&&prev!==it.mount)return;
+it.mount.innerHTML=r.svg;
+if(!it.mount.parentNode)it.pre.parentNode.insertBefore(it.mount,it.pre);
+it.pre.style.display='none';
+},function(){
+var scratch=document.getElementById(id);
+if(scratch)scratch.parentNode.removeChild(scratch);
+scratch=document.getElementById('d'+id);
+if(scratch)scratch.parentNode.removeChild(scratch);
+if(gen!==renderGen)return;
+if(it.mount.parentNode)it.mount.parentNode.removeChild(it.mount);
+it.pre.style.display='';
+});
+});
+}
+render();
+if(mq&&mq.addEventListener)mq.addEventListener('change',render);
+if(typeof MutationObserver!=='undefined')new MutationObserver(render).observe(root,{attributes:true,attributeFilter:['data-theme']});
+})();</script>
+<!--claude-mermaid-runtime-end-->
+
+</body></html>
