@@ -338,7 +338,7 @@ Penpot 本地元件庫共 **48 個元件**（依 2026-10-08 的 `Cofacts-2026 (2
 | `Base/Flag` | —（例：「從零開始的魔法旋轉花花 \| Lv. 11」；手機共用） | `UserFlag`（作者名 + 等級；橘色摺角 `surface-accent-fold`，純裝飾） | 共用 | 回應、留言 |
 | `Base/Avatar` | `Type`：default / no-level / Certification / Certification-level | `UserAvatar`（整併現有 `UserAvatar` + `OpenPeepsAvatar`；Certification 對應 [Badge System](../badge-system.md)） | 共用 | 全站 |
 | `Base/Icon` | `Name`：41 個 icon | `ui/icon`（`aria-hidden`） | ui | 全站 |
-| `Layout/Nav` | `Type`：Default / AI / login / search | `SiteNav`（`mode="site"\|"ai"`） | 共用 | 全站 |
+| `Layout/Nav` | `Type`：Default / login / search（另有 `AI`，但沒有任何畫面使用，不實作） | `SiteNav`（AI 頁也用同一個，目前頁為「問問 AI」） | 共用 | 全站（含 AI） |
 | `Layout/NavItem` | `State`：hover / default / alert / mobile / mobile-active / mobile-alert | `NavItem`（目前所在頁 = `hover` 的底線樣式，加 `aria-current="page"`；alert = 「等你來答」未解數，例如 99+，要讓螢幕閱讀器唸出） | 共用 | 全站 |
 | `Layout/Nav-Mobile`、`Nav-MobileExpanded` | Nav-Mobile `State`：open / default / second-menu / search；Nav-MobileExpanded 只剩 open-full | 合進 `SiteNav` 的 mobile 狀態（漢堡／關閉鈕用 Button `Icon-Touch`，`aria-expanded` + `aria-controls`，Esc 關閉並還焦點） | 共用 | 全站 |
 | `Layout/Footer`、`Footer-Mobile` | — | `SiteFooter`（**底色 `surface-dark`，前景只能用 `-on-dark`**，見 R4 案例；頂部 1px `border-on-dark`） | 共用 | 全站 |
