@@ -11,7 +11,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from labels import KEY2TITLE, KEYS  # noqa: E402
 
-PRICE_IN = {"jev": 0.042, "clef": 0.24, "clef-flash": 0.038}  # USD per M input tokens; output free
+PRICE_IN = {"jev": 0.042, "clef": 0.24, "clef-flash": 0.038, "openai": 0.10}  # USD per M input tokens; output free
 THRESHOLDS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95]
 
 sample = [json.loads(l) for l in open(sys.argv[1])]

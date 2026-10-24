@@ -7,6 +7,7 @@ import contextlib
 import io
 import json
 import os
+import random
 import sys
 
 import numpy as np
@@ -23,6 +24,8 @@ DECISION = {
     "clef-a": ("Clef", "A", 0.24, 0),
     "clef-b": ("Clef", "B", 0.24, 0),
     "clef-flash-a": ("clef-flash", "A", 0.038, 0),
+    "openai-a": ("OpenAI Decisions", "A", 0.10, 0),
+    "openai-b": ("OpenAI Decisions", "B", 0.10, 0),
 }
 # LLM list: a set of categories, no confidence
 LLM = {
@@ -30,7 +33,7 @@ LLM = {
     "haiku-medium": ("Claude Haiku 5.5（effort medium）", "B 的條件", 0.10, 0.50),
 }
 SEQ = {"jev-a": "latency_jev-a.jsonl", "clef-a": "latency_clef-a.jsonl", "clef-flash-a": "latency_clef-flash-a.jsonl",
-       "haiku-low": "latency_haiku-low.jsonl"}
+       "haiku-low": "latency_haiku-low.jsonl", "openai-a": "latency_openai-a.jsonl"}
 
 sys.argv = ["analyze.py", SAMPLE] + [f"{k}=results/{k}.jsonl" for k in DECISION]
 with contextlib.redirect_stdout(io.StringIO()):
@@ -113,6 +116,11 @@ PAIRS = [
     ("haiku-medium", "list", "clef-b", "rule"), ("haiku-medium", "list", "clef-b", "plf1"),
     ("haiku-low", "list", "jev-b", "rule"), ("haiku-low", "list", "jev-b", "plf1"),
     ("haiku-low", "list", "clef-b", "rule"), ("haiku-low", "list", "clef-b", "plf1"),
+    ("openai-a", "rule", "jev-a", "rule"), ("openai-a", "plf1", "jev-a", "plf1"), ("openai-a", "plp90", "jev-a", "plp90"),
+    ("openai-b", "rule", "jev-b", "rule"), ("openai-b", "plf1", "jev-b", "plf1"), ("openai-b", "plp90", "jev-b", "plp90"),
+    ("openai-b", "rule", "clef-b", "rule"), ("openai-b", "plf1", "clef-b", "plf1"),
+    ("openai-b", "rule", "openai-a", "rule"), ("openai-b", "plf1", "openai-a", "plf1"),
+    ("haiku-medium", "list", "openai-b", "rule"), ("haiku-medium", "list", "openai-b", "plf1"),
 ]
 SN = {"rule": "規則", "plf1": "逐類門檻 max F1", "plp90": "逐類門檻 P≥0.9", "list": "清單"}
 w("| 比較 | 差距（micro-F1） | 95% CI | 顯著 |")
@@ -269,5 +277,92 @@ w("|---|" + "---:|" * len(seq))
 for lo, hi in zip(edges[:-1], edges[1:]):
     lab = f"≥ {lo:g}s" if hi == np.inf else f"{lo:g}–{hi:g}s"
     w(f"| {lab} | " + " | ".join(f"{((v >= lo) & (v < hi)).mean():.0%}" for v in seq.values()) + " |")
+
+# ---------- §7.12 OpenAI Decisions ----------
+
+
+def rank_tied(x):
+    """1-based ranks; tied values share the average of their ranks."""
+    _, inv, cnt = np.unique(x, return_inverse=True, return_counts=True)
+    first = np.concatenate([[0], np.cumsum(cnt)[:-1]])
+    return (first + (cnt + 1) / 2)[inv]
+
+
+def auc_tied(s, y):
+    """ROC-AUC like A.auc, but tied scores share their rank (A.auc breaks ties by position)."""
+    pos, neg = s[y], s[~y]
+    if not len(pos) or not len(neg):
+        return np.nan
+    ranks = rank_tied(np.concatenate([pos, neg]))
+    return (ranks[: len(pos)].sum() - len(pos) * (len(pos) + 1) / 2) / (len(pos) * len(neg))
+
+
+section("openai: score spread")
+w("| 方案 | 逐類 AUC 平均（analyze.auc） | 逐類 AUC 平均（同分取平均排名） | 分數 ≤ 0.01 或 ≥ 0.99 的比例 | 分數在 0.1~0.9 的比例 |")
+w("|---|---:|---:|---:|---:|")
+for k in ("jev-a", "jev-b", "clef-a", "clef-b", "openai-a", "openai-b"):
+    s = A.P[k]
+    aucs = [np.nanmean([fn(s[:, j], Y[:, j]) for j in range(len(KEYS))]) for fn in (A.auc, auc_tied)]
+    w(f"| `{k}` | {aucs[0]:.3f} | {aucs[1]:.3f} | {((s <= 0.01) | (s >= 0.99)).mean():.1%} | {((s > 0.1) & (s < 0.9)).mean():.1%} |")
+
+section("openai: uniform 0.75")
+# §7.11: one threshold of 0.75 for every category, no cap on the number of labels
+w("| 方案 | 全樣本 P / R / F1 | 隨機子集 P / R / F1 | 每篇標籤數 | 沒有任何標籤的文章 |")
+w("|---|---|---|---:|---:|")
+for k in ("jev-b", "clef-b", "openai-b", "openai-a"):
+    p = A.P[k] >= 0.75
+    w(f"| `{k}` | {' / '.join(map(f3, A.prf(p, Y)))} | {' / '.join(map(f3, A.prf(p[RAND], Y[RAND])))} | "
+      f"{p.sum(1).mean():.2f} | {(~p.any(1)).mean():.1%} |")
+
+section("openai: confident false positives")
+# score >= 0.9 on a category the ground truth does not have
+w("| 方案 | 負例分數 ≥ 0.9 的比例 | 類別 | 誤判篇數 | 這些文章的 ground truth（前 3） |")
+w("|---|---:|---|---:|---|")
+for k in ("jev-b", "clef-b", "openai-b"):
+    s = A.P[k]
+    for c in ("medical", "intl"):
+        j = KEYS.index(c)
+        fp = (s[:, j] >= 0.9) & ~Y[:, j]
+        truth = Y[fp].sum(0)
+        top = ", ".join(f"{KEY2TITLE[KEYS[i]]} {truth[i]}" for i in np.argsort(-truth)[:3] if truth[i])
+        w(f"| `{k}` | {(s[~Y] >= 0.9).mean():.2%} | {KEY2TITLE[c]} | {fp.sum()} | {top} |")
+w("")
+for k in ("jev-b", "openai-b"):
+    s = A.P[k]
+    fp = PRED[(k, "rule")] & ~Y
+    srt = -np.sort(-s, 1)
+    tie = ((srt[:, 1] >= 0.7) & (srt[:, 2] == srt[:, 1])).sum()
+    w(f"- `{k}` 規則策略的誤判 {fp.sum()} 個，分數 ≥ 0.9 佔 {(s[fp] >= 0.9).mean():.1%}、≥ 0.99 佔 {(s[fp] >= 0.99).mean():.1%}；"
+      f"「最多取前 2 個」切在同分中間的文章 {tie} 篇")
+
+section("openai: spot check")
+# (article, category) pairs not in ground truth that one model scores >= 0.9 and the other < 0.5; §7.12 judges the sample
+O, J = A.P["openai-b"], A.P["jev-b"]
+
+
+def only(hi, lo):
+    return [(i, j) for i in range(len(Y)) for j in range(len(KEYS)) if hi[i, j] >= 0.9 and lo[i, j] < 0.5 and not Y[i, j]]
+
+
+pop = only(O, J)
+w(f"OpenAI ≥ 0.9、Jev < 0.5、ground truth 沒標：{len(pop)} 個；反方向：{len(only(J, O))} 個。抽查 30 個（seed 20261023）：\n")
+w("| # | 文章 ID | 類別 | `openai-b` | `jev-b` | ground truth |")
+w("|---:|---|---|---:|---:|---|")
+for n, (i, j) in enumerate(random.Random(20261023).sample(pop, 30), 1):
+    truth = "／".join(KEY2TITLE[KEYS[t]] for t in np.flatnonzero(Y[i]))
+    w(f"| {n} | `{ids[i]}` | {KEY2TITLE[KEYS[j]]} | {O[i, j]:.2f} | {J[i, j]:.2f} | {truth} |")
+
+section("openai: run stats")
+for k in ("openai-a", "openai-b"):
+    rs = ok_rows(f"results/{k}.jsonl")
+    ref = [r for r in rs if r.get("refusals")]
+    lat1 = [r["latency_s"] for r in rs if r["attempts"] == 1]
+    latn = [r["latency_s"] for r in rs if r["attempts"] > 1]
+    w(f"- `{k}`：拒答 {len(ref)} 篇 {sum(len(r['refusals']) for r in ref)} 題；需要重送的文章 {len(latn) / len(rs):.1%}；"
+      f"延遲中位數：一次成功 {np.median(lat1):.2f}s、需要重送 {np.median(latn):.2f}s")
+us = [r["usage"] for k in ("openai-a", "openai-b", "latency_openai-a") for r in ok_rows(f"results/{k}.jsonl")]
+tin = sum(u["input_tokens"] for u in us)
+cached = sum((u.get("input_tokens_details") or {}).get("cached_tokens", 0) for u in us)
+w(f"- 結果檔內的 OpenAI 呼叫合計 {tin:,} input tokens（${tin * DECISION['openai-a'][2] / 1e6:.2f}），其中 cache {cached / tin:.1%}")
 
 print("\n".join(out))
