@@ -1,0 +1,381 @@
+<!doctype html><html><head><meta name="robots" content="noindex, nofollow"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Cofacts AI 爬蟲開放成效</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single reading column (~72ch) with full-width figures; findings first, evidence below. */
+:root {
+  --bg: #fbfaf7;
+  --surface: #ffffff;
+  --fg: #1d1c19;
+  --fg-2: #55534d;
+  --muted: #8a877e;
+  --rule: #e6e3db;
+  --accent: #b86e00;        /* Cofacts amber, darkened for text contrast */
+  --accent-soft: #fdf1dc;
+  --series-1: #2a78d6;      /* Claude-SearchBot */
+  --series-2: #eb6834;      /* OAI-SearchBot */
+  --pos: #2a78d6;
+  --neg: #e34948;
+  --good: #1f7a3a; --good-bg: #e5f3e8;
+  --bad: #b3261e;  --bad-bg: #fbe9e7;
+  --warn: #8a5a00; --warn-bg: #fdf1dc;
+  --grid: #ece9e1;
+  --f-display: "Noto Serif TC", "Songti TC", serif;
+  --f-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #171614; --surface: #1f1e1b; --fg: #f2f0ea; --fg-2: #c3c0b6; --muted: #8f8c83;
+    --rule: #34322d; --accent: #f0a733; --accent-soft: #2e2516;
+    --series-1: #3987e5; --series-2: #d95926; --pos: #3987e5; --neg: #e66767;
+    --good: #7ccf8f; --good-bg: #1d2e21; --bad: #f2928b; --bad-bg: #3a1f1d; --warn: #f0c46a; --warn-bg: #33291a;
+    --grid: #2b2a26; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #171614; --surface: #1f1e1b; --fg: #f2f0ea; --fg-2: #c3c0b6; --muted: #8f8c83;
+  --rule: #34322d; --accent: #f0a733; --accent-soft: #2e2516;
+  --series-1: #3987e5; --series-2: #d95926; --pos: #3987e5; --neg: #e66767;
+  --good: #7ccf8f; --good-bg: #1d2e21; --bad: #f2928b; --bad-bg: #3a1f1d; --warn: #f0c46a; --warn-bg: #33291a;
+  --grid: #2b2a26; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 16px; line-height: 1.75; }
+.wrap { max-width: 860px; margin: 0 auto; padding-inline: 20px; padding-block: 48px 80px; display: grid; gap: 56px; }
+header { display: grid; gap: 14px; border-bottom: 1px solid var(--rule); padding-bottom: 28px; }
+.eyebrow { font-family: var(--f-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { font-family: var(--f-display); font-size: clamp(28px, 5vw, 40px); line-height: 1.3; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--f-display); font-size: 24px; line-height: 1.4; margin: 0; text-wrap: balance; }
+h3 { font-size: 16px; margin: 0; font-weight: 700; }
+p { margin: 0; max-width: 68ch; }
+.lede { font-size: 18px; color: var(--fg-2); }
+.meta { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.meta a { color: inherit; }
+section { display: grid; gap: 18px; min-width: 0; }
+a { color: var(--accent); }
+code { font-family: var(--f-mono); font-size: .88em; background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; }
+
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.stat { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 18px 18px 16px; display: grid; gap: 4px; align-content: start; }
+.stat .num { font-family: var(--f-mono); font-size: 30px; font-weight: 500; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.stat .lbl { font-size: 14px; font-weight: 700; }
+.stat .sub { font-size: 13px; color: var(--fg-2); line-height: 1.6; }
+
+ul.points { margin: 0; padding-left: 1.2em; display: grid; gap: 8px; max-width: 68ch; }
+
+figure { margin: 0; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 18px 16px 12px; display: grid; gap: 10px; min-width: 0; position: relative; }
+figcaption { font-size: 13px; color: var(--fg-2); }
+.fig-title { font-weight: 700; font-size: 15px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--fg-2); }
+.legend i { display: inline-block; width: 12px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+.chart { width: 100%; overflow-x: auto; }
+.chart svg { display: block; width: 100%; min-width: 520px; height: auto; }
+.chart svg text { font-family: var(--f-mono); font-size: 11px; fill: var(--muted); }
+.chart svg .lab { fill: var(--fg-2); font-size: 12px; }
+.chart svg .lab-strong { fill: var(--fg); font-size: 12px; font-weight: 500; }
+.tip { position: absolute; pointer-events: none; background: var(--fg); color: var(--bg); font-family: var(--f-mono); font-size: 12px; line-height: 1.5; padding: 6px 9px; border-radius: 6px; white-space: nowrap; z-index: 2; }
+
+.tbl { overflow-x: auto; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: .04em; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.n, th.n { text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.bot, td.nw { white-space: nowrap; } td.bot { font-family: var(--f-mono); font-size: 13px; white-space: nowrap; }
+.pill { display: inline-block; font-size: 12px; font-weight: 500; padding: 1px 9px; border-radius: 999px; white-space: nowrap; }
+.pill.ok { color: var(--good); background: var(--good-bg); }
+.pill.no { color: var(--bad); background: var(--bad-bg); }
+.pill.watch { color: var(--warn); background: var(--warn-bg); }
+tr.total td { font-weight: 700; }
+
+.callout { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 14px 18px; border-radius: 0 8px 8px 0; display: grid; gap: 6px; }
+ol.next { margin: 0; padding-left: 1.3em; display: grid; gap: 10px; max-width: 68ch; }
+.notes { font-size: 13px; color: var(--fg-2); display: grid; gap: 8px; border-top: 1px solid var(--rule); padding-top: 24px; }
+.notes ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 480px) { .wrap { padding-inline: 16px; gap: 44px; } .stat .num { font-size: 26px; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Cofacts devops · 成效追蹤</div>
+    <h1>開放 AI 搜尋爬蟲兩週後：Claude 爬完全站，導流還沒出現</h1>
+    <p class="lede">9/20 調整 Cloudflare WAF，放行經驗證的 AI Search 與 AI Assistant 爬蟲、繼續封鎖訓練爬蟲。這份報告整理 9/4–10/5 的 Cloudflare 流量與 GCP 帳單，看誰來爬、花了多少錢、Cofacts 在 AI 搜尋裡有沒有變得更容易被看見。</p>
+    <div class="meta">
+      <span>2026-10-05</span>
+      <span>zone：cofacts.tw</span>
+      <span>前情：<a href="https://github.com/cofacts/devops/pull/21">cofacts/devops#21</a>、<a href="https://github.com/cofacts/devops/issues/12">cofacts/devops#12</a></span>
+    </div>
+  </header>
+
+  <section aria-labelledby="s-summary">
+    <h2 id="s-summary">重點</h2>
+    <div class="stats">
+      <div class="stat">
+        <div class="num">18.4 萬</div>
+        <div class="lbl">Claude-SearchBot 成功抓取</div>
+        <div class="sub">9/20 晚上到 9/26 集中爬完一輪，9/27 起歸零。變更前是 0。</div>
+      </div>
+      <div class="stat">
+        <div class="num">≈ $1.5</div>
+        <div class="lbl">多出的 GCE 網路費</div>
+        <div class="sub">Claude-SearchBot 用了 15.4 GiB 傳輸量；GCE 送往 Cloudflare 的流量比前期 +10%。</div>
+      </div>
+      <div class="stat">
+        <div class="num">0</div>
+        <div class="lbl">來自 claude.ai 的導流</div>
+        <div class="sub">變更後兩週沒有任何 claude.ai referer 或 utm。Claude-User 即時讀取約變兩倍，但每天只有十幾次。</div>
+      </div>
+    </div>
+    <ul class="points">
+      <li>規則如預期運作：搜尋與使用者觸發的 AI bot 進得來，ClaudeBot、GPTBot、meta-externalagent 等訓練爬蟲照樣被擋。</li>
+      <li>成本很低，一個月約多 $3–4。同期 OAI-SearchBot 少抓了 10 GiB，幾乎抵銷。</li>
+      <li>能見度的效果還看不到。Claude 剛建好索引，可能需要更長時間才會反映在回答與點擊上。</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="s-who">
+    <h2 id="s-who">誰來爬</h2>
+    <p>Claude-SearchBot 在變更前一次都進不來，變更後馬上以每天三到四萬次的速度爬完全站，之後沒有再回來。作為對照，OAI-SearchBot 本來就放行，9 月中有一波高峰，之後回到每天五千到一萬四。</p>
+    <figure>
+      <div class="fig-title">每日成功請求數：Claude-SearchBot 與 OAI-SearchBot</div>
+      <div class="legend"><span><i style="background:var(--series-1)"></i>Claude-SearchBot</span><span><i style="background:var(--series-2)"></i>OAI-SearchBot（對照）</span></div>
+      <div class="chart" id="c-search" role="img" aria-label="9 月 6 日到 10 月 5 日每日成功請求數折線圖。Claude-SearchBot 在 9 月 21 至 25 日每天 2.8 萬到 4 萬次，其餘日子為 0；OAI-SearchBot 在 9 月 15 至 18 日約 4 萬次，之後 5 千到 1.4 萬次。"></div>
+      <figcaption>資料：AI Crawl Control「Requests」，只計放行的請求。虛線為 9/20 規則變更。</figcaption>
+    </figure>
+
+    <h3>其他 AI bot 的狀況（9/20 之後）</h3>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Bot</th><th>用途</th><th>狀態</th><th>觀察</th></tr></thead>
+        <tbody>
+          <tr><td class="bot">Amzn-SearchBot</td><td class="nw">搜尋</td><td><span class="pill ok">放行</span></td><td>9/14 起每天穩定約 8,600 次，是目前最穩定的 AI 搜尋爬蟲。AI Crawl Control 的圖表沒有列出它。</td></tr>
+          <tr><td class="bot">OAI-SearchBot</td><td class="nw">搜尋</td><td><span class="pill ok">放行</span></td><td>每天 5 千到 1.4 萬，變更前就放行。</td></tr>
+          <tr><td class="bot">Applebot、DuckAssistBot、ExaBot、ShapBot</td><td class="nw">搜尋</td><td><span class="pill ok">放行</span></td><td>正常。ExaBot 在 9/26–9/29 爬了一波。</td></tr>
+          <tr><td class="bot">ChatGPT-User</td><td class="nw">使用者觸發</td><td><span class="pill ok">放行</span></td><td>每天 200–800。從 9/10 起由約 1,500 下滑，早於變更，原因不在我們。</td></tr>
+          <tr><td class="bot">ClaudeBot</td><td class="nw">訓練</td><td><span class="pill no">封鎖</span></td><td>9/22–9/26 和 SearchBot 同期爆量，單日最多 7.9 萬次，全部被擋。</td></tr>
+          <tr><td class="bot">meta-externalagent</td><td class="nw">訓練</td><td><span class="pill watch">封鎖・加速中</span></td><td>10/1 起 5.5 千 → 1 萬 → 3.7 萬 → 9.6 萬（10/4）。擋在 edge，不會打到 origin。</td></tr>
+          <tr><td class="bot">GPTBot、PerplexityBot、Reflectionbot</td><td class="nw">訓練／未驗證</td><td><span class="pill no">封鎖</span></td><td>維持原狀。</td></tr>
+          <tr><td class="bot">冒名的 Claude-SearchBot</td><td class="nw">漏洞掃描</td><td><span class="pill no">封鎖</span></td><td>9/27 後仍用這個 UA 的請求都沒通過驗證，抓的是 <code>/.env</code>、<code>/.aws/config</code> 等路徑。</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="s-user">
+    <h2 id="s-user">claude.ai 有開始讀 Cofacts 嗎</h2>
+    <p>Claude-User 是 claude.ai 使用者對話時即時讀取網頁的 bot，最能直接反映「Claude 回答時用到 Cofacts」。變更前每天約 6 次，變更後平均約 13 次，10/2 最高 43 次。方向是對的，但量還很小。</p>
+    <figure>
+      <div class="fig-title">每日 Claude-User 成功請求數</div>
+      <div class="chart" id="c-user" role="img" aria-label="Claude-User 每日成功請求長條圖。9 月 6 日到 19 日每天 0 到 20 次，平均約 7 次；9 月 21 日到 10 月 5 日每天 3 到 43 次，平均約 14 次。"></div>
+      <figcaption>資料：AI Crawl Control「Requests」。不含 Claude Code 的 WebFetch（從使用者自己的網路送出，無法驗證，仍會被擋）。</figcaption>
+    </figure>
+  </section>
+
+  <section aria-labelledby="s-cost">
+    <h2 id="s-cost">花了多少錢</h2>
+    <p>爬蟲抓 cofacts.tw 文章頁時，網站 SSR 會呼叫 GCE 上的 API，這段流量經 Cloudflare Tunnel 送出，在帳單上記為「Carrier Peering」。比較變更前後各 14 天的 crawler 傳輸量，Claude-SearchBot 多了 15.4 GiB，OAI-SearchBot 少了 10.6 GiB，所有 crawler 合計 +17 GiB。</p>
+    <figure>
+      <div class="fig-title">各 crawler 傳輸量變化（9/21–10/4 對比 9/6–9/19，GiB）</div>
+      <div class="chart" id="c-transfer" role="img" aria-label="各 crawler 傳輸量變化橫條圖：Claude-SearchBot 增加 15.4 GiB、Googlebot 增加 10.0、BingBot 增加 6.7、ChatGPT-User 減少 0.6、Applebot 減少 3.6、OAI-SearchBot 減少 10.6。合計增加 17.2 GiB。"></div>
+      <figcaption>資料：AI Crawl Control「Data transfer」。這是 Cloudflare edge 送出的量，含快取命中，不完全等於 origin 流量。合計：164.2 → 181.4 GiB。</figcaption>
+    </figure>
+
+    <h3>GCP 帳單（9/20–10/5，和前一個等長期間比較）</h3>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>SKU</th><th class="n">用量</th><th class="n">費用</th><th class="n">vs. 前期</th></tr></thead>
+        <tbody>
+          <tr><td>GCE Network Data Transfer Out via Carrier Peering（APAC）</td><td class="n">188.4 GiB</td><td class="n">$16.01</td><td class="n">+10%</td></tr>
+          <tr><td>Cloud Run Network Data Transfer Out via Carrier Peering（APAC）</td><td class="n">76.1 GiB</td><td class="n">$3.19</td><td class="n">+23%</td></tr>
+          <tr><td>GCE Internet Data Transfer Out Taiwan → APAC</td><td class="n">6.3 GiB</td><td class="n">$0.75</td><td class="n">+9%</td></tr>
+          <tr class="total"><td>網路費合計差額</td><td class="n"></td><td class="n">≈ +$2.1</td><td class="n"></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout">
+      <p><strong>網路費不是預算壓力的來源。</strong>這 15 天帳單共 $135.64，換算一個月約 $270，會超過 $250 的預算。主要花費是 GCE 的 RAM 與 Core（約 $41）、Gemini（約 $20）、Cloud Run CPU（約 $18）。</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="s-vis">
+    <h2 id="s-vis">AI 能見度有沒有提升</h2>
+    <p>用 referer 與 <code>utm_source</code> 計算從 AI 產品點進 cofacts.tw 的真人流量。到目前為止，Claude 的導流是零，其他 AI 產品沒有明顯變化。</p>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>來源</th><th class="n">9/6–9/19 每日平均</th><th class="n">9/21–10/4 每日平均</th><th>說明</th></tr></thead>
+        <tbody>
+          <tr><td>claude.ai</td><td class="n">0.1</td><td class="n">0</td><td>整段期間只有 9/7 一次。Claude 的引用連結可能不帶 referer，Cloudflare 看不到。</td></tr>
+          <tr><td>ChatGPT（<code>utm_source=chatgpt.com</code>）</td><td class="n">53</td><td class="n">69</td><td>+30%，但 OpenAI 的 bot 變更前就能進來，和這次調整無關。</td></tr>
+          <tr><td>chatgpt.com（referer）</td><td class="n">8.1</td><td class="n">4.4</td><td>AI Crawl Control 的 Referrals 只算這一種。</td></tr>
+          <tr><td>gemini.google.com</td><td class="n">2.1</td><td class="n">0.6</td><td>10/5 單日 10 次。</td></tr>
+          <tr><td>copilot.microsoft.com</td><td class="n">0.5</td><td class="n">0.9</td><td></td></tr>
+          <tr><td>perplexity.ai</td><td class="n">0</td><td class="n">0</td><td>PerplexityBot 未通過驗證，仍被擋。</td></tr>
+          <tr><td>www.google.com（參考）</td><td class="n">4,795</td><td class="n">9,111</td><td>9/26 起大幅上升，原因不明，和 AI 爬蟲沒有直接關係。</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="s-next">
+    <h2 id="s-next">下一步</h2>
+    <ol class="next">
+      <li><strong>10 月中再看一次。</strong>確認 Claude-SearchBot 會不會定期回來重爬，以及 Referrals 裡有沒有出現 claude.ai。</li>
+      <li><strong>直接問 Claude。</strong>在 claude.ai 問幾個 Cofacts 查過的謠言，看它會不會引用 cofacts.tw。這比流量數字更快、更直接。</li>
+      <li><strong>留意 meta-externalagent。</strong>目前全擋在 edge、不花 origin 流量；如果持續加速，再討論要不要另外處理。</li>
+      <li><strong>看 AI 爬蟲全貌時不要只看 AI Crawl Control。</strong>它的圖表只算放行的請求，也沒有 Amzn-SearchBot；完整情況要查 GraphQL Analytics。</li>
+    </ol>
+  </section>
+
+  <div class="notes">
+    <strong>資料來源與方法</strong>
+    <ul>
+      <li>Cloudflare GraphQL Analytics（<code>httpRequestsAdaptiveGroups</code>，取樣估計值），依 User-Agent 與 <code>verifiedBotCategory</code> 分類，區分已驗證與未驗證流量。</li>
+      <li>Cloudflare AI Crawl Control 匯出：Requests、Data transfer、Referrals（2026-10-05）。</li>
+      <li>GCP Billing Reports（billing account <code>ocf - ikalatv</code>）：9/6–10/5 與 9/20–10/5 兩份。</li>
+      <li>「前期」為 9/6–9/19，「後期」為 9/21–10/4，各 14 天；9/20 當天為變更日，不列入比較。</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+(function () {
+  const days = [];
+  for (let d = new Date(Date.UTC(2026, 8, 6)); d <= new Date(Date.UTC(2026, 9, 5)); d = new Date(d.getTime() + 864e5)) days.push(d);
+  const lbl = d => (d.getUTCMonth() + 1) + "/" + d.getUTCDate();
+  const claudeSearch = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,427,28446,34932,34702,40004,40141,6243,0,0,0,0,0,0,0,0,0];
+  const oai = [5465,10106,17072,1219,1852,2995,8514,17759,25260,39537,42401,41725,39497,29056,22088,14671,12817,6491,12205,12710,13636,11355,5702,14347,14383,13381,10668,8455,4993,6191];
+  const claudeUser = [5,6,4,3,3,15,0,7,6,3,4,20,6,4,8,10,9,5,7,5,6,6,3,6,21,16,43,26,17,30];
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const fmt = n => n.toLocaleString("en-US");
+  const cs = getComputedStyle(document.documentElement);
+
+  function tipFor(fig) {
+    let t = fig.querySelector(".tip");
+    if (!t) { t = document.createElement("div"); t.className = "tip"; t.hidden = true; fig.appendChild(t); }
+    return t;
+  }
+  function placeTip(fig, tip, evt, html) {
+    tip.innerHTML = html; tip.hidden = false;
+    const r = fig.getBoundingClientRect();
+    let x = evt.clientX - r.left + 12, y = evt.clientY - r.top - 40;
+    const w = tip.offsetWidth;
+    if (x + w > r.width - 8) x = evt.clientX - r.left - w - 12;
+    tip.style.left = Math.max(4, x) + "px"; tip.style.top = Math.max(4, y) + "px";
+  }
+
+  function axisX(svg, x, H, m, n) {
+    days.forEach((d, i) => {
+      if (i % 4 === 0 || i === n - 1) el("text", { x: x(i), y: H - m.b + 18, "text-anchor": "middle" }, svg).textContent = lbl(d);
+    });
+  }
+  function grid(svg, y, ticks, W, m, f) {
+    ticks.forEach(t => {
+      el("line", { x1: m.l, x2: W - m.r, y1: y(t), y2: y(t), stroke: "var(--grid)", "stroke-width": 1 }, svg);
+      el("text", { x: m.l - 8, y: y(t) + 4, "text-anchor": "end" }, svg).textContent = f(t);
+    });
+  }
+  function changeLine(svg, x, H, m) {
+    const xv = x(14);
+    el("line", { x1: xv, x2: xv, y1: m.t - 4, y2: H - m.b, stroke: "var(--muted)", "stroke-width": 1, "stroke-dasharray": "3 3" }, svg);
+    el("text", { x: xv + 6, y: m.t + 6, class: "lab" }, svg).textContent = "9/20 規則變更";
+  }
+
+  // Chart 1: two-series line
+  (function () {
+    const host = document.getElementById("c-search"), fig = host.closest("figure");
+    const W = 760, H = 280, m = { t: 20, r: 128, b: 30, l: 48 }, n = days.length, max = 45000;
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}` }, host);
+    const x = i => m.l + i * (W - m.l - m.r) / (n - 1);
+    const y = v => H - m.b - v / max * (H - m.t - m.b);
+    grid(svg, y, [0, 15000, 30000, 45000], W, m, t => t === 0 ? "0" : (t / 1000) + "k");
+    axisX(svg, x, H, m, n); changeLine(svg, x, H, m);
+    const series = [{ d: oai, c: "var(--series-2)", name: "OAI-SearchBot" }, { d: claudeSearch, c: "var(--series-1)", name: "Claude-SearchBot" }];
+    series.forEach(s => {
+      el("path", { d: s.d.map((v, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1)).join(" "), fill: "none", stroke: s.c, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+    });
+    el("text", { x: x(19) + 8, y: y(40141) - 6, class: "lab-strong" }, svg).textContent = "Claude-SearchBot 4.0 萬";
+    el("text", { x: x(n - 1) + 8, y: y(6191) + 4, class: "lab" }, svg).textContent = "OAI 6.2k";
+    el("text", { x: x(n - 1) + 8, y: y(0) - 4, class: "lab" }, svg).textContent = "Claude 0";
+    const cross = el("line", { y1: m.t, y2: H - m.b, stroke: "var(--muted)", "stroke-width": 1, opacity: 0 }, svg);
+    const dots = series.map(s => el("circle", { r: 4.5, fill: s.c, stroke: "var(--surface)", "stroke-width": 2, opacity: 0 }, svg));
+    const hit = el("rect", { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, fill: "transparent" }, svg);
+    const tip = tipFor(fig);
+    hit.addEventListener("pointermove", e => {
+      const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+      const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+      const i = Math.max(0, Math.min(n - 1, Math.round((p.x - m.l) / ((W - m.l - m.r) / (n - 1)))));
+      cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i)); cross.setAttribute("opacity", 1);
+      series.forEach((s, k) => { dots[k].setAttribute("cx", x(i)); dots[k].setAttribute("cy", y(s.d[i])); dots[k].setAttribute("opacity", 1); });
+      placeTip(fig, tip, e, `${lbl(days[i])}<br>Claude-SearchBot ${fmt(claudeSearch[i])}<br>OAI-SearchBot ${fmt(oai[i])}`);
+    });
+    hit.addEventListener("pointerleave", () => { tip.hidden = true; cross.setAttribute("opacity", 0); dots.forEach(d => d.setAttribute("opacity", 0)); });
+  })();
+
+  // Chart 2: single-series bars
+  (function () {
+    const host = document.getElementById("c-user"), fig = host.closest("figure");
+    const W = 760, H = 220, m = { t: 20, r: 20, b: 30, l: 40 }, n = days.length, max = 50;
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}` }, host);
+    const step = (W - m.l - m.r) / n, bw = Math.max(4, step - 4);
+    const x = i => m.l + i * step + step / 2;
+    const y = v => H - m.b - v / max * (H - m.t - m.b);
+    grid(svg, y, [0, 25, 50], W, m, t => String(t));
+    axisX(svg, x, H, m, n);
+    const avg = (a, b) => claudeUser.slice(a, b).reduce((s, v) => s + v, 0) / (b - a);
+    [[0, 14], [15, 29]].forEach(([a, b]) => {
+      const v = avg(a, b);
+      el("line", { x1: x(a) - step / 2, x2: x(b - 1) + step / 2, y1: y(v), y2: y(v), stroke: "var(--fg-2)", "stroke-width": 1.5, "stroke-dasharray": "5 3" }, svg);
+      el("text", { x: x(a) - step / 2 + 2, y: y(v) - 6, class: "lab" }, svg).textContent = "平均 " + v.toFixed(1);
+    });
+    const tip = tipFor(fig);
+    claudeUser.forEach((v, i) => {
+      const h = Math.max(0, H - m.b - y(v));
+      if (h > 0) {
+        const r = Math.min(4, bw / 2, h);
+        const x0 = x(i) - bw / 2, y0 = y(v), yb = H - m.b;
+        el("path", { d: `M${x0} ${yb} V${y0 + r} Q${x0} ${y0} ${x0 + r} ${y0} H${x0 + bw - r} Q${x0 + bw} ${y0} ${x0 + bw} ${y0 + r} V${yb} Z`, fill: i >= 14 ? "var(--series-1)" : "var(--muted)" }, svg);
+      }
+      const hit = el("rect", { x: m.l + i * step, y: m.t, width: step, height: H - m.t - m.b, fill: "transparent" }, svg);
+      hit.addEventListener("pointermove", e => placeTip(fig, tip, e, `${lbl(days[i])}　Claude-User ${v}`));
+      hit.addEventListener("pointerleave", () => { tip.hidden = true; });
+    });
+    el("text", { x: x(26), y: y(43) - 6, "text-anchor": "middle", class: "lab-strong" }, svg).textContent = "43";
+  })();
+
+  // Chart 3: diverging horizontal bars
+  (function () {
+    const host = document.getElementById("c-transfer"), fig = host.closest("figure");
+    const rows = [["Claude-SearchBot", 0.00, 15.38], ["Googlebot", 67.98, 77.94], ["BingBot", 38.66, 45.39], ["ChatGPT-User", 1.10, 0.47], ["Applebot", 34.31, 30.70], ["OAI-SearchBot", 22.01, 11.37]];
+    const W = 760, rowH = 34, m = { t: 10, r: 70, b: 26, l: 150 }, H = m.t + rows.length * rowH + m.b;
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}` }, host);
+    const lo = -15, hi = 17;
+    const x = v => m.l + (v - lo) / (hi - lo) * (W - m.l - m.r);
+    [-10, -5, 0, 5, 10, 15].forEach(t => {
+      el("line", { x1: x(t), x2: x(t), y1: m.t, y2: H - m.b, stroke: t === 0 ? "var(--fg-2)" : "var(--grid)", "stroke-width": 1 }, svg);
+      el("text", { x: x(t), y: H - m.b + 16, "text-anchor": "middle" }, svg).textContent = (t > 0 ? "+" : "") + t;
+    });
+    const tip = tipFor(fig);
+    rows.forEach(([name, pre, post], i) => {
+      const d = post - pre, cy = m.t + i * rowH + rowH / 2, bh = 16;
+      el("text", { x: m.l - 12, y: cy + 4, "text-anchor": "end", class: name === "Claude-SearchBot" ? "lab-strong" : "lab" }, svg).textContent = name;
+      const x0 = Math.min(x(0), x(d)), w = Math.abs(x(d) - x(0)), r = Math.min(4, w);
+      const pos = d >= 0;
+      const path = pos
+        ? `M${x0} ${cy - bh / 2} H${x0 + w - r} Q${x0 + w} ${cy - bh / 2} ${x0 + w} ${cy - bh / 2 + r} V${cy + bh / 2 - r} Q${x0 + w} ${cy + bh / 2} ${x0 + w - r} ${cy + bh / 2} H${x0} Z`
+        : `M${x0 + w} ${cy - bh / 2} H${x0 + r} Q${x0} ${cy - bh / 2} ${x0} ${cy - bh / 2 + r} V${cy + bh / 2 - r} Q${x0} ${cy + bh / 2} ${x0 + r} ${cy + bh / 2} H${x0 + w} Z`;
+      el("path", { d: path, fill: pos ? "var(--pos)" : "var(--neg)" }, svg);
+      el("text", { x: pos ? x(d) + 6 : x(d) - 6, y: cy + 4, "text-anchor": pos ? "start" : "end", class: "lab" }, svg).textContent = (pos ? "+" : "−") + Math.abs(d).toFixed(1);
+      const hit = el("rect", { x: 0, y: cy - rowH / 2, width: W, height: rowH, fill: "transparent" }, svg);
+      hit.addEventListener("pointermove", e => placeTip(fig, tip, e, `${name}<br>前期 ${pre.toFixed(1)} GiB → 後期 ${post.toFixed(1)} GiB`));
+      hit.addEventListener("pointerleave", () => { tip.hidden = true; });
+    });
+  })();
+})();
+</script>
+
+</body></html>

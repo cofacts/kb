@@ -1,0 +1,336 @@
+<!doctype html><html><head><meta name="robots" content="noindex, nofollow"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>LINE webhook 錯誤追蹤</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single reading column (~68ch), status memo → chart → per-reload table → open items. */
+:root {
+  --bg: #f7f8f9;
+  --surface: #ffffff;
+  --ink: #15191d;
+  --ink-2: #4c5560;
+  --ink-3: #7a838d;
+  --rule: #dde1e5;
+  --grid: #eceff2;
+  --accent: #0a6e8a;
+  --s1: #2a78d6;  /* 499 LINE 逾時 */
+  --s2: #eb6834;  /* reload / 部署瞬間 */
+  --s3: #1baf7a;  /* 其他 502 */
+  --ok: #1d7a3e;
+  --warn: #a35a00;
+  --chip-ok-bg: #e3f3e8;
+  --chip-warn-bg: #fbeedd;
+  --chip-q-bg: #e8eef6;
+  --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14171a; --surface: #1b1f23; --ink: #eef1f3; --ink-2: #b4bcc4; --ink-3: #87909a;
+    --rule: #2f353b; --grid: #262b30; --accent: #5cc0dc;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+    --ok: #6fcf8f; --warn: #f0a94a; --chip-ok-bg: #1d3325; --chip-warn-bg: #3a2a14; --chip-q-bg: #1e2a3a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #14171a; --surface: #1b1f23; --ink: #eef1f3; --ink-2: #b4bcc4; --ink-3: #87909a;
+  --rule: #2f353b; --grid: #262b30; --accent: #5cc0dc;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+  --ok: #6fcf8f; --warn: #f0a94a; --chip-ok-bg: #1d3325; --chip-warn-bg: #3a2a14; --chip-q-bg: #1e2a3a;
+  color-scheme: dark;
+}
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.7; }
+.wrap { max-width: 760px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 64px; display: grid; gap: 40px; }
+h1, h2, h3 { text-wrap: balance; line-height: 1.35; margin: 0; }
+h1 { font-size: 1.75rem; font-weight: 700; }
+h2 { font-size: 1.2rem; font-weight: 700; }
+h3 { font-size: 1rem; font-weight: 700; }
+p { margin: 0; }
+.mono, .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.meta { color: var(--ink-3); font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 8px; }
+header p.lede { margin-top: 16px; color: var(--ink-2); max-width: 65ch; }
+section { display: grid; gap: 16px; min-width: 0; }
+.eyebrow { font-size: 0.75rem; letter-spacing: 0.08em; color: var(--accent); font-weight: 500; }
+
+.answers { display: grid; gap: 0; border-top: 1px solid var(--rule); }
+.answer { display: grid; grid-template-columns: 7.5rem 1fr; gap: 16px; padding-block: 16px; border-bottom: 1px solid var(--rule); }
+.answer .q { font-weight: 500; }
+.answer .a { display: grid; gap: 8px; min-width: 0; color: var(--ink-2); }
+.answer .a strong { color: var(--ink); }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 500; padding: 1px 10px; border-radius: 999px; width: fit-content; }
+.chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.chip.ok { color: var(--ok); background: var(--chip-ok-bg); }
+.chip.warn { color: var(--warn); background: var(--chip-warn-bg); }
+.chip.q { color: var(--accent); background: var(--chip-q-bg); }
+@media (max-width: 560px) { .answer { grid-template-columns: 1fr; gap: 6px; } }
+
+.chart-card { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.82rem; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.chart-scroll { overflow-x: auto; position: relative; }
+#chart { display: block; width: 100%; min-width: 560px; height: auto; }
+#chart text { font-family: var(--font-mono); font-size: 10px; fill: var(--ink-3); }
+#chart .evt-label { font-family: var(--font-body); font-size: 10.5px; fill: var(--ink-2); }
+#chart .bar-hit { fill: transparent; cursor: default; }
+#chart .bar-hit:hover + g rect, #chart g.day:hover rect.seg { opacity: 0.85; }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 0.78rem; line-height: 1.5; padding: 8px 10px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, -100%); }
+.tip b { font-family: var(--font-mono); font-weight: 500; }
+.note { font-size: 0.82rem; color: var(--ink-3); }
+
+.table-scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.88rem; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-weight: 500; color: var(--ink-3); font-size: 0.78rem; letter-spacing: 0.03em; }
+td.n, th.n { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+tr.hl td { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+
+.mech { display: grid; gap: 10px; color: var(--ink-2); max-width: 68ch; }
+.mech ol { margin: 0; padding-left: 1.3em; display: grid; gap: 6px; }
+code { font-family: var(--font-mono); font-size: 0.86em; background: var(--grid); padding: 1px 5px; border-radius: 4px; color: var(--ink); }
+
+.todo { display: grid; gap: 0; border-top: 1px solid var(--rule); }
+.todo > div { display: grid; grid-template-columns: 5rem 1fr; gap: 12px; padding-block: 12px; border-bottom: 1px solid var(--rule); }
+.todo .who { font-size: 0.8rem; color: var(--ink-3); padding-top: 2px; }
+.todo p { color: var(--ink-2); min-width: 0; }
+.todo p strong { color: var(--ink); }
+details { font-size: 0.88rem; }
+summary { cursor: pointer; color: var(--accent); }
+summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+footer { font-size: 0.8rem; color: var(--ink-3); border-top: 1px solid var(--rule); padding-top: 16px; display: grid; gap: 4px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">rumors-line-bot · 狀態更新</div>
+    <h1>LINE webhook 錯誤追蹤</h1>
+    <div class="meta"><span>2026-10-06</span><span>資料：Cloudflare <span class="mono">/callback</span>、cloudflared log、GCP Cloud Logging、LINE Developers Console</span></div>
+    <p class="lede">現在剩下的零星失敗有兩個來源。第一是 PM2 reload 時，有大約 1 秒沒有任何 worker 在 listen；這是設定問題，可以修。第二是 Cloudflare tunnel 的連線偶爾斷線重連，不是 app 的問題。LINE console 的錯誤變少，主要是因為 9/28 起 reload 從每小時改成每 3 小時。#417 沒有處理到主要原因。#416 看起來有效。</p>
+  </header>
+
+  <section>
+    <h2>四個待確認事項</h2>
+    <div class="answers">
+      <div class="answer">
+        <div class="q">#417 上線了嗎</div>
+        <div class="a">
+          <span class="chip ok">已上線</span>
+          <p>10/1 02:16 UTC merge，<span class="mono">release/20261001</span>。prod container 於 <strong class="mono">10/1 04:26 UTC</strong>（台灣 12:26）重建，之後沒有再換。</p>
+        </div>
+      </div>
+      <div class="answer">
+        <div class="q">錯誤有下降嗎</div>
+        <div class="a">
+          <span class="chip warn">有下降，主要是 reload 次數變少</span>
+          <p>LINE console 的錯誤和 Cloudflare 的非 200 紀錄<strong>一筆一筆都對得上</strong>（LINE 顯示 JST，換成 UTC 後時間一致）。cloudflared 的 log 也能對到每一筆，所以可以看出每次失敗的原因。</p>
+          <p>reload 每次約有 2–4% 機率掉 1–2 個 webhook，#417 前後一樣。每天失敗變少，是因為 reload 從每天 24 次降到 8 次。#417 上線後 5 天共 6 筆失敗：2 筆來自 reload，4 筆來自 tunnel 斷線。</p>
+        </div>
+      </div>
+      <div class="answer">
+        <div class="q">reload cron</div>
+        <div class="a">
+          <span class="chip q">先修 PM2 設定，再決定頻率</span>
+          <p>目前每 3 小時一次（UTC :15）。reload 造成的失敗主要是 PM2 沒等新 worker 開始 listen 就停掉舊的（見下方）。修好後 reload 頻率對失敗數的影響應該會小很多。</p>
+        </div>
+      </div>
+      <div class="answer">
+        <div class="q">舊謎團</div>
+        <div class="a">
+          <span class="chip q">部分有解</span>
+          <p>10/4、10/5 兩次無法用 reload 解釋的失敗，時間點都對上 cloudflared 的 tunnel 斷線重連。9/19–9/27 那波 499 仍然沒有答案：只有 line-bot 受影響、和 tunnel 斷線對不上，大多數請求也沒有在 cloudflared 留下紀錄。那段時間 app 是 3 月起就沒換過的同一個 image，9/28 除了 cron 也沒有其他變動。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>每日失敗數（/callback，非 200）</h2>
+    <div class="chart-card">
+      <div class="legend" aria-hidden="true">
+        <span><i style="background:var(--s1)"></i>499 LINE 等不到回應</span>
+        <span><i style="background:var(--s2)"></i>reload／部署瞬間</span>
+        <span><i style="background:var(--s3)"></i>其他 502（keep-alive、tunnel 斷線）</span>
+      </div>
+      <div class="chart-scroll" id="chartWrap">
+        <svg id="chart" viewBox="0 0 720 300" role="img" aria-label="2026-09-06 到 2026-10-05 每日 webhook 失敗數堆疊長條圖"></svg>
+        <div class="tip" id="tip" hidden></div>
+      </div>
+      <p class="note">日期以 UTC 計。「reload／部署瞬間」指發生在 PM2 reload 或部署後 20 秒內的失敗（:15:00–:15:20）。403/405 是無關的掃描流量，已排除。每天總請求數約 1 萬筆。</p>
+      <details>
+        <summary>看原始數字</summary>
+        <div class="table-scroll"><table id="rawTable"><thead><tr><th>日期</th><th class="n">499</th><th class="n">reload</th><th class="n">其他 502</th></tr></thead><tbody></tbody></table></div>
+      </details>
+    </div>
+  </section>
+
+  <section>
+    <h2>cloudflared 看到的失敗原因</h2>
+    <p class="note">9/6–10/5，所有 <span class="mono">line-bot.cofacts.tw</span> 路徑，以「事件」計（同一秒內的多筆算一次）。</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>cloudflared 錯誤</th><th>代表什麼</th><th class="n">#416 前</th><th class="n">#416 後</th></tr></thead>
+        <tbody>
+          <tr class="hl"><td><code>dial tcp … connection refused</code>，發生在 reload／部署當下</td><td>那一瞬間沒有 worker 在 listen</td><td class="n">10</td><td class="n">3</td></tr>
+          <tr><td><code>connection reset by peer</code>，發生在 reload 當下</td><td>舊 worker 結束時切斷 keep-alive 連線</td><td class="n">4</td><td class="n">1</td></tr>
+          <tr><td><code>reset</code>、<code>server closed idle connection</code>、<code>broken pipe</code>，平常時段</td><td>keep-alive 逾時的 race（#416 處理的問題）</td><td class="n">5</td><td class="n">0</td></tr>
+          <tr><td>tunnel <code>Retrying connection</code> 同時發生</td><td>Cloudflare 與 cloudflared 之間的 QUIC 連線斷線</td><td class="n">—</td><td class="n">2</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">#416 在 9/26 08:21 UTC 上線。前一列在 #416 前的 20 天出現 5 次，之後 10 天 0 次，看起來 #416 有效。</p>
+  </section>
+
+  <section>
+    <h2>reload 為什麼會掉請求</h2>
+    <div class="mech">
+      <p>10/5 00:15 那次 reload 的時間線（PM2 與 app log）：</p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th class="n">UTC</th><th>發生什麼</th></tr></thead>
+          <tbody>
+            <tr><td class="n">00:15:02.1</td><td>新 worker 0、1 啟動，PM2 標示為 online</td></tr>
+            <tr><td class="n">00:15:05.1</td><td>3 秒後 PM2 就停掉舊 worker 0、1。此時新 worker 還沒開始 listen，只剩舊 worker 2 在接請求</td></tr>
+            <tr><td class="n">00:15:08.4</td><td>PM2 停掉舊 worker 2。<strong>此時沒有任何 worker 在 listen</strong></td></tr>
+            <tr class="hl"><td class="n">00:15:08–09</td><td>cloudflared 收到 <code>connection refused</code> ×2，也就是 LINE console 上 JST 09:15:09 的那 2 筆 502</td></tr>
+            <tr><td class="n">00:15:09.1</td><td>新 worker 終於印出 <code>Listening port 5001</code>，距離啟動約 7 秒</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>app 啟動到開始 listen 大約要 7 秒，但 <span class="mono">ecosystem.config.js</span> 沒有設定 <code>wait_ready</code>。PM2 只等預設的 <code>listen_timeout</code>（3 秒）就認定新 worker 已就緒，開始停舊的。修法（<a href="https://github.com/cofacts/rumors-line-bot/pull/418">#418</a>）是設定 <code>wait_ready: true</code>，在 <code>server.listen</code> 的 callback 裡 <code>process.send('ready')</code>，並把 <code>listen_timeout</code> 拉到 15 秒左右。</p>
+      <p>#417 改的是舊 worker 的關閉流程，對這個問題沒有幫助。而且舊 worker 收到 SIGINT 後 60–200ms 就結束（handler 沒有等 <code>server.close()</code>，Node 16 也不會主動關閉閒置的 keep-alive 連線），所以 <code>kill_timeout</code> 也沒有用到。reset 這類失敗目前很少，可以晚點再處理。</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>tunnel 斷線</h2>
+    <div class="mech">
+      <p>cloudflared 和 Cloudflare 之間維持 4 條 QUIC 連線。其中一條逾時（<code>no recent network activity</code>）後會重連，期間走那條連線的請求就會失敗。這個月大約每 2–3 天發生一次。</p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>LINE console（JST）</th><th>cloudflared（UTC）</th><th>結果</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">10/5 08:36</td><td class="mono">10/4 23:36:07 重連，23:36:19 恢復</td><td>502 ×2</td></tr>
+            <tr><td class="mono">10/5 16:48</td><td class="mono">10/5 07:48:38 兩條同時重連，07:49:07 恢復</td><td>request_timeout ×2</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>目前跑的 cloudflared 是 2026.3.0，log 一直提示建議升到 2026.9.0。升版不一定能消除斷線，但成本低，值得先做。</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>9/19–9/27 的 499，目前已知</h2>
+    <div class="mech">
+      <ol>
+        <li>只有 line-bot 受影響。其他 host 的 499 平常就多（瀏覽器關分頁），同期沒有明顯增加。</li>
+        <li>和 tunnel 斷線時間對不上，也不集中在 reload 的 :15。主要出現在台灣晚上 21:00–01:00。</li>
+        <li>Cloudflare 記到數百筆，cloudflared 只留下約 15 筆 <code>context canceled</code>。大部分請求在 cloudflared 那邊沒有錯誤紀錄。</li>
+        <li><code>/callback</code> 驗完簽章後就直接回 200，處理是非同步的，所以正常情況下不應該慢到讓 LINE 放棄。</li>
+        <li>app image 從 3 月起沒換過。這波 499 在 #416 上線（9/26）後仍持續到 9/27，9/28 起消失。9/28 只改了 cron，沒有其他變動。</li>
+      </ol>
+      <p>和 cron 調整的時間吻合，但 9/6–9/17 cron 也是每小時，當時沒有出現，所以還不能下結論。下一步可以看那幾個晚上 app 的 event loop 是否被卡住，或是 LINE 平台那段時間是否有異常。</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>建議下一步</h2>
+    <div class="todo">
+      <div><span class="who">line-bot</span><p><strong>PM2 加上 <code>wait_ready</code>（已開 PR：<a href="https://github.com/cofacts/rumors-line-bot/pull/418">cofacts/rumors-line-bot#418</a>）：</strong>在 <code>server.listen</code> 的 callback 裡送 <code>process.send('ready')</code>，<code>listen_timeout</code> 設 15 秒。這可以處理目前 reload 失敗的大部分。</p></div>
+      <div><span class="who">devops</span><p><strong>升級 cloudflared</strong>，從 2026.3.0 升到 2026.9.0。</p></div>
+      <div><span class="who">團隊</span><p><strong>確認 LINE 的 webhook redelivery 有沒有開。</strong>有開的話，tunnel 斷線這類短暫失敗會自動重送，影響就很小。</p></div>
+      <div><span class="who">line-bot</span><p><strong>之後再處理：</strong>SIGINT handler 改成等 <code>server.close()</code> 完成並關閉閒置連線（Node 18 以上有 <code>closeIdleConnections()</code>）。Apollo API key 失效造成的 401／406 log 也順手清掉。</p></div>
+    </div>
+  </section>
+
+  <footer>
+    <span>相關 PR：<a href="https://github.com/cofacts/rumors-line-bot/pull/416">cofacts/rumors-line-bot#416</a>（keepAliveTimeout）、<a href="https://github.com/cofacts/rumors-line-bot/pull/417">cofacts/rumors-line-bot#417</a>（SIGINT graceful shutdown）、<a href="https://github.com/cofacts/rumors-line-bot/pull/418">cofacts/rumors-line-bot#418</a>（PM2 wait_ready，審核中）</span>
+    <span>Cloudflare zone cofacts.tw，host <span class="mono">line-bot.cofacts.tw</span>；container <span class="mono">rumors-deploy-line-bot-zh-1</span> on cofacts-prod。</span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  // [date, 499, reload-moment, other 502]  — UTC days, from Cloudflare httpRequestsAdaptiveGroups
+  const data = [
+    ["09-06",1,1,1],["09-07",0,3,1],["09-08",0,2,0],["09-09",1,0,0],["09-10",1,1,0],
+    ["09-11",1,0,0],["09-12",0,2,0],["09-13",0,2,0],["09-14",3,1,1],["09-15",1,0,0],
+    ["09-16",0,0,1],["09-17",3,2,0],["09-18",0,0,0],["09-19",7,0,0],["09-20",10,0,0],
+    ["09-21",36,0,0],["09-22",35,1,0],["09-23",44,1,0],["09-24",105,1,0],["09-25",15,1,1],
+    ["09-26",18,0,0],["09-27",22,1,0],["09-28",1,0,0],["09-29",2,0,0],["09-30",0,1,0],
+    ["10-01",0,1,0],["10-02",0,0,0],["10-03",0,0,0],["10-04",0,0,2],["10-05",2,2,0]
+  ];
+  const events = [
+    { day: "09-26", label: "#416 上線" },
+    { day: "09-28", label: "cron 改每 3 小時" },
+    { day: "10-01", label: "#417 上線" }
+  ];
+  const tbody = document.querySelector("#rawTable tbody");
+  data.forEach(d => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td class="mono">${d[0]}</td><td class="n">${d[1]}</td><td class="n">${d[2]}</td><td class="n">${d[3]}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  const svg = document.getElementById("chart");
+  const NS = "http://www.w3.org/2000/svg";
+  const W = 720, H = 300, m = { l: 36, r: 12, t: 34, b: 30 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const yMax = 120, ticks = [0, 30, 60, 90, 120];
+  const band = iw / data.length, bw = Math.max(6, band - 6);
+  const y = v => m.t + ih - (v / yMax) * ih;
+  const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (parent || svg).appendChild(e); return e; };
+
+  ticks.forEach(t => {
+    el("line", { x1: m.l, x2: W - m.r, y1: y(t), y2: y(t), stroke: "var(--grid)", "stroke-width": 1 });
+    const tx = el("text", { x: m.l - 6, y: y(t) + 3, "text-anchor": "end" }); tx.textContent = t;
+  });
+  el("line", { x1: m.l, x2: W - m.r, y1: y(0), y2: y(0), stroke: "var(--rule)", "stroke-width": 1 });
+
+  events.forEach((ev, i) => {
+    const idx = data.findIndex(d => d[0] === ev.day);
+    const x = m.l + idx * band;
+    el("line", { x1: x, x2: x, y1: m.t - 6 + (i % 2) * 0, y2: y(0), stroke: "var(--ink-3)", "stroke-width": 1, "stroke-dasharray": "3 3" });
+    const t = el("text", { x: x + 4, y: m.t - 18 + (i % 2) * 12, class: "evt-label" }); t.textContent = ev.label;
+  });
+
+  const colors = ["var(--s1)", "var(--s2)", "var(--s3)"];
+  const names = ["499 逾時", "reload／部署瞬間", "其他 502"];
+  const wrap = document.getElementById("chartWrap"), tip = document.getElementById("tip");
+  data.forEach((d, i) => {
+    const g = el("g", { class: "day" });
+    const x = m.l + i * band + (band - bw) / 2;
+    let acc = 0;
+    const segs = [1, 2, 3].map(k => ({ k, v: d[k] })).filter(s => s.v > 0);
+    segs.forEach((s, j) => {
+      const top = y(acc + s.v), bot = y(acc);
+      let h = Math.max(1.5, bot - top - (j > 0 ? 2 : 0));
+      el("rect", { class: "seg", x, y: bot - (j > 0 ? 2 : 0) - h, width: bw, height: h, rx: j === segs.length - 1 ? 2 : 0, fill: colors[s.k - 1] }, g);
+      acc += s.v;
+    });
+    if (acc > 0 && acc < 10) {
+      const lt = el("text", { x: x + bw / 2, y: y(acc) - 4, "text-anchor": "middle" }, g); lt.textContent = acc;
+    }
+    if (acc >= 10) {
+      const lt = el("text", { x: x + bw / 2, y: y(acc) - 4, "text-anchor": "middle" }, g); lt.textContent = acc;
+    }
+    if (i % 4 === 0 || i === data.length - 1) {
+      const xt = el("text", { x: m.l + i * band + band / 2, y: H - m.b + 16, "text-anchor": "middle" }); xt.textContent = d[0].replace("-", "/");
+    }
+    const hit = el("rect", { x: m.l + i * band, y: m.t, width: band, height: ih, fill: "transparent" }, g);
+    const show = () => {
+      tip.innerHTML = `<b>${d[0].replace("-", "/")}</b><br>` + names.map((n, k) => `${n}：<b>${d[k + 1]}</b>`).join("<br>");
+      const r = svg.getBoundingClientRect(), wr = wrap.getBoundingClientRect();
+      const scale = r.width / W;
+      tip.style.left = (r.left - wr.left + wrap.scrollLeft + (m.l + i * band + band / 2) * scale) + "px";
+      tip.style.top = (r.top - wr.top + Math.max(m.t + 40, y(acc) - 6) * scale) + "px";
+      tip.hidden = false;
+    };
+    hit.addEventListener("mouseenter", show);
+    hit.addEventListener("mouseleave", () => { tip.hidden = true; });
+  });
+})();
+</script>
+
+</body></html>
