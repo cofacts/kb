@@ -605,7 +605,7 @@ Track 0（WG 基礎，§2.2、§8）要完成的設定：`createRouter({ context
 | `makeStyles` 的一般樣式 | Tailwind utility，色彩一律用語意 token |
 | `theme.palette.*`、`theme.spacing()` | 對應的語意 token 與 spacing token（§5） |
 | JSS `@keyframes`（floating、breath、flashing） | CSS Modules 的 `@keyframes`，或 `@theme` 裡的 `--animate-*` |
-| react-spring 捲動動畫 | CSS scroll-driven animation / IntersectionObserver，**一律包 `@media (prefers-reduced-motion: no-preference)`** |
+| react-spring 捲動動畫 | CSS scroll-driven animation / IntersectionObserver |
 | `LOCALE` 分支（landing 圖片、新聞列表、YouTube ID） | 改讀 lingui 的當前 locale（§2.5） |
 | 圖片（首頁 888 KB、教學 1.2 MB、影響力 1.1 MB） | Vite asset import，順便轉 WebP 或 AVIF |
 
@@ -658,7 +658,7 @@ Track 0（WG 基礎，§2.2、§8）要完成的設定：`createRouter({ context
 | `/user` | 有 slug、無 slug、留言 tab、沒有任何貢獻 |
 | `/report` | 直接對應 Penpot 板：未登入、輸入、A Loading、B-1 有文章且有查核回應、B-2 有文章但無回應、C 查無此訊息準備新增 |
 | `/ai` | 新任務、串流中（呼叫工具）、草稿完成（`AI-main page-Mobile-Draft`）、工具抽屜開啟、錯誤、登入過期 |
-| 靜態頁 | 各一，另加 reduced-motion 版 |
+| 靜態頁 | 各一 |
 
 ---
 
@@ -1015,7 +1015,6 @@ sequenceDiagram
 - **Tab 順序**：AI 右側抽屜、bottom sheet 的焦點管理（同上方 dialog 規則）。
 - **螢幕閱讀器**：cofacts/ai 現有的漢堡選單、送出、附件、通知按鈕都缺 `aria-label`；可點的 backdrop 改用 `<button>` 或 Base UI 的 Dialog。
 - **狀態變動通知**：AI 串流用 `aria-live="polite"`，但只宣告「開始 / 完成 / 錯誤」，不逐字念；回報、送出成功的結果畫面要把焦點移到標題。
-- **減少動態效果**：landing 動畫、view transition 抽屜、typing indicator 都要支援 `prefers-reduced-motion`。
 - **文字壓在圖片或漸層上**：首頁 hero、impact banner 要實際量對比。
 
 ### 6.2 各層防線
@@ -1107,7 +1106,7 @@ description: >
 | **2 單一訊息與回應** | **最大** | 訊息頁用到近 20 種 Penpot 元件，外加全新的全頁編輯器。其中兩個特別重：**協作逐字稿**（ProseMirror + yjs + Hocuspocus，713 LOC，要接 WebSocket 服務）與 d3 瀏覽趨勢圖。**建議把逐字稿拆成 2b**，第一階段先唯讀顯示 |
 | **2b 協作逐字稿** | 中 | 可以晚一點做，或另外排人 |
 | **3 回報** | **最小** | [cofacts/ai#138](https://github.com/cofacts/ai/pull/138)、[#139](https://github.com/cofacts/ai/pull/139) 已完成主要功能，剩下套用設計系統、對齊 6 個狀態板，以及和訊息頁、AI 的銜接。它和Track 5 在 Penpot 同一頁，回報的結束畫面也導向 AI，**建議兩個 track交給同一人** |
-| **4 Infographics** | 中（體力活） | JSS 行數最多（landing 2,458、impact 2,132、tutorial 1,175），但只有教學與 about 有新稿，其他頁照舊移植、換 token。依賴很少（只需 Nav / Footer），**適合在 A、B 空檔插隊**。動畫要支援 reduced-motion，首頁 hero 的文字壓圖要量對比 |
+| **4 Infographics** | 中（體力活） | JSS 行數最多（landing 2,458、impact 2,132、tutorial 1,175），但只有教學與 about 有新稿，其他頁照舊移植、換 token。依賴很少（只需 Nav / Footer），**適合在 A、B 空檔插隊**。首頁 hero 的文字壓圖要量對比 |
 | **5 AI chat** | 小至中 | 主要是換皮加搬家：從 `/` 搬到 `/ai`、依 `AI-main page` / `AI-open page` 重新套設計、拆 `RightDrawer.tsx`（856 行）、補無障礙債。SSE 與 session 邏輯不動。建議由最熟這份程式的 WG 來做，或當作 contractor 的熱身 |
 | **6 上線切換** | 中 | 不屬於任何一頁，但少一件就不能切換：Cloudflare 分流與 **cache rule 排除 session cookie**（§2.6）、各種 redirect、`ALLOWED_CALLBACK_URLS`、`COFACTS_SITE_URL`、RSS 原樣移植、GTM dataLayer 與 `data-ga` 事件、Rollbar 與 request log、SEO（meta、OG、robots、sitemap，可順便加 ClaimReview JSON-LD）、rumors-site 退場。由 WG 負責 |
 
