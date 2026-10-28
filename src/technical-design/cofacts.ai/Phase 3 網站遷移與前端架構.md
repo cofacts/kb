@@ -80,7 +80,7 @@ cofacts/ai 目前的前端狀況（Phase 3 要一併處理）：
 3. **新網址用英文小寫 kebab-case**；列表用複數（`/articles`），單筆用單數加 id（`/article/:id`），跟既有慣例一致。
 4. **query 值要可讀、有白名單**：未知的 param 忽略，不合法的值退回預設，**任何輸入都不能讓頁面 crash**（rumors-site 的 `/search?type=messages` 沒帶 `q`、`/tutorial?tab=xxx` 都會 crash）。
 5. **預設值不寫進 URL**，空值不留（rumors-site 會留下 `?filters=&types=`）。
-6. **舊網址、舊 param 照收**，再轉到新格式：path 層級用 HTTP 301/308（SSR 做得到）；只有 query 格式不同時，由 route 的 `beforeLoad` 丟出 `redirect({ search, replace: true })`。
+6. **舊網址照收**，再轉到新格式：path 層級用 HTTP 301/308（SSR 做得到）。**舊 query param 不做相容轉換**，視為未知 param 忽略（§2.3）。
 7. **不加 locale 前綴**，語系由 host 決定（§2.5）。
 8. 預留的頂層 namespace：`/ai`、`/api`、`/report`、`/storybook`（若要自架）。
 
@@ -113,7 +113,7 @@ cofacts/ai 目前的前端狀況（Phase 3 要一併處理）：
 | `/user/:slug` | 個人頁 | ❌ 無稿 | 🟢 | `tab=replies\|comments`。改用 SSR 303 See Other canonicalize，不用 client `router.replace`（現行會吃掉 `?tab=`）。不用 301：slug 會被使用者修改，永久轉址會被瀏覽器與 CDN 快取 |
 | `/user?id=:userId` | 個人頁（沒有 slug 的使用者） | ❌ 無稿 | 🟢 | 使用者有 slug 時 303 到 `/user/:slug`，並保留其他 query。每次由 server 查目前的 slug，不用 301（理由同上） |
 
-- 個人頁**不**新增「送過的訊息」tab。使用者送過的訊息改由列表的「我送出的」篩選呈現（`status=reported-by-me`，§2.3）。
+- 個人頁**不**新增「送過的訊息」tab。使用者送過的訊息改由列表的「我送出的」篩選呈現（param 名稱未定，§2.3）。
 
 #### Track 2　單一訊息與回應
 
@@ -155,13 +155,18 @@ cofacts/ai 目前的前端狀況（Phase 3 要一併處理）：
 |---|---|---|---|
 | `cofacts.ai/*` | 舊網域 | 🔴 301 → `cofacts.tw/ai/*` | 在 Cloudflare 處理 |
 | `/session/*` | cofacts.ai 舊路徑 | 🔴 301 → `/ai/session/*` | |
-| 各列表的舊 query（`filters=`、`types=`…） | 舊 bookmark | 🟠 | `normalizeLegacySearch()` 轉成新格式（§2.3） |
+| 各列表的舊 query（`filters=`、`types=`…） | 舊 bookmark | 🔴 不相容 | 若 §2.3 改名，舊 query 視為未知 param 忽略，頁面以預設條件顯示；不做轉換 |
 | `/api/articles/:feed?json=…&source=…` | RSS / Atom / JSON feed | 🟢 **原樣保留** | `json` 是 LZMA 壓縮的 GraphQL variables；功能照舊移植，不改版 |
 | `en.cofacts.tw`、`ja.cofacts.tw` | 語系 host | 🟢 | 同一個 app 依 host 切語系（§2.5） |
 | `/robots.txt`、`/sitemap.xml` | SEO（rumors-site 從來沒有） | 🔵 建議 | |
 | `/analytics`、`/hack` | 由 Cloudflare 規則處理 | 🟢 | 沿用 |
 
-### 2.3 列表頁 search param 改版提案
+### 2.3 列表頁 search param 改版提案（未定案）
+
+> [!WARNING]
+> **未定案（2026-10-28）**：要不要藉這次改寫替 search param 改名、改值，還在討論；本節的命名與對照表只是提案，實作時不必照做。
+> 不論最後是否改名，**都不做舊 param 相容**：不實作舊 param → 新 param 的轉換（原提案的 `normalizeLegacySearch()` 取消），舊 bookmark 的 query 視為未知 param 忽略。
+> 本節以下仍適用、與改名無關的要求：值有白名單、不合法值退回預設、預設值與空值不寫入 URL、`*-by-me` 未登入時只忽略自己、任何輸入都不能讓頁面 crash（§2.1）。
 
 rumors-site 的問題：
 
@@ -189,7 +194,7 @@ rumors-site 的問題是 param 名 `types` 看不出是「回應的」分類，�
 
 替代方案：值改用標籤語意（`has-misinfo`、`has-facts`、`has-opinion`、`out-of-scope`）。好處是字面就帶出「含有」；壞處是 URL 值與 API enum 不一致，每層都要做對照。目前建議沿用 enum。
 
-#### 完整對照
+#### 完整對照（提案）
 
 | 新 param | 舊 param | 值（逗號分隔多選） | 說明 |
 |---|---|---|---|
@@ -207,9 +212,9 @@ rumors-site 的問題是 param 名 `types` 看不出是「回應的」分類，�
 > **「我送出的」需要確認 API 語意**：rumors-api 的 `ListArticleFilter.selfOnly` 只會列出「由目前使用者**建立**」的訊息（第一個回報者）。沒有「我曾回報過（含對既有訊息 +1）」的 filter（2026-09-28 查 `api.cofacts.tw` schema）。若「我送出的」要包含 +1 過的訊息，需要在 rumors-api 補一個依 reply request 的 `userId` 篩選的 filter。
 
 - 實作方式：每個列表 route 用 `validateSearch` + zod schema，放在 `src/lib/search-params/`。同一份 schema 產生三樣東西：GraphQL filter、篩選 UI 的狀態、canonical URL。
-- 舊 param 由 `normalizeLegacySearch()` 轉換（`filters=NO_REPLY` → `status=no-reply`、`types=NOT_RUMOR` → `replyType=not-rumor`、`start=now-1w/d` → `period=7d`…），轉完用 `replace` redirect。
+- 不做舊 param 轉換（見本節開頭）。
 
-範例：
+改名提案的對照範例（僅說明命名差異，不代表會 redirect）：
 
 ```
 舊 /articles?filters=NO_REPLY,ASKED_MANY_TIMES&types=RUMOR&start=now-1w/d&orderBy=replyRequestCount
@@ -1145,13 +1150,14 @@ description: >
 | Q4 | 編輯器網址 | `/article/:id/reply/new`、`/article/:id/reply/existing` |
 | Q5 | 分頁與 RSS | 分頁 cursor 不進 URL；RSS 原樣保留舊 `json` 格式 |
 | Q6 | 缺稿頁面 | 標記 ❌ 無稿，由工程師以 Guide 為範例用新元件拼湊 |
-| Q8 | 使用者送過的訊息 | 個人頁不顯示；列表新增「我送出的」篩選（`status=reported-by-me`） |
+| Q8 | 使用者送過的訊息 | 個人頁不顯示；列表新增「我送出的」篩選 |
 | Q9 | Dark mode | 先跟隨 `prefers-color-scheme`。之後若 Penpot 補上切換開關，JS 設定 `<html data-theme>` 即可，`tokens.css` 已支援（§5.4） |
 | Q10 | ADR | 以本文為設計紀錄，cofacts/ai 的 `docs/` 直接超連結過來；只有本文未涵蓋的取捨才另寫 ADR |
 
 ### 9.2 待辦
 
 - **與設計師 sync 設計系統的差異**：附錄 C 已大致處理完，剩斷點（#11）與深色區塊焦點環的間隔色（#5）。
+- **search param 是否改名**：§2.3 的改名提案未定案；不論結果都不做舊 param 相容（2026-10-28）。
 - **「我送出的」的語意**：只算第一個回報者，還是包含 +1；若包含，需要 rumors-api 補 filter（§2.3）。
 - **Cloudflare cache rule**：切換前要排除 `cofacts_session` cookie（§2.6，Track 6）。
 
