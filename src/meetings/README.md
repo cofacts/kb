@@ -1,6 +1,7 @@
 # Cofacts 會議記錄
 
 ## 2026
+- [1027 Vector search前綴研究、Writer換Haiku與url-resolver全文toggle、cofacts.ai網站遷移分工、影片thumbnail、自動化驗證藍圖、MozFest準備、site-tw 1GB成本延遲週報](./2026/20261027.md)
 - [1020 url-resolver、Vector search待辦、cofacts.ai分工與Track 0、Writer換模型與ADK 2升級、url-resolver與ES網路隔離、維基來源評級出處過濾、MozFest與下次會議、Production週報](./2026/20261020.md)
 - [1013 Vector search前綴與混排、cofacts.ai進度、登入牆dataset、AI category實驗、MozFest易拉展、會議時程、KB Pages上線、Production週報](./2026/20261013.md)
 - [1006 url-resolver FB/Threads處理、Vector search staging、cofacts.ai出處錯置分析、收連結登入牆處理提案、十月小聚檢討、LINE Bot #417/#418追蹤、site-tw擴容至2GB、詐騙檢舉與洗白紀錄、易拉展、Production週報](./2026/20261006.md)
