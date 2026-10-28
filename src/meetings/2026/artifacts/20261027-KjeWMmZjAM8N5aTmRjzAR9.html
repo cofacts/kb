@@ -1,0 +1,458 @@
+<!doctype html><html><head><meta name="robots" content="noindex, nofollow"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Cofacts 開發驗證藍圖</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;900&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: single reading column (≈42em) with full-bleed tables; a sticky section index on wide screens. */
+:root {
+  --bg: #fbfbf9;
+  --surface: #ffffff;
+  --ink: #1d2326;
+  --muted: #5d676c;
+  --rule: #dfe3e2;
+  --accent: #b77800;      /* Cofacts amber, darkened for text contrast */
+  --accent-soft: #fff3d6;
+  --ok: #2e7d4f;
+  --ok-soft: #e3f3e8;
+  --warn: #a35a00;
+  --warn-soft: #fdeed9;
+  --bad: #b3261e;
+  --bad-soft: #fbe4e2;
+  --code-bg: #f1f3f2;
+  --display: "Noto Serif TC", "Songti TC", "PMingLiU", serif;
+  --body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141819; --surface: #1b2022; --ink: #e6eaea; --muted: #9aa5a8; --rule: #2f3739;
+    --accent: #f2b233; --accent-soft: #3a2f14; --ok: #7fd19c; --ok-soft: #1b3325;
+    --warn: #f0b062; --warn-soft: #3b2a14; --bad: #ff8a80; --bad-soft: #3d1f1d; --code-bg: #232a2c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141819; --surface: #1b2022; --ink: #e6eaea; --muted: #9aa5a8; --rule: #2f3739;
+  --accent: #f2b233; --accent-soft: #3a2f14; --ok: #7fd19c; --ok-soft: #1b3325;
+  --warn: #f0b062; --warn-soft: #3b2a14; --bad: #ff8a80; --bad-soft: #3d1f1d; --code-bg: #232a2c;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--body); font-size: 16px; line-height: 1.75;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 80px;
+}
+.page { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 48px; }
+@media (max-width: 900px) { .page { grid-template-columns: minmax(0, 1fr); gap: 0; } nav.toc { display: none; } }
+nav.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; font-size: 13px; line-height: 1.6; }
+nav.toc ol { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+nav.toc a { color: var(--muted); text-decoration: none; }
+nav.toc a:hover, nav.toc a:focus-visible { color: var(--accent); }
+main { min-width: 0; }
+main > * { max-width: 44em; }
+main > .wide { max-width: none; }
+header.doc { border-bottom: 2px solid var(--ink); padding-bottom: 20px; margin-bottom: 32px; }
+.eyebrow { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+h1 { font-family: var(--display); font-weight: 900; font-size: clamp(30px, 5vw, 44px); line-height: 1.2; margin: 8px 0 12px; text-wrap: balance; }
+h2 { font-family: var(--display); font-weight: 600; font-size: 26px; line-height: 1.3; margin: 56px 0 12px; text-wrap: balance; padding-top: 8px; border-top: 1px solid var(--rule); }
+h3 { font-size: 18px; font-weight: 700; margin: 32px 0 8px; text-wrap: balance; }
+h4 { font-size: 15px; font-weight: 700; margin: 20px 0 4px; color: var(--muted); }
+p, li { margin: 0 0 12px; }
+ul, ol { padding-left: 1.4em; margin: 0 0 16px; }
+a { color: var(--accent); text-underline-offset: 2px; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+code { font-family: var(--mono); font-size: .86em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+pre { font-family: var(--mono); font-size: 13px; line-height: 1.6; background: var(--code-bg); padding: 14px 16px; border-radius: 6px; overflow-x: auto; margin: 0 0 16px; }
+pre code { background: none; padding: 0; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; color: var(--muted); font-size: 14px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.chip { font-family: var(--mono); font-size: 12px; border: 1px solid var(--rule); background: var(--surface); padding: 2px 8px; border-radius: 999px; }
+.lede { font-size: 17px; }
+.verdict { background: var(--accent-soft); border-left: 4px solid var(--accent); padding: 16px 20px; margin: 0 0 24px; border-radius: 0 6px 6px 0; }
+.verdict ol { margin: 0; }
+.verdict li { margin-bottom: 8px; }
+.table-wrap { overflow-x: auto; margin: 0 0 20px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; line-height: 1.55; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--rule); }
+th { font-weight: 700; background: var(--code-bg); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap; font-family: var(--mono); font-size: 13px; }
+.pill { display: inline-block; font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
+.note { font-size: 14px; color: var(--muted); }
+.callout { border: 1px solid var(--rule); background: var(--surface); border-radius: 6px; padding: 14px 18px; margin: 0 0 20px; }
+.callout strong:first-child { color: var(--accent); }
+.flow { display: grid; gap: 0; margin: 8px 0 24px; counter-reset: step; }
+.flow > div { position: relative; padding: 10px 0 10px 40px; border-left: 2px solid var(--rule); margin-left: 12px; }
+.flow > div::before { counter-increment: step; content: counter(step); position: absolute; left: -13px; top: 10px; width: 24px; height: 24px; border-radius: 50%; background: var(--ink); color: var(--bg); font-size: 12px; font-weight: 700; display: grid; place-items: center; font-family: var(--mono); }
+.flow > div:last-child { border-left-color: transparent; }
+.flow b { display: block; }
+.phase { display: grid; grid-template-columns: 7em minmax(0,1fr); gap: 4px 16px; padding: 12px 0; border-bottom: 1px solid var(--rule); }
+.phase:last-child { border-bottom: 0; }
+.phase .when { font-family: var(--mono); font-size: 13px; color: var(--accent); font-weight: 600; }
+.phase ul { margin: 0; }
+@media (max-width: 520px) { .phase { grid-template-columns: minmax(0,1fr); } }
+footer { margin-top: 56px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 16px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<div class="page">
+<nav class="toc" aria-label="章節">
+  <ol>
+    <li><a href="#summary">結論與建議</a></li>
+    <li><a href="#status">現況盤點</a></li>
+    <li><a href="#tests">補測試與 coverage</a></li>
+    <li><a href="#verify">PR 自動驗證</a></li>
+    <li><a href="#crossrepo">跨 repo 驗證</a></li>
+    <li><a href="#review">Code review</a></li>
+    <li><a href="#vuln">漏洞修補</a></li>
+    <li><a href="#cost">Claude 用量與方案</a></li>
+    <li><a href="#phases">分階段推進</a></li>
+    <li><a href="#decide">待團隊決定</a></li>
+  </ol>
+</nav>
+
+<main>
+<header class="doc">
+  <div class="eyebrow">技術規劃 · 草案</div>
+  <h1>Cofacts 開發驗證藍圖</h1>
+  <div class="meta"><span>2026-10-25</span><span>範圍：六個 repo</span><span>依據：各 repo 現行 CI、本地實測 coverage、kb 會議記錄 2026/10</span></div>
+  <div class="chips">
+    <span class="chip">cofacts/ai</span><span class="chip">cofacts/rumors-api</span><span class="chip">cofacts/rumors-db</span><span class="chip">cofacts/url-resolver</span><span class="chip">cofacts/media-manager</span><span class="chip">cofacts/devops</span>
+  </div>
+</header>
+
+<section id="summary">
+<p class="lede">目標是讓 PR 在人類看之前，已經跑過測試、看過畫面、對過需求，也做過 review。下面的建議分成兩層：<strong>確定性的檢查放在 repo 裡的 GitHub Actions</strong>（便宜、可重現、能擋 merge），<strong>需要判斷的驗收交給一個跨 repo 的 Claude「驗收員」</strong>（讀需求、操作 preview、截圖、提出修復路徑），review 排在驗收員之後啟動。</p>
+<div class="verdict">
+<ol>
+  <li><strong>先補 CI 的洞，再談 AI。</strong> cofacts/ai 的 CI 沒有跑 vitest（87 個前端測試只在本機跑）；url-resolver 只有 <code>.travis.yml</code>，PR 上沒有任何測試；media-manager 只在 push 時跑。這三個都是一兩行 workflow 就能補的。另外 rumors-api 與 ai 之間的 GraphQL schema 目前完全沒有契約檢查。</li>
+  <li><strong>Coverage 用「變更行覆蓋率」當門檻，不設全域門檻。</strong> 全域數字落差太大（adk 77%、前端 20%），設門檻只會逼人寫無意義的測試。新增或修改的行要求 ≥ 80%，不需要測的檔案在設定檔排除。</li>
+  <li><strong>驗收員用 Claude Code 排程任務（routine），由 CI／Deploy 完成後呼叫 API 觸發。</strong> 它能一次 clone 多個 repo，適合跨 repo 的需求；需求來源讀 PR 連結的 issue、GitHub Project、kb 會議記錄與 design doc。</li>
+  <li><strong>登入問題用 staging 專用測試帳號 + 預先簽好的 session JWT 解決</strong>，Playwright 直接把 <code>cofacts_session</code> cookie 塞進瀏覽器，不走 OAuth 頁面。前提是 staging 與 production 的 JWT 金鑰不同。</li>
+  <li><strong>Code review 沿用 Vertex AI billing</strong>，不要用個人 subscription 的 OAuth token：官方文件明講共用的 CI secret 應該用 API key／雲端帳號，個人 token 綁在單一使用者的額度上。</li>
+  <li><strong>漏洞修補在私有的 cofacts/devops 開票、評估、測試，人類加 label 放行後才在公開 repo 開 PR。</strong> 需要另一個能讀 Dependabot alerts 的 GitHub App 或 token，因為 Claude GitHub App 沒有這個權限。</li>
+  <li><strong>方案：先全員 $8 nonprofit Standard 席位 + 開 extra usage 並設上限，跑一個月看每人的 extra usage。</strong> 超過 $32/月的人（主要是掛 routine 的那位）升級成 $40 席位。</li>
+</ol>
+</div>
+</section>
+
+<section id="status">
+<h2>現況盤點</h2>
+<p>2026-10-25 在 clone 下來的 default branch 上檢查。Coverage 是在本機實際跑測試量到的，除非另外註明。</p>
+<div class="table-wrap wide">
+<table>
+<thead><tr><th>Repo</th><th>PR 上跑的檢查</th><th>測試 / coverage</th><th>Claude / AI</th><th>值得注意</th></tr></thead>
+<tbody>
+<tr><td><code>ai</code> (adk)</td><td>pytest、ruff、ty</td><td class="num">178 tests<br>lines 77%<br>branch 65%</td><td rowspan="2"><code>claude.yml</code>（@claude，Vertex）。Gemini workflows 已在 <a href="https://github.com/cofacts/ai/pull/173">cofacts/ai#173</a> 移除</td><td><code>tools.py</code> 只有 12%：GraphQL 工具、<code>draft_factcheck_response</code> 的出處檢查都沒測到</td></tr>
+<tr><td><code>ai</code> (src)</td><td>ESLint、Prettier、tsc<br><span class="pill bad">沒跑 vitest</span></td><td class="num">87 tests<br>lines 20%</td><td>每個 PR 都有 Cloud Run preview（tag <code>pr-N</code>）；Storybook 在 <a href="https://github.com/cofacts/ai/pull/154">cofacts/ai#154</a> 審查中，會掛在 <code>/storybook/</code></td></tr>
+<tr><td><code>rumors-api</code></td><td>lint、typecheck、jest（ES 9.3.2 service）、Coveralls</td><td class="num">411 tests<br>lines 87%<br>（全檔 81%）</td><td><code>claude.yml</code>（Vertex）</td><td>沒有 coverage 設定：沒被任何測試 import 的 11 個檔案不算進分母，所以 CI 的 87% 偏高。<code>ListReplies</code> 測試在預設 heap 下會 OOM。雲端測試只在每晚的 <code>integration.yml</code> 跑。沒有 GraphQL schema 契約測試</td></tr>
+<tr><td><code>rumors-db</code></td><td>lint、typecheck、schema 載入、seed、zod scan</td><td class="num">無單元測試</td><td><code>claude.yaml</code>（Vertex）</td><td>rumors-api 的 submodule 指在 <code>9c8273c</code>，落後 master 2 個 commit（只改了 reloadSchema 腳本）。沒有檢查 mapping 改了是否有升 <code>VERSION</code></td></tr>
+<tr><td><code>url-resolver</code></td><td><span class="pill bad">無</span>（只有 <code>.travis.yml</code>；Actions 只負責 build/push image）</td><td class="num">7 suites<br>未量測</td><td>無</td><td>jest 23、eslint 7。<code>npm ci</code> 在我的 sandbox 卡在 <code>grpc-tools</code> 原生模組，所以沒量到 coverage</td></tr>
+<tr><td><code>media-manager</code></td><td>lint、test、build、Coveralls<br><span class="pill warn">只在 push 觸發</span></td><td class="num">8 tests<br>lines 55%</td><td>無</td><td>整合測試需要 GCS 憑證，沒有就 <code>it.skip</code>。<code>MediaManager.ts</code> 本體只有 9%</td></tr>
+</tbody>
+</table>
+</div>
+<p class="note">PR 量（9/25–10/25）：cofacts/ai 22 個、rumors-api 6 個。以下的成本估算用「每月約 30 個 PR」。</p>
+
+<div class="callout"><strong>關於 proto 同步。</strong> url-resolver 的 <code>.proto</code> 在 rumors-api 與 ai 各有一份 vendored copy，這是 gRPC client 的正常做法。目前三份已經不一致：上游把 <code>UNKNOWN_SCRAP_ERROR</code> 改名為 <code>UNKNOWN_SCRAPE_ERROR</code>，但編號都是 6，所以線上傳輸相容，ai 用舊名字也不會壞。建議不要追求逐字同步，而是在 url-resolver 的 CI 跑 <code>buf breaking --against '.git#branch=master'</code>，只擋真正破壞相容的修改（改欄位編號、型別、刪欄位）。ai 那份唯一刻意的差異是把 <code>ResolveError</code> 寫成完整名稱 <code>resolve_error.ResolveError</code>；上游直接改成一樣的寫法，就能少掉這個差異。</div>
+</section>
+
+<section id="tests">
+<h2>補測試與 coverage</h2>
+
+<h3>各 repo 該補的測試</h3>
+<div class="table-wrap wide">
+<table>
+<thead><tr><th>位置</th><th>現況</th><th>為什麼值得測</th><th>怎麼測</th></tr></thead>
+<tbody>
+<tr><td><code>adk/cofacts_ai/tools.py</code></td><td class="num">12%</td><td>agent 能看到的全部外部資料都從這裡進來；<code>draft_factcheck_response</code> 的 claim_sources 檢查就是 10/20 會議提到「只看 writer 自己填的布林值」的地方</td><td>mock <code>httpx</code> 與 Vision client，針對每個 tool 的輸入輸出寫測試</td></tr>
+<tr><td><code>adk/cofacts_ai/agent.py</code> 111–159 行</td><td class="num">85%</td><td><code>append_grounding_sources</code>：RECITATION 重試、組 <code>sources</code>，屬於 <code>{content, sources}</code> 契約</td><td>沿用 <code>test_verifier_round_trip.py</code> 的 scripted model</td></tr>
+<tr><td><code>adk/cofacts_ai/media_filedata.py</code></td><td class="num">46%</td><td>signed URL → <code>gs://</code>、MIME 判斷，換 Claude 模型時（<a href="https://github.com/cofacts/ai/pull/162">#162</a>）最容易出事</td><td>純函式，直接測</td></tr>
+<tr><td><code>src/lib/chatCache.ts</code></td><td class="num">29%</td><td>前端解析 SSE 串流的 reducer，聊天畫面壞掉多半是這裡</td><td>錄一段真實的 ADK SSE 事件當 fixture</td></tr>
+<tr><td><code>src/routes/api/run-sse.ts</code> 140–187 行</td><td class="num">62%</td><td>401 處理、Bearer token 轉送、中斷</td><td>沿用現有 <code>__tests__</code> 的寫法</td></tr>
+<tr><td><code>src/lib/chatSessions.functions.ts</code>、<code>src/server/articles.functions.ts</code></td><td class="num">0%</td><td>session 列表／建立／改名，附件 signed URL</td><td>照 <code>feedbackScores</code> 測試的模式</td></tr>
+<tr><td><code>rumors-api/src/checkHeaders.js</code>、<code>src/adm/util.ts</code></td><td class="num">4%、0%</td><td>前者檢查 <code>/graphql</code> 與 <code>/auth/*</code> 的 app secret 與 CORS，後者是 admin API 的 Cloudflare Access JWT 驗證與 audit log，兩個都是安全邊界</td><td>koa context 的單元測試即可</td></tr>
+<tr><td><code>rumors-api/src/auth.js</code></td><td class="num">67%</td><td>OAuth 登入流程，也是 cofacts.ai 登入的上游（branch 62%）</td><td>補 callback 的錯誤分支</td></tr>
+<tr><td><code>rumors-api</code> 的 GraphQL schema</td><td class="num">—</td><td>ai 的 BFF 與 adk 都依賴它，現在改壞 schema 兩邊都不會發現</td><td><code>printSchema(schema)</code> snapshot 測試，schema 變更會出現在 PR diff 裡</td></tr>
+<tr><td><code>media-manager/src/MediaManager.ts</code></td><td class="num">9%</td><td>rumors-api 上傳／查詢媒體都走這裡</td><td>用 GCS emulator（<code>fsouza/fake-gcs-server</code>）讓整合測試在 PR 上也能跑，不必等憑證</td></tr>
+<tr><td><code>url-resolver/src/lib/scrape.js</code></td><td class="num">—</td><td>cofacts.ai verifier 與 rumors-api 都依賴它</td><td>先把 CI 搬到 Actions（升 jest），再談補測試</td></tr>
+<tr><td><code>rumors-db/schema/*</code></td><td class="num">—</td><td>改 mapping 卻沒升 <code>VERSION</code>，<code>npm run schema</code> 不會建新 index</td><td>CI 比對 diff：mapping 有變、<code>VERSION</code> 沒變就失敗</td></tr>
+</tbody>
+</table>
+</div>
+<p class="note">rumors-api 的 env-guarded 測試中，<code>src/graphql/__tests__/util.js</code> 的 <code>createTranscript</code> 區塊沒有 else 分支，沒憑證時會直接消失，不會顯示為 skipped；<code>createBackendUsers</code> 的測試永遠是 <code>describe.skip</code>。<code>integration.yml</code> 傳了 <code>OPENAI_API_KEY</code>，但沒有任何測試用到。</p>
+
+<h3>不用測的東西：怎麼排除</h3>
+<p>原則是<strong>排除寫在設定檔，整個檔案排除</strong>；行內忽略只用在少數防禦性分支，而且要附一句理由。這樣 reviewer 看得到排除清單，也不會被 <code>ignore</code> 註解淹沒。</p>
+<div class="table-wrap wide">
+<table>
+<thead><tr><th>Repo</th><th>設定位置</th><th>排除</th><th>行內語法</th></tr></thead>
+<tbody>
+<tr><td>ai (adk)</td><td><code>[tool.coverage.run] omit</code></td><td><code>cofacts_ai/tests/*</code>、<code>url_resolver/_generated/*</code>、<code>main.py</code></td><td><code># pragma: no cover</code></td></tr>
+<tr><td>ai (src)</td><td><code>vite.config.ts → test.coverage.exclude</code></td><td><code>src/routeTree.gen.ts</code>、<code>src/server/gql/**</code>、<code>src/**/*.d.ts</code>、<code>src/components/ui/**</code>（shadcn）、<code>src/**/__tests__/**</code>、<code>src/router.tsx</code>、<code>src/routes/__root.tsx</code>、<code>*.stories.tsx</code></td><td><code>/* v8 ignore next */</code></td></tr>
+<tr><td>rumors-api</td><td><code>jest.collectCoverageFrom</code> + <code>coveragePathIgnorePatterns</code></td><td>先加 <code>collectCoverageFrom: ["src/**/*.{js,ts}", "!src/rumors-db/**", "!**/__{tests,fixtures,mocks}__/**"]</code> 讓沒測到的檔案也算進分母；再排除 <code>src/scripts/migrations/</code>、<code>src/scripts/experiment*</code>、<code>src/util/pseudonymDict.js</code>（字典資料）、<code>src/rollbarInstance.js</code>、<code>src/index.js</code>、<code>src/adm/index.ts</code>。<code>src/util/grpc.js</code> 在 <code>test/setup.js</code> 被全域 mock，要嘛排除、要嘛單獨寫測試</td><td><code>/* istanbul ignore next */</code></td></tr>
+<tr><td>media-manager</td><td><code>jest.collectCoverageFrom</code></td><td><code>src/index.ts</code>（只 re-export）</td><td><code>/* istanbul ignore next */</code></td></tr>
+<tr><td>url-resolver</td><td><code>jest.coveragePathIgnorePatterns</code></td><td><code>src/vendor/Readability.js</code>、<code>src/lib/*_pb.js</code>（protoc 產物）</td><td><code>/* istanbul ignore next */</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>CI 門檻</h3>
+<ul>
+  <li><strong>變更行覆蓋率 ≥ 80%</strong>，不設全域門檻。rumors-api 與 media-manager 已經接 Coveralls，可以直接用它的 PR 狀態；ai 用 <code>diff-cover</code> 讀 lcov / coverage.xml 即可，不必新增服務。</li>
+  <li>cofacts/ai 的 CI 加 <code>pnpm test -- --coverage</code>（需要 <code>@vitest/coverage-v8@3.2.4</code>，版本要和 vitest 一致）。注意 <code>"nitro": "latest"</code> 會在任何 lockfile 變動時被重新解析，加 devDependency 前先把 nitro 釘住（<a href="https://github.com/cofacts/ai/pull/154">#154</a> 已經做了）。</li>
+  <li>url-resolver 新增 <code>.github/workflows/ci.yml</code>，內容照 <code>.travis.yml</code>；media-manager 的觸發改成 <code>[push, pull_request]</code>。</li>
+</ul>
+</section>
+
+<section id="verify">
+<h2>PR 自動驗證</h2>
+<p>單元測試回答「這個函式對不對」，驗收要回答「這個 PR 有沒有做到它說要做的事、有沒有弄壞別的地方」。後者需要讀需求、操作實際部署、看畫面，這部分交給 Claude。</p>
+
+<h3>整體流程</h3>
+<div class="flow">
+  <div><b>PR 開啟或更新</b>repo 自己的 CI 跑測試、coverage、契約檢查（見下節）。cofacts/ai 同時部署 preview（含 <code>/storybook/</code>）。</div>
+  <div><b>Deploy／CI 成功後呼叫驗收員</b>workflow 最後一步 <code>curl</code> 驗收員 routine 的 <code>/fire</code> endpoint，帶上 repo、PR 編號、preview URL。這樣驗收員一定在部署完成後才開始，不必輪詢。</div>
+  <div><b>驗收員蒐集需求</b>PR 內文與 <code>Closes #N</code> 連結的 issue、GitHub Project（AI 相關是 org project 12）、cofacts/kb 的會議記錄與 design doc（<code>src/meetings/</code>、<code>src/technical-design/</code>）、repo 的 <code>docs/decisions/</code>。</div>
+  <div><b>驗收員實際操作</b>用 Playwright 開 preview：未登入頁面、Storybook 上這次改到的元件、登入後的聊天流程（見下方登入方案），逐條對照需求截圖。</div>
+  <div><b>回報</b>在 PR 上維護<strong>一則</strong>置頂留言（每次更新同一則），內容是需求對照表、截圖、失敗項目與建議修法。</div>
+  <div><b>啟動 code review</b>驗收通過後才觸發 review（見 <a href="#review">Code review</a>）。</div>
+</div>
+
+<h3>需求來源</h3>
+<p>驗收員可靠的程度取決於能不能找到需求。建議依序找：</p>
+<ol>
+  <li><strong>PR 內文的「需求來源」欄位</strong>：加一個 PR template，請作者貼 issue、會議記錄段落或 design doc 的連結。最便宜，也最準。</li>
+  <li><strong>連結的 issue</strong>（<code>Closes #N</code>）與它在 GitHub Project 上的欄位。</li>
+  <li><strong>kb 會議記錄</strong>：會議記錄裡大量直接引用 PR 編號（例如 10/20 那份提到 <a href="https://github.com/cofacts/ai/pull/118">#118</a>、<a href="https://github.com/cofacts/ai/pull/154">#154</a>、<a href="https://github.com/cofacts/ai/pull/162">#162</a>、<a href="https://github.com/cofacts/ai/pull/163">#163</a>），而且每份都有 OKF frontmatter。驗收員可以直接 <code>grep -rn "ai/pull/162\|#162" src/meetings/</code> 找出討論脈絡與決議（例如「#162 為了 Claude on Vertex 把附件濾掉了，不確定是不是真的不能吃檔案」，這就是驗收時要確認的一條）。</li>
+  <li><strong>design doc 與 ADR</strong>：kb 的 <code>src/technical-design/</code>、<code>src/research/</code>，以及 repo 內的 <code>docs/decisions/</code>。</li>
+</ol>
+<p>找不到需求時，驗收員應該在留言裡明說「沒找到需求來源，以下只做 regression 檢查」，不要自己腦補需求。</p>
+
+<h3>驗證環境與登入</h3>
+<div class="table-wrap wide">
+<table>
+<thead><tr><th>環境</th><th>能驗什麼</th><th>要登入嗎</th><th>注意事項</th></tr></thead>
+<tbody>
+<tr><td>Storybook（<code>&lt;preview&gt;/storybook/</code>）</td><td>元件外觀、各種狀態；可以跟 staging 的 Storybook 做截圖比對</td><td>不用</td><td>結果穩定，最適合當視覺 regression 的基準。網址結尾的 <code>/</code> 不能省</td></tr>
+<tr><td>Preview，未登入</td><td>首頁、登入導向、公開頁面、SSR 有沒有壞</td><td>不用</td><td>cofacts.ai 大部分功能要登入，這層能驗的有限</td></tr>
+<tr><td>Preview，已登入</td><td>聊天流程、session 列表、回饋按鈕，也就是真正的功能</td><td>要</td><td>會打 staging rumors-api（<code>dev-api.cofacts.tw</code>）和真的 Gemini，每次都有成本；只跑少數 smoke 對話</td></tr>
+<tr><td>本機（cloud session 裡 <code>pnpm dev</code>）</td><td>沒有 preview 的 repo、需要改設定才能重現的情境</td><td>同上</td><td>需要 Vertex 憑證與 network 設定，留到第二階段</td></tr>
+</tbody>
+</table>
+</div>
+
+<h4>登入怎麼做</h4>
+<p>cofacts.ai 的 session 就是 HttpOnly cookie <code>cofacts_session</code>，內容是 rumors-api 用 RS256 簽的 access JWT（<code>token_use: "access"</code>，效期等於 <code>COOKIE_MAXAGE</code>，預設 14 天）。BFF 只驗證簽章，不在乎 cookie 是怎麼來的。所以自動化不需要走 OAuth 畫面：</p>
+<ol>
+  <li>在 <strong>staging</strong> 資料庫建一個專用測試帳號（例如 <code>cofacts-ai-e2e</code>），權限跟一般使用者一樣。</li>
+  <li>在 rumors-api 加一個小腳本，用 staging 的 <code>JWT_PRIVATE_KEY</code> 呼叫既有的 <code>signLongLivedJWT(userId)</code> 簽出 token，由人工執行，存進 cloud environment 的 network secret（給驗收員 routine 用）或 GitHub secret（給 Playwright workflow 用）。</li>
+  <li>Playwright 用 <code>context.addCookies([{ name: 'cofacts_session', value, domain: '&lt;preview host&gt;', path: '/', httpOnly: true, secure: true, sameSite: 'Lax' }])</code>，接著直接開頁面。</li>
+  <li>14 天會過期：腳本可以加 <code>--ttl</code> 參數，只替測試帳號簽 90 天的 token；或者每兩週由人工重簽一次。</li>
+</ol>
+<div class="callout"><strong>前提：</strong>先確認 staging 與 production 的 <code>JWT_PRIVATE_KEY</code> 不同。若相同，staging 簽出的 token 在 production 也有效，這個方案就不能用，要先分開金鑰。另外不建議在 preview 加「測試用登入 route」，那段程式碼遲早會跟著 image 進 production。</div>
+<div class="callout"><strong>Session DB。</strong> ADK 的 staging DB 已經與 production 分開（DB 名稱加上 staging 後綴，<a href="https://github.com/cofacts/ai/pull/163">#163</a> 已 merge）。production 在 GCE 上用 rumors-deploy 的 env file，與 Cloud Run 的 <code>DATABASE_URL</code> secret 無關。preview 與 staging 仍是同一個 Cloud Run service、同一個 DB，所以驗收員建立的 session 會留在 staging DB。用專用測試帳號就能辨識，必要時依 user id 定期清掉即可。</div>
+
+<h3>截圖怎麼貼到 GitHub</h3>
+<p>GitHub CLI v2.99.0（2026-09-01）起，<code>gh pr comment</code>、<code>gh issue comment</code> 和 create / edit 都支援 <code>--attach</code>，檔案會上傳到 <code>user-attachments</code> 並插入內文，一次最多 50 個，需要 repo 的 push 權限。要確認的只有執行環境的 gh 版本：</p>
+<ul>
+  <li><strong>推薦：</strong><code>gh pr comment &lt;N&gt; --body-file report.md --attach shots/login.png --attach shots/chat.png</code>。body 裡已經寫的 <code>![alt](./shots/login.png)</code> 會被原地換成上傳後的網址。GitHub Actions runner 與 routine 的 cloud environment 都要先把 gh 升到 2.99 以上（我這個 cloud session 裡是 2.89，沒有這個參數），routine 可以在 environment 的 setup script 裡裝。</li>
+  <li>沒有新版 gh 時的備案：同 repo 開一個 orphan branch <code>pr-screenshots</code>，路徑 <code>pr-&lt;N&gt;/&lt;sha&gt;/*.png</code>，留言用 raw URL 嵌入。</li>
+  <li>GCS bucket（設 30 天 lifecycle）：圖片不進 git 歷史，但要多管一個 bucket 與權限。</li>
+  <li>Actions artifact：只能下載，不能在留言內顯示，不適合。</li>
+</ul>
+
+<h3>Regression：不重複既有測試</h3>
+<p>驗收員不應該重跑 CI 已經跑過的單元測試，而是做 CI 做不到的事：</p>
+<ul>
+  <li><strong>視覺差異</strong>：Storybook 上每個 story，在 staging 和 preview 各截一張比對，只回報有差異的。</li>
+  <li><strong>端到端 smoke</strong>：固定 3–5 段對話腳本（例如一則有圖片的可疑訊息、一則帶連結的訊息），確認 preview 能跑完、回應有 <code>sources</code>、引用的網址真的出現在工具輸出裡。最後這條檢查跟 <a href="https://github.com/cofacts/ai/issues/144">#144</a> 的程式層級出處檢查是同一個方向。</li>
+  <li><strong>agent 品質</strong>：改到 <code>adk/</code> 的 prompt 或模型時，抽 cofacts-ai-eval（<a href="https://github.com/cofacts/ai/issues/143">#143</a>）裡的小樣本跑一次，報分數變化。整套 eval 太貴，不適合每個 PR 都跑。</li>
+  <li><strong>整合測試</strong>：rumors-api 的雲端整合測試已經在每晚的 <code>integration.yml</code> 跑。驗收員只需要在 PR 改到那些模組時，提醒「這個 PR 影響的整合測試只在 nightly 跑」，必要時用 <code>workflow_dispatch</code> 手動觸發一次。</li>
+</ul>
+
+<h3>PR 留言格式</h3>
+<pre><code>## 驗收報告 · 3f2a1c9（第 2 次執行，前一次：1 項失敗）
+
+需求來源：#140、kb 20261020 會議記錄「cofacts.ai &lt;&gt; url-resolver」段
+
+| 需求 | 驗證方式 | 結果 | 證據 |
+|---|---|---|---|
+| 登入後可以上傳 PDF 附件 | preview，已登入 | ✅ | 截圖 1 |
+| writer 收到的附件會轉成 gs:// | smoke 對話 #2 + trace | ❌ | trace 連結 |
+| Storybook ChatInput 外觀不變 | 與 staging 比對 | ✅ | 無差異 |
+
+### 失敗：writer 沒收到附件
+- 現象：smoke 對話 #2 的 writer 輸入沒有 FileData
+- 可能原因：media_filedata.py:48 只處理 image/*
+- 建議修法：把 application/pdf 加進 SUPPORTED_MIME，補一個測試
+- 重現：開 &lt;preview&gt;/session/new，上傳 test/fixtures/sample.pdf</code></pre>
+</section>
+
+<section id="crossrepo">
+<h2>跨 repo 驗證</h2>
+<p>六個 repo 之間的依賴是固定的幾條，每條都有明確的契約，所以多數情況用便宜的確定性檢查就夠了，不需要把所有服務都架起來。</p>
+<div class="table-wrap wide">
+<table>
+<thead><tr><th>依賴</th><th>契約</th><th>確定性檢查（repo 層級）</th></tr></thead>
+<tbody>
+<tr><td>rumors-db → rumors-api</td><td>ES index mapping、zod schema（git submodule）</td><td>rumors-db 的 PR 加一個 job：checkout rumors-api，把 submodule 換成 PR 的 commit，跑 rumors-api 的 <code>npm test</code>。mapping 有變卻沒升 <code>VERSION</code> 就直接失敗</td></tr>
+<tr><td>rumors-api → ai</td><td>GraphQL schema</td><td>現在兩邊都沒檢查：ai 的 <code>codegen.ts</code> 讀的是 <strong>production</strong> schema（<code>api.cofacts.tw</code>），CI 也沒跑 codegen；adk 的 <code>tools.py</code> 則是直接送沒有型別的 query 字串。建議三步：rumors-api 加 <code>printSchema</code> snapshot；rumors-api 的 PR 加一個 job，checkout cofacts/ai，用這份 schema 跑 <code>graphql-codegen</code> 驗證 ai 的 documents；ai 的 CI 加「codegen 產物與 commit 的版本一致」檢查</td></tr>
+<tr><td>url-resolver → rumors-api、ai</td><td>gRPC proto</td><td>url-resolver 的 PR 跑 <code>buf breaking</code>（見上方 proto 說明）</td></tr>
+<tr><td>media-manager → rumors-api</td><td>npm 套件 API</td><td>media-manager 有 TypeScript 型別；rumors-api 升版時跑 <code>typecheck</code> 就會抓到</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>repo 層級還是 routine？</h3>
+<div class="table-wrap wide">
+<table>
+<thead><tr><th></th><th>repo 層級（GitHub Actions）</th><th>routine（Claude Code 排程任務）</th></tr></thead>
+<tbody>
+<tr><td>適合做</td><td>上表的契約檢查、測試、coverage、Playwright smoke</td><td>讀需求、判斷、操作 preview、寫回報、跨 repo 的功能驗收</td></tr>
+<tr><td>能看到幾個 repo</td><td>需要額外的 token 才能 checkout 其他 repo</td><td>一個任務可以選多個 repo，每次都 clone</td></tr>
+<tr><td>誰付錢</td><td>Actions 分鐘數；呼叫 Claude 的話走 Vertex</td><td>掛 routine 的那個人的 subscription 額度（超過後走 extra usage）</td></tr>
+<tr><td>以誰的身分留言</td><td>GitHub App / bot</td><td>掛 routine 的人本人</td></tr>
+<tr><td>觸發</td><td>任何 GitHub 事件</td><td>排程、API <code>/fire</code>、GitHub 事件（PR、release、issue）</td></tr>
+</tbody>
+</table>
+</div>
+<p>結論：<strong>契約檢查放 repo 層級，功能驗收放 routine。</strong> 跨 repo 的功能（例如 rumors-api 加欄位、ai 使用它）由驗收員處理：rumors-api 沒有 preview 環境，驗收員能做的是確認兩邊的 PR 互相引用、契約檢查都通過，然後在 ai 的 preview 上（指向 staging API）驗證。真正的端到端要等 rumors-api 的 PR 部署到 staging 之後；驗收員可以在 ai 的 PR 留言列出「等 rumors-api#N 上 staging 後要補驗的項目」。</p>
+</section>
+
+<section id="review">
+<h2>Code review</h2>
+
+<h3>三個選項</h3>
+<div class="table-wrap wide">
+<table>
+<thead><tr><th></th><th>Claude Code Review（官方託管）</th><th><code>claude-code-action</code> + Vertex</th><th>個人 routine</th></tr></thead>
+<tbody>
+<tr><td>品質</td><td>多個 agent 平行找問題，加上驗證步驟過濾誤報；結果附 severity、inline comment 與 check run</td><td>單一 session 跑 <code>/code-review</code> plugin，品質取決於 prompt</td><td>同左，可以自訂流程</td></tr>
+<tr><td>計費</td><td>Team 方案的 usage credits，按 token 計，沒有固定單價，可設每月上限</td><td>GCP 帳單（現在 <code>claude.yml</code> 已經是這樣）</td><td>個人額度</td></tr>
+<tr><td>觸發</td><td>每個 repo 可設：開 PR 時、每次 push、或只在留言 <code>@claude review</code> 時</td><td>任何 workflow 事件，包括 <code>workflow_run</code>（CI 成功後）</td><td>API／GitHub 事件</td></tr>
+<tr><td>設定</td><td>repo 的 <code>REVIEW.md</code>、<code>CLAUDE.md</code>（從 base branch 讀，PR 本身改不到）</td><td>workflow 的 prompt 與 <code>CLAUDE.md</code></td><td>routine 的 prompt</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>建議</h3>
+<ul>
+  <li><strong>計費沿用 Vertex，不用個人 subscription。</strong> 官方文件對 org 共用的 secret 建議用 API key 或雲端帳號，因為 OAuth token 綁在跑 <code>claude setup-token</code> 那個人的 subscription 上。用個人 token 等於把團隊的 CI 額度跟某人的日常使用綁在一起，那個人離開或額度用完時 review 就停。</li>
+  <li><strong>「驗完功能才 review」的做法：</strong>官方 Code Review 設成 Manual 模式，由驗收員在通過後留言 <code>@claude review</code>。routine 以掛的人的身分留言，那個人有 write 權限，所以這個留言有效。若用 Action 版本，就用 <code>workflow_run</code> 接在 CI 與 Deploy 之後。</li>
+  <li><strong>先試官方 Code Review 一個月</strong>（Manual 模式、設每月上限），跟目前的 Vertex 方案比較誤報率與成本。注意：現有 <code>claude.yml</code> 只要留言含 <code>@claude</code> 就會觸發，跟 <code>@claude review</code> 會同時跑；要嘛把 <code>claude.yml</code> 的 <code>trigger_phrase</code> 改掉，要嘛在 <code>if</code> 排除 <code>@claude review</code>。</li>
+</ul>
+
+<h3>通用 review 還是放入團隊偏好？</h3>
+<p>用通用的正確性 review，再補上足夠的脈絡；不要一開始就寫風格偏好。格式與風格交給 Prettier、ESLint、ruff。脈絡放在 <code>REVIEW.md</code>，內容是這個系統特有、而且出錯代價高的不變量，例如：</p>
+<ul>
+  <li><code>src/lib/adk.ts</code> 的 <code>AllTools</code> 必須與 <code>adk/cofacts_ai/tools.py</code>、<code>agent.py</code> 同步。</li>
+  <li><code>{content, sources}</code> JSON 契約與每條主張的出處覆蓋檢查。</li>
+  <li><code>deploy.yml</code> 的 <code>envsubst</code> 白名單：新增 placeholder 卻沒加進清單，會原封不動送進 Cloud Run。</li>
+  <li>改到 agent 編排、session 儲存、auth、部署時，要有 <code>docs/decisions/</code> 的 ADR（呼應 <code>CLAUDE.md</code> 的規則）。</li>
+  <li>rumors-db mapping 有變要升 <code>VERSION</code>；ES 查詢不能用 <code>_id</code> 排序（ES 9 遷移的經驗）。</li>
+  <li>url-resolver 會依使用者提供的網址發出請求，任何新的抓取路徑都要檢查 SSRF（10/18 會議發現 url-resolver 與 ES 在同一個網路）。</li>
+</ul>
+<p>之後 review 裡反覆出現的團隊意見，再逐條加進 <code>REVIEW.md</code>。</p>
+</section>
+
+<section id="vuln">
+<h2>漏洞修補</h2>
+
+<h3>先說清楚能隱藏什麼</h3>
+<p>這幾個 repo 都公開，<code>package-lock.json</code>、<code>pnpm-lock.yaml</code>、<code>uv.lock</code> 也都公開。任何人都能從 lockfile 看出套件版本，再對照公開的 advisory。所以私有流程真正能爭取的是<strong>從發現到修好的時間</strong>：Renovate 或 Dependabot security PR 一開，就等於公告「這裡有洞、還沒修」，而且這個訊號一直掛到 merge 為止。私有流程讓公開的那一刻就是修補 PR 本身，最好連部署也在同一天完成。</p>
+
+<h3>dependabot high / critical 的流程</h3>
+<div class="flow">
+  <div><b>開啟 Dependabot alerts，關閉 Dependabot security updates</b>只要 alert（只有 repo 管理者看得到），不要它自動開公開 PR。</div>
+  <div><b>devops 每日同步 alert</b>cofacts/devops 裡一個排程 GitHub Action，用一個有 <em>Dependabot alerts: read</em> 權限的 GitHub App 或 fine-grained token，把各 repo 新出現的 high / critical alert 開成 devops issue（label <code>vuln</code>，用 alert URL 去重）。Claude GitHub App 的權限清單沒有 Dependabot alerts，所以這一步不能靠它。</div>
+  <div><b>Claude 評估影響</b>一個 routine 以 GitHub trigger 監聽 devops 的 <code>issues.opened</code>（label <code>vuln</code>）：clone 受影響的 repo，判斷有沒有實際用到有漏洞的程式路徑、是不是只有 devDependency，然後在 session 裡升級套件、跑測試，把影響評估與 diff 貼回 devops issue。<strong>不要 push branch 到公開 repo</strong>，branch 名稱本身就會洩漏。</div>
+  <div><b>人類放行</b>維護者看完評估，加上 label <code>approved</code>。</div>
+  <div><b>開公開 PR</b>同一個 routine 監聽 <code>issues.labeled</code>，在公開 repo 開 PR。標題用中性的 <code>chore(deps): bump X</code>，merge 後立即部署，最後關閉 devops issue。</div>
+</div>
+<p class="note">rumors-api 與 url-resolver 的 Renovate（每月一次）可以保留，負責一般升版；安全性升級走上面這條。在 Renovate 設定把有 advisory 的套件交給上面的流程處理，避免兩邊重複開 PR。</p>
+
+<h3>重大事件（on-demand）</h3>
+<ul>
+  <li>在 devops 加一個 incident issue template（時間軸、影響範圍、處置、後續）。發現事件的人開票，在 claude.ai/code 以 devops + 受影響 repo 開 session 處理。</li>
+  <li>解完才對外說明：在 devops issue 寫好摘要，由人工貼到 Slack（若 routine 接了 Slack connector，可以讓它草擬，由人按送出）。</li>
+  <li>不是依賴套件、而是自己程式碼的漏洞（例如 10/18 的 SSRF），用 GitHub 的 repository security advisory：它提供暫時性的私有 fork 讓人在裡面修，修完再一起公開。公開 repo 免費。</li>
+</ul>
+</section>
+
+<section id="cost">
+<h2>Claude 用量與方案</h2>
+
+<h3>價格</h3>
+<div class="table-wrap wide">
+<table>
+<thead><tr><th>方案</th><th>價格（每席每月）</th><th>用量</th><th>來源</th></tr></thead>
+<tbody>
+<tr><td>Team Standard，nonprofit</td><td class="num">$8</td><td>約 Pro 的 1.25 倍；最少 2 席</td><td>claude.com 的 nonprofits 頁面</td></tr>
+<tr><td>Team Premium，nonprofit</td><td class="num">$40</td><td>Standard 的 5 倍（約 Pro 的 6.25 倍）</td><td>nonprofits 頁面只列 Standard，$40 是你提供的數字，跟一般價 $100 打 4 折一致；請在 admin billing 確認</td></tr>
+<tr><td>Team Standard / Premium，一般價</td><td class="num">$20 / $100（年繳）</td><td>同上</td><td>claude.com/pricing</td></tr>
+<tr><td>Extra usage</td><td class="num">API 牌價</td><td>Opus 5.5 每百萬 token 輸入 $4、輸出 $20；Sonnet 5.5 $2 / $10</td><td>超出席位額度後的計費，管理員可設上限</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>怎麼選</h3>
+<p>兩種席位每月差 <strong>$32</strong>。Standard 席位的人如果每月 extra usage 超過 $32，換成 $40 席位比較划算；沒超過就留在 $8。Premium 的用量是 Standard 的 5 倍，換算下來 extra usage 要高出很多才會超過 Premium 的額度。</p>
+<ul>
+  <li><strong>掛 routine 的人</strong>：驗收員、漏洞評估的 routine 都吃這個人的額度。以每月約 30 個 PR、每個 PR 平均跑 2 次估算，若全走 API 牌價，每次 Opus 驗收 session 約 $1.5–4，每月約 $90–240（粗估，實際取決於 cache 命中與 preview 操作的步數）。這個量在 Standard 席位上幾乎一定超過 $32，<strong>這個人用 $40 席位</strong>。</li>
+  <li><strong>其他開發者</strong>：先用 $8，開 extra usage 並在 <code>admin-settings/usage</code> 設組織上限，一個月後看每人的 extra usage 再決定。</li>
+  <li><strong>官方 Code Review</strong>：不吃席位額度，直接扣組織的 usage credits，需要另外設 Code Review 的每月上限。</li>
+  <li><strong>Vertex 上的 <code>claude.yml</code></strong>：走 GCP 帳單，與席位無關。</li>
+</ul>
+<p class="note">建議第一個月就把驗收員與 review 的花費分開看：routine 的用量在 claude.ai 的 usage 頁，Code Review 在 <code>claude.ai/analytics/code-review</code>，Vertex 在 GCP billing。</p>
+</section>
+
+<section id="phases">
+<h2>分階段推進</h2>
+<div class="phase"><div class="when">第 1–2 週</div><ul>
+  <li>cofacts/ai CI 跑 vitest + coverage；url-resolver 搬到 Actions；media-manager 加 <code>pull_request</code> 觸發</li>
+  <li>rumors-api 加 <code>collectCoverageFrom</code> 與 <code>printSchema</code> snapshot；jest 加 <code>--max-old-space-size</code> 避免 <code>ListReplies</code> OOM</li>
+  <li>四個 Node repo 與 adk 加上 coverage 排除設定與變更行 80% 門檻</li>
+  <li>url-resolver 加 <code>buf breaking</code>；rumors-db 加「mapping 變更要升 VERSION」檢查</li>
+  <li>開始開 Dependabot alerts、關閉 security updates PR</li>
+</ul></div>
+<div class="phase"><div class="when">第 3–4 週</div><ul>
+  <li>補 <code>tools.py</code>、<code>chatCache.ts</code>、<code>run-sse.ts</code> 的測試</li>
+  <li><a href="https://github.com/cofacts/ai/pull/154">#154</a> Storybook merge 後，加入 staging 與 preview 的 Storybook 截圖比對</li>
+  <li>PR template 加「需求來源」欄位；驗收員 routine 第一版只做未登入 + Storybook，從 Deploy workflow 觸發</li>
+  <li>devops 的 alert 同步 Action 與評估 routine</li>
+</ul></div>
+<div class="phase"><div class="when">第 5–8 週</div><ul>
+  <li>建立 staging 測試帳號與 token 腳本，驗收員加入登入後的 smoke 對話</li>
+  <li>官方 Code Review 以 Manual 模式試行，由驗收員觸發</li>
+  <li>rumors-db → rumors-api、rumors-api → ai 的跨 repo 契約 job</li>
+  <li>依第一個月的用量調整席位</li>
+</ul></div>
+</section>
+
+<section id="decide">
+<h2>待團隊決定</h2>
+<ol>
+  <li><strong>routine 掛在誰的帳號？</strong>驗收員留言會以那個人的名義出現，用量也算那個人的。或者另外申請一個「Cofacts bot」席位專門掛 routine（需要另一個 GitHub 帳號與 claude.ai 帳號）。</li>
+  <li><strong>staging 與 production 的 JWT 金鑰是否已分開？</strong>沒分開的話，登入方案要先處理金鑰。</li>
+  <li><strong>截圖放 orphan branch 還是 GCS？</strong></li>
+  <li><strong>驗收員要不要能擋 merge？</strong>建議前一個月只留言、不設 required check，等誤報率穩定再說。</li>
+  <li><strong>要不要寫成 ADR？</strong>「驗收員架構」與「登入用預簽 JWT」都跨前後端，也動到 auth 與部署，依 cofacts/ai 的 <code>CLAUDE.md</code> 屬於該記錄的決策。</li>
+</ol>
+</section>
+
+<footer>
+資料來源：各 repo default branch（2026-10-25）、本機執行的 pytest / vitest / jest coverage、cofacts/kb <code>src/meetings/2026/20261020.md</code>、Claude Code 官方文件（scheduled tasks、Code Review、GitHub Actions）、claude.com/pricing 與 nonprofits 頁面。成本數字是粗估，請以第一個月的實際用量為準。
+</footer>
+</main>
+</div>
+
+</body></html>
