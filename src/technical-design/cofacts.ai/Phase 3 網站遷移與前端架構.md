@@ -26,9 +26,9 @@ timestamp: "2026-10-17T12:00:00+08:00"
 
 本文提出：
 
-1. **網址（§2）**：URL 總表依分工 track 分組。rumors-site 既有 path 全部沿用；AI 功能收進 `/ai/*`；列表頁的 search param 改成小寫、可讀、有白名單的新格式，舊格式照收並 redirect 到新格式。語系用 lingui，依 host 切換。
+1. **網址（§2）**：URL 總表依分工 track 分組。rumors-site 既有 path 全部沿用；AI 功能收進 `/ai/*`；列表頁的 search param 是否改名未定案，不做舊格式相容（§2.3）。語系用 lingui，依 host 切換。
 2. **元件（§3）**：分四層，由下而上是 shadcn（Base UI）primitives、Cofacts 領域元件、feature 元件、route。**Penpot 元件路徑 = 程式元件 = Storybook title**，三邊名字一致。
-3. **Storybook（§4）**：元件層每個 Penpot variant 一個 story，頁面層每個 Penpot board（含狀態板）一個 scenario。light/dark × 375/1440 全跑 axe。
+3. **Storybook（§4）**：只寫元件層，每個 Penpot variant 一個 story，light/dark × 375/1440 全跑 axe。頁面不寫 story，在每個 PR 的 preview 環境驗收。
 4. **Penpot ↔ Tailwind（§5）**：規則是「**Penpot token 去掉角色前綴就是 Tailwind class**」，例如 `surface-raised` → `bg-raised`、`text-secondary` → `text-secondary`、`border-control` → `border-control`、`spacing-16` → `p-16`、`RADIUS-5` → `rounded-5`、font size `16` → `text-16`。Tailwind 預設色盤整個關掉，原始色不做成 utility，所以 `text-gray-400`、`text-accent`（品牌黃當字）、`text-15` 這類 class **根本編譯不出來**。已用 Tailwind 4.2.0 實測。
 5. **無障礙（§6）**：指南四條規則中，R2（品牌黃不當字）與 R3（只用語意名）靠 token 設計在建構時就擋掉，R1（狀態要有文字）靠元件擋，R4（底色與前景配套）靠 dark 主題的 axe 測試抓。這些規則寫成 `cofacts/ai` 的 repo-level skill `cofacts-frontend`，做前端時自動載入。
 6. **分工（§8）**：0（WG 基礎）＋ 1 列表、2 單一訊息與回應、3 回報、4 Infographics、5 AI chat，另加 6 上線切換。§8 談規模與人力建議。**切換前必須讓 Cloudflare 的 HTML cache rule 排除 session cookie**（§2.6）。
@@ -627,7 +627,6 @@ Track 0（WG 基礎，§2.2、§8）要完成的設定：`createRouter({ context
 ### 4.1 命名與組織
 
 - **Story title = Penpot 元件路徑**：`Base/Button`、`Content/FactCheckReply`、`Layout/Nav`。設計師在 Penpot 看到什麼，就能在 Storybook 用同一個名字找到。
-- 頁面層級一律放 `Pages/<Penpot 頁名>/<board 名>`，例如 `Pages/Article Detail/MessagePage`。
 - 每個 story 的 `parameters.penpot = { page, board, componentId }` 記錄對應的 Penpot 物件。skill 與 agent 可以由此雙向查找；§6.3 的元件 registry 也從這裡產生，不必手動維護。
 
 ### 4.2 全域設定
@@ -641,29 +640,18 @@ Track 0（WG 基礎，§2.2、§8）要完成的設定：`createRouter({ context
 | 互動狀態 | `storybook-addon-pseudo-states` 展示 hover、focus-visible、active，不必為每個狀態另寫元件變體（呼應指南：「焦點是一條全域規則，不是每個元件各做一個」） |
 | 無障礙 | `@storybook/addon-a11y`，設定 `parameters.a11y.test = 'error'` |
 | 測試 | `@storybook/addon-vitest`：每個 story 就是一個測試，CI 裡跑 axe（light + dark） |
-| 部署 | 每個 PR build 一份 Storybook（放 GCS 或 Cloudflare Pages），PR 裡附連結給設計師 review |
+| 部署 | 每個 PR 的 preview 都掛 Storybook（`/storybook/`，[cofacts/ai#154](https://github.com/cofacts/ai/pull/154)）；改到共用元件的 PR 附連結給設計師 review |
 
 ### 4.3 元件層 story
 
 - **每個 Penpot variant 一個 story**，再加一個 `AllVariants` 矩陣 story 方便和 Penpot 的元件板並排比對。
 - 邊界情況：超長標題、空值、沒有頭像、數字 99+、`disabled`。
 
-### 4.4 頁面層 scenario（page-level stories）
+### 4.4 頁面不寫 story（2026-10-29）
 
-頁面拆成「`XxxPageView`（純 props）＋ route（loader）」，story 只渲染 `XxxPageView`，用 `src/fixtures/` 的資料。**Penpot 裡每個狀態板都應該有對應的 scenario**：
+頁面不做 page-level story。每個 PR 都有 Cloud Run preview（tag `pr-N`），設計師直接在 preview 上看實際頁面驗收，PR 附 preview 連結。頁面要接 router、loader 與 query，在 Storybook 裡 mock 這些的成本高，結果也不如真實環境可信。
 
-| 頁面 | Scenarios |
-|---|---|
-| `/replies` | 預設、套用篩選、篩選器展開（mobile「篩選器手機版」）、空結果、載入中、載入更多 |
-| `/articles`、`/hoax-for-you` | 預設、已讀狀態（`DisputedMessage/read`）、多媒體訊息（圖片、影片）、空結果 |
-| `/search` | 搜訊息、搜回應、沒有 `q`、無結果、帶篩選 |
-| `/article/:id` | 無回應（顯示 AI 自動分析）、有 5 則回應、多種判定並存、圖片訊息加逐字稿、未登入、已登入且自己回應過、被封鎖的訊息（未登入 / 已登入）、mobile 快速索引 |
-| 編輯器 | 撰寫回應（3 個分頁各一）、使用既有回應、驗證錯誤、送出中 |
-| `/reply/:id` | 單一文章、多篇文章共用同一回應 |
-| `/user` | 有 slug、無 slug、留言 tab、沒有任何貢獻 |
-| `/report` | 直接對應 Penpot 板：未登入、輸入、A Loading、B-1 有文章且有查核回應、B-2 有文章但無回應、C 查無此訊息準備新增 |
-| `/ai` | 新任務、串流中（呼叫工具）、草稿完成（`AI-main page-Mobile-Draft`）、工具抽屜開啟、錯誤、登入過期 |
-| 靜態頁 | 各一 |
+Penpot 的狀態板（例如 `/report` 的 A Loading、B-1、B-2、C）仍是要實作、要驗收的狀態清單，不能只做預設狀態；只是驗收地點在 preview，不是 Storybook。
 
 ---
 
@@ -928,7 +916,7 @@ flowchart LR
    - 找同名的 `-1440` / `-Mobile` board，或 `X` / `X-Mobile` 元件，合成一個響應式元件。
    - mobile-first：mobile 的值寫在基本 class，desktop 的值加斷點前綴（兩級斷點，切換寬度見附錄 C #11）。
 7. **Icon**：`Base/Icon` 的 `Name` 屬性值轉成 snake_case 餵給 `<Icon name>`（`Open-In-New` → `open_in_new`）；`status-*`、`fb`、`line` 用自訂 SVG。
-8. **狀態板**（`A-…`、`B-1-…`、`回報可疑訊息-未登入`）：每個對應一個 story scenario，不要只做預設狀態。
+8. **狀態板**（`A-…`、`B-1-…`、`回報可疑訊息-未登入`）：每個狀態都要實作，並在 preview 驗收，不要只做預設狀態。
 9. **備註 board**：「開發 Note」是需求，要逐條落實或在 PR 說明為何不做；「頁面層級標記」是頁面 / route 的名稱。
 
 ### 5.6 實作工作流程：設計師完稿 → agent 接手
@@ -939,7 +927,7 @@ sequenceDiagram
   participant GH as GitHub issue / PR
   participant E as 工程師
   participant A as Coding agent（cofacts-frontend skill + Penpot MCP）
-  participant SB as Storybook preview
+  participant SB as PR preview（頁面 + /storybook/）
 
   D->>D: 用元件與 token 完稿；狀態各一個 board；寫「開發 Note」；依 R1–R5 自查
   D->>GH: 開 issue「Ready for dev」：Penpot 連結、board 名稱與 id
@@ -947,10 +935,10 @@ sequenceDiagram
   A->>A: ① 盤點：用到的元件、有無對應程式元件、未綁 token 清單、R1–R5 預檢
   A->>E: 回報實作計畫與設計疑點
   E-->>D: 設計疑點（Penpot comment 或 issue）
-  A->>A: ② 先補 ui 與共用元件及 story，③ 再做 PageView 與 scenario，④ 最後接 route / loader
-  A->>A: ⑤ 驗證：lint、axe（light/dark）、Storybook 截圖 vs export_shape PNG（375/1440）、鍵盤走查
-  A->>GH: 開 PR：Storybook 連結、Penpot 對照、偏差說明、未綁 token 清單、無障礙檢查表
-  GH->>SB: CI build Storybook preview
+  A->>A: ② 先補 ui 與共用元件及 story，③ 再做頁面與 route / loader
+  A->>A: ④ 驗證：lint、axe（light/dark）、元件的 Storybook 截圖 vs export_shape PNG（375/1440）、鍵盤走查
+  A->>GH: 開 PR：preview 連結（改到元件時另附 Storybook 連結）、Penpot 對照、偏差說明、未綁 token 清單、無障礙檢查表
+  GH->>SB: CI 部署 PR preview
   D->>SB: 設計師驗收
   E->>GH: WG code review → merge
 ```
@@ -1031,7 +1019,7 @@ sequenceDiagram
 | Lint | `better-tailwindcss`、自訂規則（`*-status-*` 白名單、禁 `dark:`、禁 arbitrary color、禁 `leading-*` 與單獨字級、Icon-only 按鈕必填 `aria-label`） | 手寫的違規 |
 | 測試 | Storybook + addon-a11y + addon-vitest，light 與 dark 都跑 | 對比、名稱、role、R4 |
 | Agent | `cofacts-frontend` skill 的完成條件 | 流程遺漏、指南 06 的互動規格、§6.1 程式階段清單 |
-| 人 | PR 模板的無障礙檢查表、設計師在 Storybook 驗收 | 其餘項目 |
+| 人 | PR 模板的無障礙檢查表、設計師在 PR preview 驗收頁面、在 Storybook 驗收元件 | 其餘項目 |
 
 ### 6.3 `cofacts-frontend` skill 設計
 
@@ -1078,12 +1066,12 @@ description: >
    每個 route 都在 loader await SSR 需要的 query，且只回傳 head 需要的欄位；
    loader 只呼叫 server function；*.server import 只在 handler 裡用；
    dev 出現 import protection 警告視同錯誤。
-4. Stories: 每個 Penpot 狀態板一個 scenario。
+4. Stories: 只寫元件 story；頁面不寫 story，Penpot 狀態板的每個狀態都要實作並在 preview 驗收。
 5. Verify（完成條件，全部要過）:
    - pnpm lint && pnpm test（含 storybook a11y，light + dark）
-   - 375 與 1440 的 Storybook 截圖對照 export_shape
+   - 元件：375 與 1440 的 Storybook 截圖對照 export_shape；頁面：在 preview 對照
    - references/a11y.md 的「程式階段」項目逐條確認
-6. PR: 附 Penpot 連結、Storybook 連結、偏差說明、未綁 token 清單、a11y 檢查表。
+6. PR: 附 Penpot 連結、preview 連結（改到元件時另附 Storybook 連結）、偏差說明、未綁 token 清單、a11y 檢查表。
 ```
 
 另外在 cofacts/ai 的 `AGENTS.md` 加一行：「前端工作請使用 `cofacts-frontend` skill」。skill 靠 description 觸發，但寫在 AGENTS.md，其他 agent 也看得到。
@@ -1094,7 +1082,7 @@ description: >
 
 - 目前 CI 只跑 lint、prettier、`tsc`，**沒跑 vitest，也沒跑 production build**。Phase 3 要加上：`pnpm build`（import protection 只在 build 時讓違規失敗，§3.5）、vitest、Storybook test（a11y）、`tokens.css` 是否與 json 一致、build-storybook。
 - PR 模板新增「設計對照」與「無障礙檢查」兩段。
-- 視覺回歸（Chromatic 或 Playwright 截圖）列為加分項，先靠設計師在 Storybook preview 驗收。
+- 視覺回歸（Chromatic 或 Playwright 截圖）列為加分項，先靠設計師在 PR preview 驗收。
 
 ---
 
@@ -1134,7 +1122,7 @@ description: >
 - **共用元件由「第一個用到的 track」負責**：做好後放進 Storybook 並登錄到 registry（`parameters.penpot`）；其他 track只能透過 PR 擴充 props，不 fork。`ReplyTypeLabel`、`UserAvatar` / `UserFlag` 在Track 0 先做；`FactCheckReply`、`ArticleCard`、`ReplyFeedback` 由Track 1 負責、Track 2 沿用（Penpot 的 `Latest replies` 與 `MessagePage` 各有 39 個 `FactCheckReply` 子節點）。
 - 要做新共用元件前，或把 `-components/` 的元件搬進 `src/components/` 前，先查 Storybook 與 `components.md`，避免 A、B 各做一份。
 - search param 的 schema 工具在Track 0 建立，Track 1 擴充。
-- 無稿頁面由工程師以 Guide 為範例拼湊，PR 附 Storybook 連結請設計師 review。**設計師的主要工作是驗收，不是補稿。**
+- 無稿頁面由工程師以 Guide 為範例拼湊，PR 附 preview 連結請設計師 review。**設計師的主要工作是驗收，不是補稿。**
 
 ---
 
