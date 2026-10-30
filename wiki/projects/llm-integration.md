@@ -3,7 +3,7 @@ type: Project
 title: "LLM 整合"
 description: "Cofacts 逐步將 LLM 引入查核流程的設計與研究歷程，從 ChatGPT 使用情境探索到 MCP server 與 Langfuse 可觀測性。"
 tags: [cofacts, llm, chatgpt, mcp, langfuse, ai]
-timestamp: "2026-06-25T00:00:00+08:00"
+timestamp: "2026-10-12T22:00:00+08:00"
 ---
 
 ## 背景
@@ -32,6 +32,21 @@ Cofacts 的 LLM 整合分為兩個軸線：
 [src/technical-design/chatgpt-integration.md](../../src/technical-design/chatgpt-integration.md)
 
 上述研究的工程設計文件，說明 ChatGPT 整合的具體實作方式。
+
+### [Design] Topic Classifier：從 BERT 到 LLM
+
+[src/technical-design/jev-topic-classifier-evaluation.md](../../src/technical-design/jev-topic-classifier-evaluation.md)
+
+Article category（主題標籤）自動分類的歷程，以及 Jev、Clef、Haiku 的可行性評估與實測：
+
+- 2021：`rumors-ai-bert` + 若水 ground truth，因需常駐 GPU host 而停用
+- 2025：改以 LLM 實作，程式碼在 [cofacts/worker](https://github.com/cofacts/worker) PR #1 / #3，benchmark 未結案、尚未上線
+- 2026：評估 Cloudflare Workers AI 的 `typesafe/jev`（每個 category 一題 noul，取得 calibrated 機率後訂 precision-recall gate）；
+  同時決定**放棄 cofacts/worker 路線**——classifier 直接做在 rumors-api 的 `CreateArticle` / `CreateMediaArticle`，
+  url-resolver 維持現有 gRPC 寫法
+- 2026-10：以 ground truth 1,000 篇比較 7 個方案（Jev、Clef、clef-flash 搭配兩種題目寫法，以及 Claude Haiku 5.5 直接輸出分類清單）：
+  決策模型逐類 AUC 約 0.97，最好的方案 micro-F1 約 0.75；題目寫法的影響（+0.02~0.07）大於模型之間的差距（±0.01）。
+  建議 Jev 搭配逐類具體條件的題目：每篇 $0.000176、p50 0.27 秒、可調門檻；Haiku 準確率相當但無法調門檻、成本約 3.4 倍
 
 ### [Design] Langfuse LLM observability
 
