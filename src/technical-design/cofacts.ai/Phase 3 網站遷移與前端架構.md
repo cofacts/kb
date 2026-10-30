@@ -137,9 +137,8 @@ cofacts/ai 目前的前端狀況（Phase 3 要一併處理）：
 | `/` | 首頁（landing） | ❌ 無稿 | 🟢 | 移植現有設計；JSS 改寫成 Tailwind / CSS Modules（§3.6） |
 | `/tutorial?tab=bust-hoaxes\|check-rumors` | 使用教學 | ✅ `Guide how-1440` | 🟢 | 不合法的 `tab` 退回預設；修掉站內的錯字連結 `/tutorial?bust-hoaxes` |
 | `/about` | Cofacts 是什麼 | ✅ `Guide what-1440` | 🟢 | 設計師註記：「目前僅針對主要樣式套上新的設計系統，原本的教學內容無更動」 |
-| `/impact` | 社會影響力報告 | ❌ 無稿 | 🟢 | rumors-site 的版本沒有 header / footer；新版建議納入全站 shell |
+| `/impact` | 社會影響力報告 | ❌ 無稿 | 🟢 | 沿用 rumors-site，不放全站 header / footer：route 設 `staticData.hideGlobalNav` 與 `hideGlobalFooter`（§3.4） |
 | `/terms` | 使用者條款 | ❌ 無稿 | 🟢 | 由 `LEGAL.md` 轉換（build-time 即可） |
-| `/instant` | 已退役的 stub | — | 🔴 | 302 到 community builder |
 
 #### Track 5　AI chat
 
@@ -431,7 +430,7 @@ design/
 └── tokens.json                      # Penpot 匯出的 token（DTCG JSON），token 的來源
 ```
 
-**全站 shell 放在 `__root.tsx`，各 route 用 `staticData` 關掉不要的部分。** Penpot 裡所有頁面（含 AI 首頁）共用同一組 Nav 與 Footer，只有進入有 side panel 的畫面（AI 對話、編輯器）時不放 footer。所以不另設 `_site` 這類 pathless layout，route 直接放在 `routes/` 下：
+**全站 shell 放在 `__root.tsx`，各 route 用 `staticData` 關掉不要的部分。** Penpot 裡所有頁面（含 AI 首頁）共用同一組 Nav 與 Footer，只有進入有 side panel 的畫面（AI 對話、編輯器）時不放 footer；`/impact` 沿用 rumors-site 的版面，header 與 footer 都不放。所以不另設 `_site` 這類 pathless layout，route 直接放在 `routes/` 下：
 
 ```tsx
 // src/routes/__root.tsx（節錄）
