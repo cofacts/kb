@@ -26,9 +26,9 @@ timestamp: "2026-10-17T12:00:00+08:00"
 
 本文提出：
 
-1. **網址（§2）**：URL 總表依分工 track 分組。rumors-site 既有 path 全部沿用；AI 功能收進 `/ai/*`；列表頁的 search param 改成小寫、可讀、有白名單的新格式，舊格式照收並 redirect 到新格式。語系用 lingui，依 host 切換。
+1. **網址（§2）**：URL 總表依分工 track 分組。rumors-site 既有 path 全部沿用；AI 功能收進 `/ai/*`；列表頁的 search param 是否改名未定案，不做舊格式相容（§2.3）。語系用 lingui，依 host 切換。
 2. **元件（§3）**：分四層，由下而上是 shadcn（Base UI）primitives、Cofacts 領域元件、feature 元件、route。**Penpot 元件路徑 = 程式元件 = Storybook title**，三邊名字一致。
-3. **Storybook（§4）**：元件層每個 Penpot variant 一個 story，頁面層每個 Penpot board（含狀態板）一個 scenario。light/dark × 375/1440 全跑 axe。
+3. **Storybook（§4）**：只寫元件層，每個 Penpot variant 一個 story，light/dark × 375/1440 全跑 axe。頁面不寫 story，在每個 PR 的 preview 環境驗收。
 4. **Penpot ↔ Tailwind（§5）**：規則是「**Penpot token 去掉角色前綴就是 Tailwind class**」，例如 `surface-raised` → `bg-raised`、`text-secondary` → `text-secondary`、`border-control` → `border-control`、`spacing-16` → `p-16`、`RADIUS-5` → `rounded-5`、font size `16` → `text-16`。Tailwind 預設色盤整個關掉，原始色不做成 utility，所以 `text-gray-400`、`text-accent`（品牌黃當字）、`text-15` 這類 class **根本編譯不出來**。已用 Tailwind 4.2.0 實測。
 5. **無障礙（§6）**：指南四條規則中，R2（品牌黃不當字）與 R3（只用語意名）靠 token 設計在建構時就擋掉，R1（狀態要有文字）靠元件擋，R4（底色與前景配套）靠 dark 主題的 axe 測試抓。這些規則寫成 `cofacts/ai` 的 repo-level skill `cofacts-frontend`，做前端時自動載入。
 6. **分工（§8）**：0（WG 基礎）＋ 1 列表、2 單一訊息與回應、3 回報、4 Infographics、5 AI chat，另加 6 上線切換。§8 談規模與人力建議。**切換前必須讓 Cloudflare 的 HTML cache rule 排除 session cookie**（§2.6）。
@@ -80,7 +80,7 @@ cofacts/ai 目前的前端狀況（Phase 3 要一併處理）：
 3. **新網址用英文小寫 kebab-case**；列表用複數（`/articles`），單筆用單數加 id（`/article/:id`），跟既有慣例一致。
 4. **query 值要可讀、有白名單**：未知的 param 忽略，不合法的值退回預設，**任何輸入都不能讓頁面 crash**（rumors-site 的 `/search?type=messages` 沒帶 `q`、`/tutorial?tab=xxx` 都會 crash）。
 5. **預設值不寫進 URL**，空值不留（rumors-site 會留下 `?filters=&types=`）。
-6. **舊網址、舊 param 照收**，再轉到新格式：path 層級用 HTTP 301/308（SSR 做得到）；只有 query 格式不同時，由 route 的 `beforeLoad` 丟出 `redirect({ search, replace: true })`。
+6. **舊網址照收**，再轉到新格式：path 層級用 HTTP 301/308（SSR 做得到）。**舊 query param 不做相容轉換**，視為未知 param 忽略（§2.3）。
 7. **不加 locale 前綴**，語系由 host 決定（§2.5）。
 8. 預留的頂層 namespace：`/ai`、`/api`、`/report`、`/storybook`（若要自架）。
 
@@ -110,10 +110,10 @@ cofacts/ai 目前的前端狀況（Phase 3 要一併處理）：
 | `/replies` | 最新查核 | ✅ `Latest replies` / `/ Mobile`、「選單展開示意」「篩選器手機版」 | 🟠 | |
 | `/hoax-for-you` | 等你來答 | ❌ 無稿（套 `Doubious Message` 版型） | 🟠 | 只收 `topic` 與時間參數 |
 | `/search?q=…&type=messages\|replies` | 搜尋 | ❌ 無稿 | 🟠 | `type` 沿用；沒有 `q` 時顯示空狀態，不 crash |
-| `/user/:slug` | 個人頁 | ❌ 無稿 | 🟢 | `tab=replies\|comments`。改用 SSR 301 canonicalize，不用 client `router.replace`（現行會吃掉 `?tab=`） |
-| `/user?id=:userId` | 個人頁（沒有 slug 的使用者） | ❌ 無稿 | 🟢 | 使用者有 slug 時 301 到 `/user/:slug`，並保留其他 query |
+| `/user/:slug` | 個人頁 | ❌ 無稿 | 🟢 | `tab=replies\|comments`。改用 SSR 303 See Other canonicalize，不用 client `router.replace`（現行會吃掉 `?tab=`）。不用 301：slug 會被使用者修改，永久轉址會被瀏覽器與 CDN 快取 |
+| `/user?id=:userId` | 個人頁（沒有 slug 的使用者） | ❌ 無稿 | 🟢 | 使用者有 slug 時 303 到 `/user/:slug`，並保留其他 query。每次由 server 查目前的 slug，不用 301（理由同上） |
 
-- 個人頁**不**新增「送過的訊息」tab。使用者送過的訊息改由列表的「我送出的」篩選呈現（`status=reported-by-me`，§2.3）。
+- 個人頁**不**新增「送過的訊息」tab。使用者送過的訊息改由列表的「我送出的」篩選呈現（param 名稱未定，§2.3）。
 
 #### Track 2　單一訊息與回應
 
@@ -137,9 +137,8 @@ cofacts/ai 目前的前端狀況（Phase 3 要一併處理）：
 | `/` | 首頁（landing） | ❌ 無稿 | 🟢 | 移植現有設計；JSS 改寫成 Tailwind / CSS Modules（§3.6） |
 | `/tutorial?tab=bust-hoaxes\|check-rumors` | 使用教學 | ✅ `Guide how-1440` | 🟢 | 不合法的 `tab` 退回預設；修掉站內的錯字連結 `/tutorial?bust-hoaxes` |
 | `/about` | Cofacts 是什麼 | ✅ `Guide what-1440` | 🟢 | 設計師註記：「目前僅針對主要樣式套上新的設計系統，原本的教學內容無更動」 |
-| `/impact` | 社會影響力報告 | ❌ 無稿 | 🟢 | rumors-site 的版本沒有 header / footer；新版建議納入全站 shell |
+| `/impact` | 社會影響力報告 | ❌ 無稿 | 🟢 | 沿用 rumors-site，不放全站 header / footer：route 設 `staticData.hideGlobalNav` 與 `hideGlobalFooter`（§3.4） |
 | `/terms` | 使用者條款 | ❌ 無稿 | 🟢 | 由 `LEGAL.md` 轉換（build-time 即可） |
-| `/instant` | 已退役的 stub | — | 🔴 | 302 到 community builder |
 
 #### Track 5　AI chat
 
@@ -155,13 +154,18 @@ cofacts/ai 目前的前端狀況（Phase 3 要一併處理）：
 |---|---|---|---|
 | `cofacts.ai/*` | 舊網域 | 🔴 301 → `cofacts.tw/ai/*` | 在 Cloudflare 處理 |
 | `/session/*` | cofacts.ai 舊路徑 | 🔴 301 → `/ai/session/*` | |
-| 各列表的舊 query（`filters=`、`types=`…） | 舊 bookmark | 🟠 | `normalizeLegacySearch()` 轉成新格式（§2.3） |
+| 各列表的舊 query（`filters=`、`types=`…） | 舊 bookmark | 🔴 不相容 | 若 §2.3 改名，舊 query 視為未知 param 忽略，頁面以預設條件顯示；不做轉換 |
 | `/api/articles/:feed?json=…&source=…` | RSS / Atom / JSON feed | 🟢 **原樣保留** | `json` 是 LZMA 壓縮的 GraphQL variables；功能照舊移植，不改版 |
 | `en.cofacts.tw`、`ja.cofacts.tw` | 語系 host | 🟢 | 同一個 app 依 host 切語系（§2.5） |
 | `/robots.txt`、`/sitemap.xml` | SEO（rumors-site 從來沒有） | 🔵 建議 | |
 | `/analytics`、`/hack` | 由 Cloudflare 規則處理 | 🟢 | 沿用 |
 
-### 2.3 列表頁 search param 改版提案
+### 2.3 列表頁 search param 改版提案（未定案）
+
+> [!WARNING]
+> **未定案（2026-10-28）**：要不要藉這次改寫替 search param 改名、改值，還在討論；本節的命名與對照表只是提案，實作時不必照做。
+> 不論最後是否改名，**都不做舊 param 相容**：不實作舊 param → 新 param 的轉換（原提案的 `normalizeLegacySearch()` 取消），舊 bookmark 的 query 視為未知 param 忽略。
+> 本節以下仍適用、與改名無關的要求：值有白名單、不合法值退回預設、預設值與空值不寫入 URL、`*-by-me` 未登入時只忽略自己、任何輸入都不能讓頁面 crash（§2.1）。
 
 rumors-site 的問題：
 
@@ -176,7 +180,7 @@ URL 不需要跟 Penpot 的 token 名稱綁定，改名只為了**好讀、不�
 
 Cofacts 的四種分類是**對「一則查核回應」的標記**，不是對訊息真偽的判決：
 
-- 一則訊息可能有多則回應、分屬不同分類。篩「含有錯誤訊息」加「含有正確訊息」是指「有任一則回應屬於其中之一」（any-of），兩者並不互斥。
+- 一則訊息可能有多則回應、分屬不同分類。篩「含有不實訊息」加「含有正確訊息」是指「有任一則回應屬於其中之一」（any-of），兩者並不互斥。
 - 「含有正確訊息」（`NOT_RUMOR`）不等於「這則訊息是真的」，只表示查核者認為其中含有正確資訊。
 
 rumors-site 的問題是 param 名 `types` 看不出是「回應的」分類，值 `NOT_RUMOR` 又容易被人或 AI 望文生義讀成「查證為真」。提案：
@@ -185,11 +189,11 @@ rumors-site 的問題是 param 名 `types` 看不出是「回應的」分類，�
 |---|---|
 | param 名 | **`replyType`**：寫明是「回應」的分類 |
 | 值 | **沿用 API enum，改小寫 kebab**：`rumor`、`not-rumor`、`opinionated`、`not-article`。與 rumors-api、open data、LINE bot 同一套詞，研究者與 agent 都查得到定義 |
-| 防誤解 | ① zod schema 的 `.describe()` 寫明「任一回應被標記為…（any-of，可多選，不代表訊息真偽）」並附中文標籤；② `cofacts-frontend` skill 與 `docs/` 收錄同一段定義；③ UI 標籤一律用「含有錯誤訊息」「含有正確訊息」「含有個人意見」「不在查證範圍」，不用「正確／錯誤」 |
+| 防誤解 | ① zod schema 的 `.describe()` 寫明「任一回應被標記為…（any-of，可多選，不代表訊息真偽）」並附中文標籤；② `cofacts-frontend` skill 與 `docs/` 收錄同一段定義；③ UI 標籤一律用設計師無障礙指南的用詞「含有不實訊息」「含有正確訊息」「含有個人意見」「不在查證範圍」，不用「正確／錯誤」 |
 
 替代方案：值改用標籤語意（`has-misinfo`、`has-facts`、`has-opinion`、`out-of-scope`）。好處是字面就帶出「含有」；壞處是 URL 值與 API enum 不一致，每層都要做對照。目前建議沿用 enum。
 
-#### 完整對照
+#### 完整對照（提案）
 
 | 新 param | 舊 param | 值（逗號分隔多選） | 說明 |
 |---|---|---|---|
@@ -207,9 +211,9 @@ rumors-site 的問題是 param 名 `types` 看不出是「回應的」分類，�
 > **「我送出的」需要確認 API 語意**：rumors-api 的 `ListArticleFilter.selfOnly` 只會列出「由目前使用者**建立**」的訊息（第一個回報者）。沒有「我曾回報過（含對既有訊息 +1）」的 filter（2026-09-28 查 `api.cofacts.tw` schema）。若「我送出的」要包含 +1 過的訊息，需要在 rumors-api 補一個依 reply request 的 `userId` 篩選的 filter。
 
 - 實作方式：每個列表 route 用 `validateSearch` + zod schema，放在 `src/lib/search-params/`。同一份 schema 產生三樣東西：GraphQL filter、篩選 UI 的狀態、canonical URL。
-- 舊 param 由 `normalizeLegacySearch()` 轉換（`filters=NO_REPLY` → `status=no-reply`、`types=NOT_RUMOR` → `replyType=not-rumor`、`start=now-1w/d` → `period=7d`…），轉完用 `replace` redirect。
+- 不做舊 param 轉換（見本節開頭）。
 
-範例：
+改名提案的對照範例（僅說明命名差異，不代表會 redirect）：
 
 ```
 舊 /articles?filters=NO_REPLY,ASKED_MANY_TIMES&types=RUMOR&start=now-1w/d&orderBy=replyRequestCount
@@ -426,7 +430,7 @@ design/
 └── tokens.json                      # Penpot 匯出的 token（DTCG JSON），token 的來源
 ```
 
-**全站 shell 放在 `__root.tsx`，各 route 用 `staticData` 關掉不要的部分。** Penpot 裡所有頁面（含 AI 首頁）共用同一組 Nav 與 Footer，只有進入有 side panel 的畫面（AI 對話、編輯器）時不放 footer。所以不另設 `_site` 這類 pathless layout，route 直接放在 `routes/` 下：
+**全站 shell 放在 `__root.tsx`，各 route 用 `staticData` 關掉不要的部分。** Penpot 裡所有頁面（含 AI 首頁）共用同一組 Nav 與 Footer，只有進入有 side panel 的畫面（AI 對話、編輯器）時不放 footer；`/impact` 沿用 rumors-site 的版面，header 與 footer 都不放。所以不另設 `_site` 這類 pathless layout，route 直接放在 `routes/` 下：
 
 ```tsx
 // src/routes/__root.tsx（節錄）
@@ -605,7 +609,7 @@ Track 0（WG 基礎，§2.2、§8）要完成的設定：`createRouter({ context
 | `makeStyles` 的一般樣式 | Tailwind utility，色彩一律用語意 token |
 | `theme.palette.*`、`theme.spacing()` | 對應的語意 token 與 spacing token（§5） |
 | JSS `@keyframes`（floating、breath、flashing） | CSS Modules 的 `@keyframes`，或 `@theme` 裡的 `--animate-*` |
-| react-spring 捲動動畫 | CSS scroll-driven animation / IntersectionObserver，**一律包 `@media (prefers-reduced-motion: no-preference)`** |
+| react-spring 捲動動畫 | CSS scroll-driven animation / IntersectionObserver |
 | `LOCALE` 分支（landing 圖片、新聞列表、YouTube ID） | 改讀 lingui 的當前 locale（§2.5） |
 | 圖片（首頁 888 KB、教學 1.2 MB、影響力 1.1 MB） | Vite asset import，順便轉 WebP 或 AVIF |
 
@@ -622,7 +626,6 @@ Track 0（WG 基礎，§2.2、§8）要完成的設定：`createRouter({ context
 ### 4.1 命名與組織
 
 - **Story title = Penpot 元件路徑**：`Base/Button`、`Content/FactCheckReply`、`Layout/Nav`。設計師在 Penpot 看到什麼，就能在 Storybook 用同一個名字找到。
-- 頁面層級一律放 `Pages/<Penpot 頁名>/<board 名>`，例如 `Pages/Article Detail/MessagePage`。
 - 每個 story 的 `parameters.penpot = { page, board, componentId }` 記錄對應的 Penpot 物件。skill 與 agent 可以由此雙向查找；§6.3 的元件 registry 也從這裡產生，不必手動維護。
 
 ### 4.2 全域設定
@@ -636,29 +639,18 @@ Track 0（WG 基礎，§2.2、§8）要完成的設定：`createRouter({ context
 | 互動狀態 | `storybook-addon-pseudo-states` 展示 hover、focus-visible、active，不必為每個狀態另寫元件變體（呼應指南：「焦點是一條全域規則，不是每個元件各做一個」） |
 | 無障礙 | `@storybook/addon-a11y`，設定 `parameters.a11y.test = 'error'` |
 | 測試 | `@storybook/addon-vitest`：每個 story 就是一個測試，CI 裡跑 axe（light + dark） |
-| 部署 | 每個 PR build 一份 Storybook（放 GCS 或 Cloudflare Pages），PR 裡附連結給設計師 review |
+| 部署 | 每個 PR 的 preview 都掛 Storybook（`/storybook/`，[cofacts/ai#154](https://github.com/cofacts/ai/pull/154)）；改到共用元件的 PR 附連結給設計師 review |
 
 ### 4.3 元件層 story
 
 - **每個 Penpot variant 一個 story**，再加一個 `AllVariants` 矩陣 story 方便和 Penpot 的元件板並排比對。
 - 邊界情況：超長標題、空值、沒有頭像、數字 99+、`disabled`。
 
-### 4.4 頁面層 scenario（page-level stories）
+### 4.4 頁面不寫 story（2026-10-29）
 
-頁面拆成「`XxxPageView`（純 props）＋ route（loader）」，story 只渲染 `XxxPageView`，用 `src/fixtures/` 的資料。**Penpot 裡每個狀態板都應該有對應的 scenario**：
+頁面不做 page-level story。每個 PR 都有 Cloud Run preview（tag `pr-N`），設計師直接在 preview 上看實際頁面驗收，PR 附 preview 連結。頁面要接 router、loader 與 query，在 Storybook 裡 mock 這些的成本高，結果也不如真實環境可信。
 
-| 頁面 | Scenarios |
-|---|---|
-| `/replies` | 預設、套用篩選、篩選器展開（mobile「篩選器手機版」）、空結果、載入中、載入更多 |
-| `/articles`、`/hoax-for-you` | 預設、已讀狀態（`DisputedMessage/read`）、多媒體訊息（圖片、影片）、空結果 |
-| `/search` | 搜訊息、搜回應、沒有 `q`、無結果、帶篩選 |
-| `/article/:id` | 無回應（顯示 AI 自動分析）、有 5 則回應、多種判定並存、圖片訊息加逐字稿、未登入、已登入且自己回應過、被封鎖的訊息（未登入 / 已登入）、mobile 快速索引 |
-| 編輯器 | 撰寫回應（3 個分頁各一）、使用既有回應、驗證錯誤、送出中 |
-| `/reply/:id` | 單一文章、多篇文章共用同一回應 |
-| `/user` | 有 slug、無 slug、留言 tab、沒有任何貢獻 |
-| `/report` | 直接對應 Penpot 板：未登入、輸入、A Loading、B-1 有文章且有查核回應、B-2 有文章但無回應、C 查無此訊息準備新增 |
-| `/ai` | 新任務、串流中（呼叫工具）、草稿完成（`AI-main page-Mobile-Draft`）、工具抽屜開啟、錯誤、登入過期 |
-| 靜態頁 | 各一，另加 reduced-motion 版 |
+Penpot 的狀態板（例如 `/report` 的 A Loading、B-1、B-2、C）仍是要實作、要驗收的狀態清單，不能只做預設狀態；只是驗收地點在 preview，不是 Storybook。
 
 ---
 
@@ -923,7 +915,7 @@ flowchart LR
    - 找同名的 `-1440` / `-Mobile` board，或 `X` / `X-Mobile` 元件，合成一個響應式元件。
    - mobile-first：mobile 的值寫在基本 class，desktop 的值加斷點前綴（兩級斷點，切換寬度見附錄 C #11）。
 7. **Icon**：`Base/Icon` 的 `Name` 屬性值轉成 snake_case 餵給 `<Icon name>`（`Open-In-New` → `open_in_new`）；`status-*`、`fb`、`line` 用自訂 SVG。
-8. **狀態板**（`A-…`、`B-1-…`、`回報可疑訊息-未登入`）：每個對應一個 story scenario，不要只做預設狀態。
+8. **狀態板**（`A-…`、`B-1-…`、`回報可疑訊息-未登入`）：每個狀態都要實作，並在 preview 驗收，不要只做預設狀態。
 9. **備註 board**：「開發 Note」是需求，要逐條落實或在 PR 說明為何不做；「頁面層級標記」是頁面 / route 的名稱。
 
 ### 5.6 實作工作流程：設計師完稿 → agent 接手
@@ -934,7 +926,7 @@ sequenceDiagram
   participant GH as GitHub issue / PR
   participant E as 工程師
   participant A as Coding agent（cofacts-frontend skill + Penpot MCP）
-  participant SB as Storybook preview
+  participant SB as PR preview（頁面 + /storybook/）
 
   D->>D: 用元件與 token 完稿；狀態各一個 board；寫「開發 Note」；依 R1–R5 自查
   D->>GH: 開 issue「Ready for dev」：Penpot 連結、board 名稱與 id
@@ -942,10 +934,10 @@ sequenceDiagram
   A->>A: ① 盤點：用到的元件、有無對應程式元件、未綁 token 清單、R1–R5 預檢
   A->>E: 回報實作計畫與設計疑點
   E-->>D: 設計疑點（Penpot comment 或 issue）
-  A->>A: ② 先補 ui 與共用元件及 story，③ 再做 PageView 與 scenario，④ 最後接 route / loader
-  A->>A: ⑤ 驗證：lint、axe（light/dark）、Storybook 截圖 vs export_shape PNG（375/1440）、鍵盤走查
-  A->>GH: 開 PR：Storybook 連結、Penpot 對照、偏差說明、未綁 token 清單、無障礙檢查表
-  GH->>SB: CI build Storybook preview
+  A->>A: ② 先補 ui 與共用元件及 story，③ 再做頁面與 route / loader
+  A->>A: ④ 驗證：lint、axe（light/dark）、元件的 Storybook 截圖 vs export_shape PNG（375/1440）、鍵盤走查
+  A->>GH: 開 PR：preview 連結（改到元件時另附 Storybook 連結）、Penpot 對照、偏差說明、未綁 token 清單、無障礙檢查表
+  GH->>SB: CI 部署 PR preview
   D->>SB: 設計師驗收
   E->>GH: WG code review → merge
 ```
@@ -1015,7 +1007,6 @@ sequenceDiagram
 - **Tab 順序**：AI 右側抽屜、bottom sheet 的焦點管理（同上方 dialog 規則）。
 - **螢幕閱讀器**：cofacts/ai 現有的漢堡選單、送出、附件、通知按鈕都缺 `aria-label`；可點的 backdrop 改用 `<button>` 或 Base UI 的 Dialog。
 - **狀態變動通知**：AI 串流用 `aria-live="polite"`，但只宣告「開始 / 完成 / 錯誤」，不逐字念；回報、送出成功的結果畫面要把焦點移到標題。
-- **減少動態效果**：landing 動畫、view transition 抽屜、typing indicator 都要支援 `prefers-reduced-motion`。
 - **文字壓在圖片或漸層上**：首頁 hero、impact banner 要實際量對比。
 
 ### 6.2 各層防線
@@ -1027,7 +1018,7 @@ sequenceDiagram
 | Lint | `better-tailwindcss`、自訂規則（`*-status-*` 白名單、禁 `dark:`、禁 arbitrary color、禁 `leading-*` 與單獨字級、Icon-only 按鈕必填 `aria-label`） | 手寫的違規 |
 | 測試 | Storybook + addon-a11y + addon-vitest，light 與 dark 都跑 | 對比、名稱、role、R4 |
 | Agent | `cofacts-frontend` skill 的完成條件 | 流程遺漏、指南 06 的互動規格、§6.1 程式階段清單 |
-| 人 | PR 模板的無障礙檢查表、設計師在 Storybook 驗收 | 其餘項目 |
+| 人 | PR 模板的無障礙檢查表、設計師在 PR preview 驗收頁面、在 Storybook 驗收元件 | 其餘項目 |
 
 ### 6.3 `cofacts-frontend` skill 設計
 
@@ -1074,12 +1065,12 @@ description: >
    每個 route 都在 loader await SSR 需要的 query，且只回傳 head 需要的欄位；
    loader 只呼叫 server function；*.server import 只在 handler 裡用；
    dev 出現 import protection 警告視同錯誤。
-4. Stories: 每個 Penpot 狀態板一個 scenario。
+4. Stories: 只寫元件 story；頁面不寫 story，Penpot 狀態板的每個狀態都要實作並在 preview 驗收。
 5. Verify（完成條件，全部要過）:
    - pnpm lint && pnpm test（含 storybook a11y，light + dark）
-   - 375 與 1440 的 Storybook 截圖對照 export_shape
+   - 元件：375 與 1440 的 Storybook 截圖對照 export_shape；頁面：在 preview 對照
    - references/a11y.md 的「程式階段」項目逐條確認
-6. PR: 附 Penpot 連結、Storybook 連結、偏差說明、未綁 token 清單、a11y 檢查表。
+6. PR: 附 Penpot 連結、preview 連結（改到元件時另附 Storybook 連結）、偏差說明、未綁 token 清單、a11y 檢查表。
 ```
 
 另外在 cofacts/ai 的 `AGENTS.md` 加一行：「前端工作請使用 `cofacts-frontend` skill」。skill 靠 description 觸發，但寫在 AGENTS.md，其他 agent 也看得到。
@@ -1090,7 +1081,7 @@ description: >
 
 - 目前 CI 只跑 lint、prettier、`tsc`，**沒跑 vitest，也沒跑 production build**。Phase 3 要加上：`pnpm build`（import protection 只在 build 時讓違規失敗，§3.5）、vitest、Storybook test（a11y）、`tokens.css` 是否與 json 一致、build-storybook。
 - PR 模板新增「設計對照」與「無障礙檢查」兩段。
-- 視覺回歸（Chromatic 或 Playwright 截圖）列為加分項，先靠設計師在 Storybook preview 驗收。
+- 視覺回歸（Chromatic 或 Playwright 截圖）列為加分項，先靠設計師在 PR preview 驗收。
 
 ---
 
@@ -1107,7 +1098,7 @@ description: >
 | **2 單一訊息與回應** | **最大** | 訊息頁用到近 20 種 Penpot 元件，外加全新的全頁編輯器。其中兩個特別重：**協作逐字稿**（ProseMirror + yjs + Hocuspocus，713 LOC，要接 WebSocket 服務）與 d3 瀏覽趨勢圖。**建議把逐字稿拆成 2b**，第一階段先唯讀顯示 |
 | **2b 協作逐字稿** | 中 | 可以晚一點做，或另外排人 |
 | **3 回報** | **最小** | [cofacts/ai#138](https://github.com/cofacts/ai/pull/138)、[#139](https://github.com/cofacts/ai/pull/139) 已完成主要功能，剩下套用設計系統、對齊 6 個狀態板，以及和訊息頁、AI 的銜接。它和Track 5 在 Penpot 同一頁，回報的結束畫面也導向 AI，**建議兩個 track交給同一人** |
-| **4 Infographics** | 中（體力活） | JSS 行數最多（landing 2,458、impact 2,132、tutorial 1,175），但只有教學與 about 有新稿，其他頁照舊移植、換 token。依賴很少（只需 Nav / Footer），**適合在 A、B 空檔插隊**。動畫要支援 reduced-motion，首頁 hero 的文字壓圖要量對比 |
+| **4 Infographics** | 中（體力活） | JSS 行數最多（landing 2,458、impact 2,132、tutorial 1,175），但只有教學與 about 有新稿，其他頁照舊移植、換 token。依賴很少（只需 Nav / Footer），**適合在 A、B 空檔插隊**。首頁 hero 的文字壓圖要量對比 |
 | **5 AI chat** | 小至中 | 主要是換皮加搬家：從 `/` 搬到 `/ai`、依 `AI-main page` / `AI-open page` 重新套設計、拆 `RightDrawer.tsx`（856 行）、補無障礙債。SSE 與 session 邏輯不動。建議由最熟這份程式的 WG 來做，或當作 contractor 的熱身 |
 | **6 上線切換** | 中 | 不屬於任何一頁，但少一件就不能切換：Cloudflare 分流與 **cache rule 排除 session cookie**（§2.6）、各種 redirect、`ALLOWED_CALLBACK_URLS`、`COFACTS_SITE_URL`、RSS 原樣移植、GTM dataLayer 與 `data-ga` 事件、Rollbar 與 request log、SEO（meta、OG、robots、sitemap，可順便加 ClaimReview JSON-LD）、rumors-site 退場。由 WG 負責 |
 
@@ -1130,7 +1121,7 @@ description: >
 - **共用元件由「第一個用到的 track」負責**：做好後放進 Storybook 並登錄到 registry（`parameters.penpot`）；其他 track只能透過 PR 擴充 props，不 fork。`ReplyTypeLabel`、`UserAvatar` / `UserFlag` 在Track 0 先做；`FactCheckReply`、`ArticleCard`、`ReplyFeedback` 由Track 1 負責、Track 2 沿用（Penpot 的 `Latest replies` 與 `MessagePage` 各有 39 個 `FactCheckReply` 子節點）。
 - 要做新共用元件前，或把 `-components/` 的元件搬進 `src/components/` 前，先查 Storybook 與 `components.md`，避免 A、B 各做一份。
 - search param 的 schema 工具在Track 0 建立，Track 1 擴充。
-- 無稿頁面由工程師以 Guide 為範例拼湊，PR 附 Storybook 連結請設計師 review。**設計師的主要工作是驗收，不是補稿。**
+- 無稿頁面由工程師以 Guide 為範例拼湊，PR 附 preview 連結請設計師 review。**設計師的主要工作是驗收，不是補稿。**
 
 ---
 
@@ -1146,13 +1137,14 @@ description: >
 | Q4 | 編輯器網址 | `/article/:id/reply/new`、`/article/:id/reply/existing` |
 | Q5 | 分頁與 RSS | 分頁 cursor 不進 URL；RSS 原樣保留舊 `json` 格式 |
 | Q6 | 缺稿頁面 | 標記 ❌ 無稿，由工程師以 Guide 為範例用新元件拼湊 |
-| Q8 | 使用者送過的訊息 | 個人頁不顯示；列表新增「我送出的」篩選（`status=reported-by-me`） |
+| Q8 | 使用者送過的訊息 | 個人頁不顯示；列表新增「我送出的」篩選 |
 | Q9 | Dark mode | 先跟隨 `prefers-color-scheme`。之後若 Penpot 補上切換開關，JS 設定 `<html data-theme>` 即可，`tokens.css` 已支援（§5.4） |
 | Q10 | ADR | 以本文為設計紀錄，cofacts/ai 的 `docs/` 直接超連結過來；只有本文未涵蓋的取捨才另寫 ADR |
 
 ### 9.2 待辦
 
 - **與設計師 sync 設計系統的差異**：附錄 C 已大致處理完，剩斷點（#11）與深色區塊焦點環的間隔色（#5）。
+- **search param 是否改名**：§2.3 的改名提案未定案；不論結果都不做舊 param 相容（2026-10-28）。
 - **「我送出的」的語意**：只算第一個回報者，還是包含 +1；若包含，需要 rumors-api 補 filter（§2.3）。
 - **Cloudflare cache rule**：切換前要排除 `cofacts_session` cookie（§2.6，Track 6）。
 
