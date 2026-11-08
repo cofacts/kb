@@ -1,0 +1,666 @@
+<!doctype html><html><head><meta name="robots" content="noindex, nofollow"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>cofacts.ai Harness Agent</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column with a sticky section index on wide screens; option cards carry a verdict chip and a diagram. */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --ink: #17202b;
+  --muted: #5a6573;
+  --rule: #dde2e8;
+  --accent: #c98a00;          /* Cofacts yellow, darkened for text contrast */
+  --accent-soft: #fff3cf;
+  --good: #1f7a4d; --good-soft: #e3f4ea;
+  --warn: #9a5b00; --warn-soft: #fdf0d8;
+  --bad: #a3322a;  --bad-soft: #fbe5e2;
+  --code-bg: #eef1f5;
+  --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161d; --surface: #18202a; --ink: #e6ebf1; --muted: #9aa6b4; --rule: #2a3542;
+    --accent: #ffc233; --accent-soft: #3a2f12;
+    --good: #6fd19c; --good-soft: #15301f; --warn: #f2b65a; --warn-soft: #36280f; --bad: #f08a80; --bad-soft: #3a1a17;
+    --code-bg: #212b37; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161d; --surface: #18202a; --ink: #e6ebf1; --muted: #9aa6b4; --rule: #2a3542;
+  --accent: #ffc233; --accent-soft: #3a2f12;
+  --good: #6fd19c; --good-soft: #15301f; --warn: #f2b65a; --warn-soft: #36280f; --bad: #f08a80; --bad-soft: #3a1a17;
+  --code-bg: #212b37; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.75;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 64px;
+}
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 48px; }
+nav.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; font-size: 14px; }
+nav.toc ol { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+nav.toc a { color: var(--muted); text-decoration: none; }
+nav.toc a:hover, nav.toc a:focus-visible { color: var(--ink); }
+main { min-width: 0; }
+@media (max-width: 860px) { .wrap { grid-template-columns: minmax(0, 1fr); } nav.toc { display: none; } }
+
+h1 { font-size: clamp(28px, 4vw, 40px); font-weight: 900; line-height: 1.25; margin: 0 0 8px; text-wrap: balance; letter-spacing: 0.01em; }
+h2 { font-size: 24px; font-weight: 700; margin: 56px 0 12px; text-wrap: balance; padding-top: 12px; border-top: 1px solid var(--rule); }
+h3 { font-size: 19px; font-weight: 700; margin: 0; text-wrap: balance; }
+h4 { font-size: 15px; font-weight: 700; margin: 16px 0 4px; color: var(--muted); letter-spacing: 0.04em; }
+p { margin: 0 0 12px; max-width: 68ch; }
+.lede { color: var(--muted); font-size: 17px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+code { font-family: var(--font-mono); font-size: 0.88em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+a { color: var(--ink); text-decoration-color: var(--accent); text-underline-offset: 3px; }
+ul { margin: 0 0 12px; padding-left: 1.3em; max-width: 72ch; }
+li { margin: 2px 0; }
+
+.verdict { background: var(--surface); border: 1px solid var(--rule); border-left: 4px solid var(--accent); border-radius: 6px; padding: 20px 24px; margin: 24px 0 8px; }
+.verdict p:last-child { margin-bottom: 0; }
+.verdict strong { color: var(--ink); }
+
+.chip { display: inline-block; font-size: 12.5px; font-weight: 700; padding: 2px 10px; border-radius: 999px; letter-spacing: 0.03em; white-space: nowrap; }
+.chip.rec { background: var(--good-soft); color: var(--good); }
+.chip.alt { background: var(--warn-soft); color: var(--warn); }
+.chip.no  { background: var(--bad-soft);  color: var(--bad); }
+.chip.ref { background: var(--code-bg); color: var(--muted); }
+
+.option { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 24px; margin: 20px 0; }
+.option header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 14px; margin-bottom: 8px; }
+.option .tag { font-family: var(--font-mono); font-weight: 500; color: var(--accent); font-size: 15px; }
+.cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 28px; }
+@media (max-width: 640px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+.cols ul { padding-left: 1.1em; }
+.pro h4 { color: var(--good); } .con h4 { color: var(--bad); }
+
+.diagram { overflow-x: auto; background: var(--bg); border: 1px solid var(--rule); border-radius: 6px; padding: 12px; margin: 12px 0 8px; }
+.diagram pre.mermaid { margin: 0; background: transparent; min-width: 560px; text-align: center; font-family: var(--font-body); }
+
+.table-wrap { overflow-x: auto; margin: 16px 0; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 14.5px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--rule); }
+thead th { font-size: 13px; color: var(--muted); font-weight: 700; background: var(--code-bg); }
+tbody th { font-weight: 700; white-space: nowrap; }
+tr:last-child td, tr:last-child th { border-bottom: 0; }
+.g { color: var(--good); font-weight: 700; } .w { color: var(--warn); font-weight: 700; } .b { color: var(--bad); font-weight: 700; }
+
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 16px 0; }
+.fact { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; font-size: 14.5px; line-height: 1.65; }
+.fact b { display: block; margin-bottom: 4px; font-size: 15px; }
+.fact .src { display: block; margin-top: 6px; font-family: var(--font-mono); font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+
+ol.steps { counter-reset: s; list-style: none; padding: 0; margin: 16px 0; display: grid; gap: 12px; max-width: none; }
+ol.steps > li { counter-increment: s; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px 14px 56px; position: relative; }
+ol.steps > li::before { content: counter(s); position: absolute; left: 16px; top: 13px; width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 900; display: grid; place-items: center; font-size: 14px; }
+.decide { background: var(--accent-soft); border-radius: 8px; padding: 20px 24px; margin-top: 16px; }
+.decide ol { margin: 0; padding-left: 1.3em; }
+.decide li { margin: 8px 0; }
+.small { font-size: 14px; color: var(--muted); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+<nav class="toc" aria-label="段落">
+  <ol>
+    <li><a href="#tldr">結論</a></li>
+    <li><a href="#needs">查核需要的能力</a></li>
+    <li><a href="#options">三個方案</a></li>
+    <li><a href="#h3">H3 要補多少</a></li>
+    <li><a href="#subagent">Subagent 與分身</a></li>
+    <li><a href="#tools">工具分層</a></li>
+    <li><a href="#sandbox">Sandbox</a></li>
+    <li><a href="#fs">檔案系統</a></li>
+    <li><a href="#matrix">比較表</a></li>
+    <li><a href="#backtest">Langfuse 回測</a></li>
+    <li><a href="#plan">建議路線</a></li>
+    <li><a href="#decide">請你決定</a></li>
+  </ol>
+</nav>
+<main>
+
+<div class="eyebrow">cofacts/ai · 問題一：Harness · 2026-10-30</div>
+<h1>cofacts.ai Harness Agent</h1>
+<p class="lede">這份只談 ADK 背後的 agent 要怎麼取得 coding harness 等級的能力。背景執行和重連（問題二）另開 session 討論，這裡只在和工作區相關時才會提到。依據是 <code>cofacts/ai</code> 的程式碼，以及 google-adk 2.13、claude-agent-sdk 0.2.175 的原始碼。</p>
+
+<section id="tldr">
+<div class="verdict" style="border-left-color: var(--bad)">
+  <p><strong>2026-10-30 回測結論：現在不值得投入完整的 H1 或 H3。</strong>在 9/18 之後的正式流量裡，harness 明顯會改善結果的 turn 只有約 1%。倒讚的主因是出處錯配和捏造，那是 #144 和模型選擇的問題。harness 反而會讓受影響的 turn 變慢、變貴。詳見<a href="#backtest">Langfuse 回測</a>。下面的方案分析保留，等工作負載改變時再拿出來。</p>
+</div>
+<div class="verdict">
+  <p><strong>三個方案共用一半的工程。</strong>工作區目錄、<code>fetch_to_workspace</code>、路徑守門、環境變數清理、配額和清理機制，不管選哪個方案都要做，而且應該先做。</p>
+  <p><strong>H3（維持 ADK LlmAgent，自己補工具）比想像中便宜。</strong>ADK 2.13 已經有實驗性的 <code>EnvironmentToolset</code>（Execute、ReadFile、WriteFile、EditFile），也有遠端沙箱、Skills 和 token 門檻 compaction。程式面大約要補 6 到 8 個工具和幾個 callback。真正追不上的是行為調校：工具描述、system prompt、compaction 品質、subagent 怎麼分工。這些 Claude Code 已經調得很好，H3 要靠 cofacts-ai-eval 一輪一輪迭代。</p>
+  <p><strong>建議：先做共用元件，再用 eval 讓 H3 和 H1（Claude Agent SDK）比一場。</strong>單台 GCE 上，H3 不用每個 run 開一個 <code>claude</code> 子程序，Langfuse、串流、callbacks 也都能原封不動，維運上明顯比較輕。如果 eval 顯示 H1 的查核品質明顯較好，再切換到 H1。</p>
+</div>
+</section>
+
+<section id="needs">
+<h2>查核工作需要 harness 的哪些能力</h2>
+<p>我們要的不是寫程式的能力，而是 coding harness 處理資料的那套方法。</p>
+<div class="facts">
+  <div class="fact"><b>工作區</b>下載的網頁、PDF、CSV 和使用者上傳的檔案要先存下來，需要時才讀進 context，不要一開始就整份塞進去。</div>
+  <div class="fact"><b>讀大檔</b>能分段讀、用 grep 找關鍵字、讀 PDF 指定頁、看圖片。</div>
+  <div class="fact"><b>計算</b>對 CSV 做篩選、加總、比對，例如核對政府開放資料裡的數字。</div>
+  <div class="fact"><b>分工</b>多個 subagent 平行查不同的主張，共用同一個工作區。</div>
+  <div class="fact"><b>長 run 的 context 管理</b>中途壓縮 context，工具輸出太大時存成檔案，只回傳預覽。</div>
+  <div class="fact"><b>可控的最終輸出</b>維持 <code>draft_factcheck_response</code> 的 per-claim gate、<code>{content, sources}</code> 的形狀，以及 Langfuse trace 和讚、倒讚回饋。</div>
+</div>
+</section>
+
+<section id="options">
+<h2>三個方案</h2>
+
+<article class="option">
+  <header><span class="tag">H1</span><h3>HarnessAgent 接 Claude Agent SDK</h3><span class="chip alt">品質上限高</span></header>
+  <p>自寫 <code>BaseAgent</code> 包住 <code>ClaudeSDKClient</code>，把 SDK 的訊息流翻成 ADK Event。ADK 自己的 <code>AntigravityAgent</code> 就是同樣的做法，可行性沒有疑慮。</p>
+  <div class="diagram"><pre class="mermaid">
+flowchart LR
+  A["ADK FastAPI"] --> H["HarnessAgent (BaseAgent)"]
+  H -->|"stream-json over stdio"| C["claude 子程序"]
+  C -->|"Vertex AI"| M["Claude"]
+  C --> B["內建: Read Glob Grep Write Edit Agent TodoWrite"]
+  C -.->|"in-process MCP"| T["Cofacts 工具 + fetch_to_workspace + draft_factcheck_response"]
+  B --> WS[("session 工作區")]
+  T --> WS
+</pre></div>
+  <div class="cols">
+    <div class="pro"><h4>優點</h4><ul>
+      <li>Read（含 PDF 和圖片）、Grep、subagent、mid-run auto-compact、大輸出存檔，這些都已經調校好了。</li>
+      <li>工具在 ADK 的 Python process 裡執行，token ContextVar 和 url-resolver 都能沿用。</li>
+    </ul></div>
+    <div class="con"><h4>缺點</h4><ul>
+      <li>每個進行中的 run 要一個 <code>claude</code> 子程序，官方建議至少 1 GiB，單台 GCE 能同時跑的 run 數量有限。</li>
+      <li>只能用 Claude。root 變成自訂 agent 之後，Langfuse 要重接，工具名稱要正規化，UI 要加顯示不認得的工具的方式。</li>
+      <li>investigator 和 verifier 的 Gemini grounding 要包成工具才能保留。</li>
+    </ul></div>
+  </div>
+</article>
+
+<article class="option">
+  <header><span class="tag">H2</span><h3>HarnessAgent 接 ACP</h3><span class="chip ref">之後再說</span></header>
+  <p>好處是能換 harness，但 in-process 工具、hooks、structured output 都過不了 ACP，工具要改成 HTTP MCP，transcript 也存在 harness 的本機。cofacts 的最終答案可以靠 <code>draft_factcheck_response</code> 這個工具，所以 structured output 的缺口影響不大。等 Cofacts MCP（rumors-api PR 389）上線之後，可以把 H2 加成 H1 的另一個後端。</p>
+</article>
+
+<article class="option">
+  <header><span class="tag">H3</span><h3>維持 ADK LlmAgent，自己補工具</h3><span class="chip rec">新的備選，建議先試</span></header>
+  <p>把現在的 <code>ai_writer</code> 升級成 harness：加上 ADK 2.13 的 <code>EnvironmentToolset</code>，再補上缺的工具和守門 callback。agent tree、callbacks、Langfuse、前端都不用改。</p>
+  <div class="diagram"><pre class="mermaid">
+flowchart LR
+  A["ADK FastAPI"] --> W["ai_writer: LlmAgent (Claude 或 Gemini)"]
+  W --> E["EnvironmentToolset: ReadFile WriteFile EditFile Execute"]
+  W --> N["自補: Glob Grep ReadPdfPage ViewImage Todo fetch_to_workspace"]
+  W --> S["subagent: AgentTool + 共用工作區"]
+  W --> T["現有 Cofacts 工具 + draft_factcheck_response"]
+  E --> ENV{"BaseEnvironment"}
+  ENV --> L["LocalEnvironment (工作區目錄)"]
+  ENV --> R["E2B / Daytona / OpenSandbox / Agent Engine"]
+  L --> WS[("session 工作區")]
+  N --> WS
+</pre></div>
+  <div class="cols">
+    <div class="pro"><h4>優點</h4><ul>
+      <li>沒有子程序，記憶體只比現在多一點，單台 GCE 的並行能力不受影響。</li>
+      <li>Langfuse、串流、<code>AllTools</code> 同步、所有 callbacks（citation、url-resolver 注入、media 注入）都原封不動。</li>
+      <li>不綁模型：writer 可以用 Claude，investigator 繼續用 Gemini grounding，每個 agent 都能各自換模型。</li>
+      <li>可以一個工具一個工具加，每加一個就用 eval 量一次效果。</li>
+    </ul></div>
+    <div class="con"><h4>缺點</h4><ul>
+      <li>工具描述、system prompt、compaction、subagent 怎麼分工，都要自己調。這是持續性的工作，也是 Claude Code 最難追上的地方。</li>
+      <li><code>EnvironmentToolset</code> 標示為 <code>@experimental</code>，ADK 升級時 API 可能會變。</li>
+      <li>通用 subagent 的接線要自己做，見「Subagent 與 writer 分身」一章。</li>
+    </ul></div>
+  </div>
+</article>
+<article class="option">
+  <header><span class="tag">H4</span><h3>HarnessAgent 接 managed agent（Claude 或 Gemini）</h3><span class="chip alt">備案</span></header>
+  <p>harness 和 sandbox 都交給供應商代管。ADK 這邊寫一個 BaseAgent，負責建立遠端 session、送出訊息、追蹤對方的 event stream，再翻成 ADK Event。ADK 2.13 的 <code>ManagedAgent</code>（Gemini Interactions，<code>background=True</code>）可以當參考。</p>
+  <div class="diagram"><pre class="mermaid">
+flowchart LR
+  A["ADK FastAPI"] --> H["ManagedHarnessAgent (BaseAgent)"]
+  H -->|"建立 session、送訊息、追 event stream"| MA["Claude Managed Agents 或 Gemini Managed Agents"]
+  MA -->|"remote MCP: 公開 URL + OAuth"| MCP["Cofacts MCP server"]
+  MA -.->|"custom tool 進入 requires_action"| H
+  MA --> SB[("供應商的 sandbox、檔案系統、transcript")]
+</pre></div>
+  <div class="cols">
+    <div class="pro"><h4>優點</h4><ul>
+      <li>供應商有真正的 sandbox：Bash、寫檔、跑 Python 都比較安全，前面討論的 secret 外洩和 metadata server 問題都不存在。</li>
+      <li>工作區由供應商保管，不吃我們 GCE 的磁碟，也不用每個 run 開一個子程序。</li>
+      <li>run 在伺服器端持續跑，瀏覽器斷線也不受影響。</li>
+    </ul></div>
+    <div class="con"><h4>缺點</h4><ul>
+      <li><b>工具：</b>只有兩條路。一是做成公開的 remote MCP（可以和 rumors-api PR 389 的 Cofacts MCP 合併），二是用 custom tool，讓 session 停在 <code>requires_action</code>，由我們的 process 回應結果。callbacks（citation、url-resolver 注入）都得改寫成工具。</li>
+      <li><b>Claude 版：</b>在 GCP 上只能透過 Anthropic-managed（Marketplace）使用，Vertex 不支援。資料只能放 US 或 global，存在 Anthropic，沒有亞洲區。除了 token 費用，每 session-hour 另收 0.08 美元。目前是 beta。</li>
+      <li><b>Gemini 版：</b>只能用 Gemini 模型，目前是 Public Preview。環境閒置 15 分鐘後會做快照，7 天後刪除，所以使用者隔幾天再追問時，工作區已經不在了。也沒有 session list API。</li>
+      <li>Langfuse 要從供應商的事件重建 trace。</li>
+    </ul></div>
+  </div>
+</article>
+
+<article class="option">
+  <header><span class="tag">H5</span><h3>Pi Durable：用新的 Node 服務取代 ADK</h3><span class="chip no">不建議採用</span> <span class="chip ref">設計參考</span></header>
+  <p><code>@earendil-works/pi-durable</code>（2026-10-01 發表，MIT）是一個 TypeScript library。每次 model call 和 tool call 都是會 checkpoint 的 durable task；UI 看到的都是已經提交的狀態，client 用 <code>watch()</code> 接回。它的 <code>CodingTools</code> 提供 read、write、edit、bash，透過可以替換的 <code>ExecutionEnv</code> 執行（本機、虛擬或遠端）。</p>
+  <div class="diagram"><pre class="mermaid">
+flowchart LR
+  F["BFF"] -.->|"session list、events、上傳都要重新對接"| P["新 Node 服務: pi-durable + 自寫 HTTP/SSE"]
+  P --> ST[("自寫 Postgres storage adapter")]
+  P --> T["TS 重寫的 Cofacts 工具與 callbacks"]
+  P --> EX["ExecutionEnv: 本機、虛擬或遠端"]
+  P --> MD["Anthropic / Gemini / Vertex Gemini"]
+</pre></div>
+  <div class="cols">
+    <div class="pro"><h4>優點</h4><ul>
+      <li>durability 和多人 attach 是內建的設計。工具可以用 <code>replay: "safe"</code> 宣告 crash 之後能不能自動重跑。</li>
+      <li>工具就是純 TypeScript 的 <code>defineTool()</code>，執行環境可以替換，和 H3 的 <code>BaseEnvironment</code> 是同一種思路。</li>
+      <li>支援多家模型供應商。</li>
+    </ul></div>
+    <div class="con"><h4>缺點</h4><ul>
+      <li>要拿新的 Node 服務取代 ADK：BFF 和前端的對接要重寫，<code>agent.py</code> 的所有 callbacks 也要移植到 TypeScript。</li>
+      <li>README 寫著 Experimental，API 隨時會變，也沒有附測試。沒有 HTTP server，也沒有官方的 Postgres storage，只有 Vercel 的 reference 實作。</li>
+      <li>沒有內建 web fetch，coding agent 也沒有 subagent、MCP 或權限系統。這些都要自己補，補的量不比 H3 少。</li>
+      <li>不確定是否支援 Claude on Vertex。</li>
+    </ul></div>
+  </div>
+  <p class="small">值得借鏡的地方：可以替換的執行環境、在工具上標註 replay 是否安全，以及「先送快照、再送 delta」的接回方式。</p>
+</article>
+</section>
+
+<section id="h3">
+<h2>H3 要補多少：和 Claude Code 逐項對照</h2>
+<p>「ADK 現成」欄是我在 google-adk 2.13 原始碼裡查到的。工作量是相對估計：小代表一個工具或 callback 的規模，中代表需要設計和測試，大代表會持續調校。</p>
+<div class="table-wrap"><table>
+<thead><tr><th>能力</th><th>Claude Code 內建</th><th>ADK 2.13 現成</th><th>要自己補</th><th>工作量</th></tr></thead>
+<tbody>
+<tr><th>讀寫和編輯檔案</th><td>Read、Write、Edit</td><td><code>ReadFile</code>、<code>WriteFile</code>、<code>EditFile</code>（<code>EnvironmentToolset</code>，輸出 30k 字截斷）</td><td>限制路徑必須在工作區內；ReadFile 要能分段讀（offset 和 limit）</td><td class="g">小</td></tr>
+<tr><th>PDF 和圖片</th><td>Read 直接讀 PDF 頁和圖片</td><td>ReadFile 只回傳文字</td><td><code>read_pdf_pages</code>：抽文字，或把頁面轉成圖片 Part；<code>view_image</code>：把圖片當 Part 回給模型。多模態的 Part 注入已經有 <code>media_filedata.py</code> 的經驗</td><td class="w">中</td></tr>
+<tr><th>找檔案和搜內容</th><td>Glob、Grep（ripgrep）</td><td>沒有專用工具，只能用 Execute 跑 grep</td><td>不開 shell 的話，要自寫 <code>glob</code> 和 <code>grep</code> 工具（Python 或呼叫 rg）</td><td class="g">小</td></tr>
+<tr><th>Shell 和計算</th><td>Bash，可搭配 bubblewrap sandbox</td><td><code>Execute</code>（LocalEnvironment，<b>繼承 os.environ</b>）；<code>ExecuteBashTool</code>（指令前綴白名單、rlimit、需要確認）；遠端沙箱 E2B、Daytona、OpenSandbox、Agent Engine</td><td>選定沙箱策略（見下方 Sandbox 一節），或只提供一個唯讀的 CSV 查詢工具</td><td class="w">中</td></tr>
+<tr><th>抓網頁並存檔</th><td>WebFetch 只回傳小模型的摘要，不存檔</td><td><code>load_web_page</code>（requests，回傳文字）、<code>url_context</code>（Gemini）</td><td><code>fetch_to_workspace</code>：走 url-resolver 抓網頁、直接下載 PDF 和 CSV、寫 manifest、防 SSRF。<b>H1 也要做這個</b></td><td class="w">中，共用</td></tr>
+<tr><th>大型工具輸出</th><td>自動存成檔案，只回傳預覽</td><td>截斷</td><td>在 after_tool callback 裡，超過門檻就寫進工作區，改回傳路徑和摘要</td><td class="g">小</td></tr>
+<tr><th>Subagent</th><td>Agent 工具：平行、共用 cwd、可以定義多種 agent</td><td>AgentTool（每次全新 session，只回傳最終結果）；平行的 function call 會一起執行（batch executor）</td><td>工作區路徑要放在 state 裡傳下去；通用的 subagent（writer 分身）；交接契約；子 session 持久化與可觀察。<b>細節見下一章</b></td><td class="w">中到大，可以延後</td></tr>
+<tr><th>Context 管理</th><td>run 進行中自動 compact</td><td><code>EventsCompactionConfig</code>（有 token 門檻，在模型呼叫前處理）、context cache</td><td>設定摘要器，並實測長 run 壓縮之後查核品質還守不守得住</td><td class="w">中，不確定</td></tr>
+<tr><th>計畫和待辦</th><td>TodoWrite</td><td>有 planner（BuiltIn、PlanReAct），沒有待辦工具</td><td>做一個 <code>todo</code> 工具，存在 session state 裡</td><td class="g">小</td></tr>
+<tr><th>Skills</th><td>Skill 系統</td><td><code>SkillToolset</code>（list、load、run script）</td><td>把查核 SOP 寫成 skill 內容</td><td class="g">小</td></tr>
+<tr><th>結構化輸出</th><td>output_format</td><td>output_schema、set_model_response</td><td>不用補，<code>draft_factcheck_response</code> 已經是現成的閘門</td><td class="g">無</td></tr>
+<tr><th>權限和 hooks</th><td>permission rules、hooks</td><td>before 和 after tool callback、plugins、tool confirmation</td><td>一個做路徑守門和配額記帳的 callback</td><td class="g">小</td></tr>
+<tr><th>工具描述和 system prompt</th><td>長期依使用數據調校過</td><td>沒有</td><td>為每個工具寫好描述和使用時機，並用 eval 迭代</td><td class="b">大，持續</td></tr>
+<tr><th>觀測</th><td>要另外接</td><td>Langfuse 已經接好</td><td>不用補</td><td class="g">無</td></tr>
+</tbody>
+</table></div>
+<p><b>小結：</b>程式部分大約是 <code>glob</code>、<code>grep</code>、<code>read_pdf_pages</code>、<code>view_image</code>、<code>todo</code>、<code>fetch_to_workspace</code>，加上一個計算工具，再加上路徑守門、大輸出落地兩個 callback，以及共用工作區的 subagent。其中 <code>fetch_to_workspace</code>、路徑守門、工作區本來就是共用元件，所以 H3 真正多出來的程式量不大。風險集中在最後那一列：要做出和 Claude Code 一樣好用的工具描述和 agent 行為，得靠 eval 反覆調整，沒有捷徑。</p>
+</section>
+
+<section id="subagent">
+<h2>Subagent 與 writer 分身</h2>
+<p>這是 H1 和 H3 之間最明顯的取捨。Claude Code 的 subagent 已經蓋好了：主 agent 寫一段任務描述，派給通用的 subagent，它用同一套工具在同一個 cwd 裡工作，平行執行，進度會回報。ADK 有這些零件，但接線要自己做。</p>
+
+<h4>情境</h4>
+<p>一則網傳訊息常常有好幾個面向，例如數據、人物發言、圖片出處。writer 可以為每個面向派一個分身，各自主導 investigator 和 verifier 的迴圈，查完擬好該面向的段落，再由 writer 合稿。</p>
+<div class="diagram"><pre class="mermaid">
+flowchart TB
+  W["ai_writer: 拆面向、合稿、呼叫 draft_factcheck_response"]
+  W -->|"同一輪平行派出"| A["ai_worker: 面向 1"]
+  W --> B["ai_worker: 面向 2"]
+  W --> C["ai_worker: 面向 3"]
+  A --> I1["investigator"]
+  A --> V1["verifier"]
+  B --> I2["investigator"]
+  B --> V2["verifier"]
+  A -.->|"子 session 存進 Postgres"| DB[("app: cofacts_ai__sub")]
+  B -.-> DB
+  C -.-> DB
+  A --> WS[("共用工作區: sources/ 與 work/aspects/n/")]
+  B --> WS
+  C --> WS
+</pre></div>
+
+<h4>Claude Code 內建，ADK 要自己接的部分</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>能力</th><th>Claude Code（H1）</th><th>ADK（H3）要做的</th></tr></thead>
+<tbody>
+<tr><th>平行執行</th><td>內建</td><td>已經有：同一輪的多個 function call 會一起跑（batch executor）。要自己加每個 turn 的派發上限和 Vertex 並行上限</td></tr>
+<tr><th>通用 subagent</th><td>內建的 general-purpose agent</td><td>用 <code>ai_writer.clone()</code> 做分身：換 instruction、拿掉 <code>draft_factcheck_response</code>、拿掉改標題和 citation 的 callbacks、不帶呼叫自己的工具（避免無限遞迴）</td></tr>
+<tr><th>共用工作區</th><td>同一個 cwd</td><td>子層的 session id 是新的，工作區路徑要放進 state 傳下去，不能用 <code>ctx.session.id</code> 推算</td></tr>
+<tr><th>交接</th><td>subagent 的最終報告</td><td>自訂回傳契約，加上工作區檔案，見下方</td></tr>
+<tr><th>進度可觀察</th><td>事件帶 <code>parent_tool_use_id</code></td><td>AgentTool 強制用非串流模式執行，只回傳最後一個 event。要做修改版 AgentTool，把子 session 持久化，見下方</td></tr>
+<tr><th>來源可信度</th><td>要自己處理</td><td>和 #144 的 gate 對齊：子層的 investigator 和 verifier 結果要能被 gate 讀到</td></tr>
+<tr><th>何時該派、怎麼寫任務</th><td>已經調校過</td><td>靠 instruction 和 eval 調</td></tr>
+</tbody>
+</table></div>
+
+<h4>交接契約</h4>
+<ul>
+  <li><b>結構化回傳：</b>欄位包含 <code>aspect</code>、<code>status</code>（done 或 partial）、<code>verdict</code>、<code>draft</code>、<code>claims</code>、<code>sources</code>、<code>open_questions</code>、<code>notes_path</code>。其中 <code>claims</code> 的形狀對齊 <code>draft_factcheck_response</code> 的 <code>claim_sources</code>，<code>sources</code> 維持 investigator 的形狀，讓 writer 的 <code>attach_citation</code> 統一編號。</li>
+  <li><b><code>draft</code> 只是素材：</b>最終稿的語氣、長度、結構由 writer 統一寫。</li>
+  <li><b>細節放檔案：</b>筆記和證據放在 <code>work/aspects/&lt;n&gt;/</code>，只有面向之間互相矛盾、或要引用原文時，writer 才去讀。<code>sources/</code> 由所有分身共用，以 URL hash 做快取，寫檔要先寫暫存檔再改名。</li>
+  <li><b>衝突處理：</b>兩個面向的結論矛盾時，writer 要回頭看證據，或自己再叫一次 verifier，不能直接拼接。</li>
+</ul>
+
+<h4>修改版 AgentTool：把子 session 存下來</h4>
+<p>現在 <code>AgentTool.run_async</code> 在 <code>agent_tool.py:274</code> 寫死了 <code>InMemorySessionService()</code>，子層跑完 event 就消失了。修改版只改三件事：</p>
+<ol class="steps">
+  <li><b>改用真正的 session service。</b>子 session 開在同一個 Postgres 的 <code>DatabaseSessionService</code> 上。</li>
+  <li><b>用獨立的 app name。</b>例如 <code>cofacts_ai__sub</code>，子 session 就不會出現在側欄。ADK 的 <code>GET .../sessions/{id}</code>（<code>api_server.py:1703</code>）不檢查 app 是否存在，前端可以直接用現有的 endpoint 讀。</li>
+  <li><b>在回傳裡帶 <code>child_session_id</code>。</b>寫在工具程式產生的 <code>function_response</code> 裡，模型無法竄改。</li>
+</ol>
+<div class="cols">
+  <div class="pro"><h4>好處</h4><ul>
+    <li><b>點開就能看：</b>工具卡片加「查看過程」，用現成的 <code>convertAdkSessionToChatState</code> 重播子 session。investigator 和 verifier 也換成這個版本的話，就是一棵可以逐層展開的樹。</li>
+    <li><b>進行中也看得到：</b>子 session 的非 partial event 一寫進資料庫就讀得到，前端輪詢就能看進度。</li>
+    <li><b>不會搶寫父 session：</b>子層寫自己的 session，不會觸發 <code>StaleSessionError</code>。</li>
+    <li><b>#144 的 gate 可以吃真實紀錄：</b>走訪 writer 的 events 時，遇到 <code>child_session_id</code> 就載入子 session 遞迴收集 <code>sources[]</code>，來源集合的定義和 #144 一致。</li>
+    <li><b>可以接續同一個子 session：</b>分身回報 partial 時，下一次呼叫延續同一個子 session。</li>
+    <li><b>不做分身也有用：</b>套在現有的 investigator 和 verifier 上，使用者就看得到 verifier 讀了哪些頁面，除錯也不必翻 Langfuse。</li>
+  </ul></div>
+  <div class="con"><h4>要注意</h4><ul>
+    <li><b>維護成本：</b><code>run_async</code> 約 200 行，session service 寫死在裡面，只能整段複製，ADK 升級時要跟著對齊。比較好的做法是發 PR 給 ADK，讓 <code>AgentTool</code> 能傳入 <code>session_service</code>。</li>
+    <li><b>state 複製：</b>子 session 會複製一份父 state，持久化之後每個子 session 都存一份，要先過濾。</li>
+    <li><b>刪除要連動：</b>ADK 不會連帶刪子 session，BFF 要自己依 <code>child_session_id</code> 一併刪除，保存期限也要和父 session、工作區一致。</li>
+    <li><b>資料量：</b>investigator 回應裡的 grounding 和搜尋 widget HTML 很大，存檔前可以先拿掉。</li>
+    <li><b>權限：</b>子 session 用同一個 <code>user_id</code> 建立，BFF 讀的時候要確認它屬於同一個使用者。</li>
+  </ul></div>
+</div>
+
+<div class="verdict">
+  <p><strong>建議：走 H3 的話，先不做 writer 分身。</strong>H3 的最小版先用現有的 investigator 和 verifier 加上工作區工具，分身留到 eval 顯示「多面向的訊息品質較差」時再做。順序是：</p>
+  <ol>
+    <li>#144 的 provenance gate（獨立追蹤）。實作時讓收集來源的函式能吃子 session，介面先留好。</li>
+    <li>持久化子 session 的 AgentTool，先套在 investigator 和 verifier 上，獨立帶來可見性。</li>
+    <li>writer 分身與交接契約。</li>
+  </ol>
+  <p>如果最後選 H1，分身可以直接用 Claude Code 的 Agent 工具，但 #144 的來源收集一樣要處理子層（事件帶 <code>parent_tool_use_id</code>）。</p>
+</div>
+</section>
+
+<section id="tools">
+<h2>工具分三層（H1 和 H3 通用）</h2>
+<div class="diagram"><pre class="mermaid">
+flowchart TB
+  subgraph L1["第一層: 檔案工具, 只能碰工作區"]
+    R["Read / ReadFile"]
+    G["Glob, Grep"]
+    WE["Write, Edit"]
+    SA["Agent / subagent"]
+  end
+  subgraph L2["第二層: 我們的 Python 工具, 在 ADK process 內"]
+    F["fetch_to_workspace (url-resolver, PDF, CSV)"]
+    C["search_cofacts_database, get_single_cofacts_article"]
+    I["investigator / verifier (Gemini grounding)"]
+    D["draft_factcheck_response (per-claim gate)"]
+  end
+  subgraph L3["第三層: 守門"]
+    P["路徑守門: realpath 必須在工作區內"]
+    Q["配額記帳: 單檔與每個 session 的上限"]
+    X["工具白名單: 沒列出的一律拒絕"]
+  end
+  L1 --> L3
+  L2 --> L3
+</pre></div>
+<ul>
+  <li><b>關掉 WebFetch。</b>依 claude-agent-sdk 的 <code>WebFetchOutput</code> schema，它回傳的是 <code>result</code>，也就是「把 prompt 套用在內容上」的小模型摘要，不會存檔。查核需要原文和能引用的來源，所以所有抓取都改走 <code>fetch_to_workspace</code>：存原文、記 URL 和 hash 到 manifest，正好接上 source-coverage gate 和 <code>stage_archived_links</code>。</li>
+  <li><b><code>fetch_to_workspace</code> 要防 SSRF。</b>直接下載時要擋私有 IP、link-local 和 <code>169.254.169.254</code>，否則 agent 可以叫它去讀 metadata server。走 url-resolver（Cloudflare browser）的那條路，抓取本來就在外部發生。</li>
+  <li><b>H1 的設定示意：</b></li>
+</ul>
+<pre class="diagram" style="font-family: var(--font-mono); font-size: 13px; line-height: 1.6; margin: 0 0 16px;"><code style="background:none;padding:0">ClaudeAgentOptions(
+    cwd=f"{ws}/work",
+    tools=["Read", "Glob", "Grep", "Write", "Edit", "Agent", "TodoWrite"],  # 沒有 Bash、WebFetch
+    mcp_servers={"cofacts": cofacts_tools},
+    allowed_tools=[..., "mcp__cofacts__*"],
+    permission_mode="dontAsk",           # 沒在 allowed 清單裡的一律拒絕
+    hooks={"PreToolUse": [HookMatcher("Read|Write|Edit|Glob|Grep", [confine_to(ws)])]},
+    env={"CLAUDE_CONFIG_DIR": f"{ws}/.claude"},
+    setting_sources=[],
+)</code></pre>
+<p class="small">H3 的做法相同：把 <code>EnvironmentToolset(environment=LocalEnvironment(working_dir=ws))</code> 加進 <code>ai_writer.tools</code>，路徑守門寫在 <code>before_tool_callback</code> 裡。工作區要依 session 動態決定，所以 Environment 可能需要每個 session 建一個，或者自己包一層，這點待驗證。</p>
+</section>
+
+<section id="sandbox">
+<h2>Sandbox：docker 只能當外層</h2>
+<p>docker 隔開的是 GCE 主機和 container。但 agent 可能拿來做壞事的東西，幾乎都在 container 裡面。查核時抓下來的網頁本來就不可信，一段 prompt injection 加上能執行指令的工具，就能把下面這些東西送出去：</p>
+<div class="facts">
+  <div class="fact"><b>Secrets 會被繼承</b>Agent SDK 啟動子程序時，帶的是 <code>os.environ</code> 的完整副本。ADK 的 <code>LocalEnvironment</code> 執行指令時也是，用的是 <code>os.environ.copy()</code>。其中包括 <code>DATABASE_URL</code>（所有使用者的 session）和 Langfuse secret。<span class="src">subprocess_cli.py:819 · _local_environment.py</span></div>
+  <div class="fact"><b>Metadata server</b>在 GCE 上，container 連得到 <code>169.254.169.254</code>，可以直接拿到 service account token，能存取 Cloud SQL、GCS 和 Vertex。</div>
+  <div class="fact"><b>同一個檔案系統</b>別人的工作區，以及 <code>/proc/&lt;ADK pid&gt;/environ</code>，檔案工具都讀得到。所以路徑守門一定要先做 realpath，再檢查前綴。</div>
+</div>
+<h4>Shell 的三個等級</h4>
+<ol class="steps">
+  <li><b>不開 shell（建議起步）。</b>檔案只透過我們的工具進來，用 Read、Grep 和 PDF、圖片工具處理。filesystem 的好處大部分就已經拿到了。</li>
+  <li><b>專用的計算工具。</b>例如唯讀的 DuckDB 查詢，關掉網路和工作區外的檔案存取。CSV 的篩選、加總、比對夠用，風險也可以控制。</li>
+  <li><b>真正的 shell，放在沙箱裡。</b>
+    <ul>
+      <li>H1 可以用 Claude Code 的 bubblewrap。但在 docker 裡要打開 <code>enableWeakerNestedSandbox</code>，SDK 自己寫了這會降低安全性。</li>
+      <li>H3 可以把 <code>BaseEnvironment</code> 換成 E2B、Daytona、OpenSandbox，或另開一個不帶任何憑證、網路受限的 sandbox container。</li>
+      <li>不管哪條路，shell 都應該<b>不能連網</b>，只計算本地檔案。</li>
+    </ul>
+  </li>
+</ol>
+<p class="small">不論哪個等級，都要在 ADK 讀完 secrets 之後把它們從 <code>os.environ</code> 刪掉，或者用明確列出的 env 啟動子程序。</p>
+</section>
+
+<section id="fs">
+<h2>檔案系統：怎麼放、累積了會怎樣、怎麼管</h2>
+<div class="diagram"><pre class="mermaid">
+flowchart LR
+  U["上傳 (ADK artifact, GCS)"] --> WS
+  F["fetch_to_workspace"] --> WS[("本機工作區: ws/session_id")]
+  WS -->|"run 結束時同步"| GCS[("GCS: workspaces/session_id, 設 lifecycle")]
+  GCS -->|"下次 run 本機沒有時還原"| WS
+  RP["清理程式: 閒置或磁碟超過門檻時 LRU 刪除"] -->|"跳過進行中的 run"| WS
+  WS -->|"要給使用者看的檔案"| ART["ADK artifact, UI 可顯示"]
+</pre></div>
+<h4>目錄配置</h4>
+<p><code>/var/lib/cofacts-ai/ws/{session_id}/</code> 底下分成 <code>uploads/</code>、<code>sources/</code>（附 <code>manifest.json</code>）、<code>work/</code>，H1 再多一個 <code>.claude/</code>。這個目錄要掛 host volume。清掉一個 session 就是刪掉一個目錄。H1 的 transcript 另外用 <code>SessionStore</code> 備份到 Postgres。</p>
+<h4>一直累積的後果</h4>
+<ul>
+  <li><b>單台 GCE 的磁碟滿了，整站一起倒。</b>frontend、ADK、url-resolver、docker log 都在同一台，寫不進去就全部出錯，不只是查核功能。</li>
+  <li><b>寫在 container 的 writable layer 會有兩個問題。</b>平常它長在 <code>/var/lib/docker</code> 裡，不容易監控；redeploy 重建 container 時又會整批消失，使用者下次追問時檔案已經不見了。</li>
+  <li><b>Cloud Run 會 OOM。</b>dev 和 preview 跑在 Cloud Run 上，它的可寫檔案系統就是記憶體，會吃掉 backend 的 2 GiB，OOM 時整個 instance 連同進行中的 run 一起被殺掉。</li>
+  <li><b>H1 的 transcript 也會長。</b>Read 過的內容會以 tool_result 的形式寫進 transcript。另外 Claude Code 預設 <code>cleanupPeriodDays: 30</code>，transcript 如果只存在本機，30 天後再追問就 resume 不起來。</li>
+  <li><b>隱私。</b>使用者上傳的 LINE 截圖和轉傳訊息可能含個資，保存期限要和 Cofacts 的隱私政策一致。</li>
+  <li><b>context 不受影響。</b>檔案放在磁碟上，只有被讀的時候才進 context，這正是要用 filesystem 的理由。</li>
+</ul>
+<h4>管理機制</h4>
+<ul>
+  <li><b>入口集中：</b>檔案只能從 <code>fetch_to_workspace</code> 和受限的 Write 進來。設單檔上限、每個 session 的總量上限、content-type 白名單，由 after_tool callback 或 PostToolUse hook 記帳，超過就拒絕寫入。</li>
+  <li><b>冷熱分層：</b>本機只當快取，run 結束時同步到 GCS（可以放在現有 artifact bucket 底下），GCS 用 lifecycle rule 設保存期限。下次 run 時本機沒有就還原，或只還原 manifest，讓 agent 自己重抓。</li>
+  <li><b>清理程式：</b>session 閒置超過一段時間，或磁碟用量超過門檻時，依 LRU 刪本機目錄，但要跳過正在跑的 session。「哪些 run 正在跑」要從問題二的 run registry 取得，這是兩個 session 之間唯一的介面。</li>
+  <li><b>產出檔案：</b>只有要給使用者看的檔案（例如整理好的 CSV）才升級成 ADK artifact，UI 已經有讀 artifact 的路徑。</li>
+</ul>
+</section>
+
+<section id="matrix">
+<h2>比較表</h2>
+<div class="table-wrap"><table>
+<thead><tr><th></th><th>H1：Agent SDK</th><th>H2：ACP</th><th>H3：ADK 自補</th><th>H4：Managed</th><th>H5：Pi Durable</th></tr></thead>
+<tbody>
+<tr><th>開箱即用的 harness 品質</th><td class="g">最高</td><td class="w">依 adapter 而定</td><td class="b">要靠 eval 調出來</td><td class="g">高</td><td class="w">精簡，要自己補</td></tr>
+<tr><th>每個 run 的資源</th><td class="w">一個 claude 子程序，約 1 GiB</td><td class="b">Node 加 claude</td><td class="g">幾乎不增加</td><td class="g">在供應商端，按時計費</td><td class="w">新增一個服務</td></tr>
+<tr><th>模型</th><td class="b">只有 Claude</td><td class="g">依 harness</td><td class="g">每個 agent 各自選</td><td class="b">綁單一供應商</td><td class="g">多供應商</td></tr>
+<tr><th>Langfuse 和串流</th><td class="w">要重接</td><td class="w">要重接</td><td class="g">原封不動</td><td class="w">要從供應商事件重建</td><td class="b">全部重做</td></tr>
+<tr><th>現有 callbacks 和 UI</th><td class="w">要包裝、正規化</td><td class="w">要包裝、正規化</td><td class="g">原封不動</td><td class="b">callbacks 要改寫成公開 MCP 工具</td><td class="b">用 TS 重寫</td></tr>
+<tr><th>Shell 沙箱</th><td class="w">bubblewrap，在 docker 裡較弱</td><td class="w">依 harness</td><td class="g">可以換成遠端沙箱</td><td class="g">供應商 sandbox</td><td class="w">可以換 ExecutionEnv</td></tr>
+<tr><th>Mid-run compaction</th><td class="g">成熟</td><td class="g">依 harness</td><td class="w">有，品質待驗證</td><td class="g">成熟</td><td class="w">要自己做</td></tr>
+<tr><th>相依的成熟度</th><td class="w">SDK 是 Alpha</td><td class="w">adapter 0.x</td><td class="w">EnvironmentToolset 是 experimental</td><td class="w">beta 或 preview</td><td class="b">Experimental，沒有測試</td></tr>
+<tr><th>額外工作量</th><td>中：包裝層、Langfuse、UI</td><td>中到大</td><td>中：工具，加上持續的調校</td><td>中：MCP 化，加上資料落地評估</td><td>大</td></tr>
+</tbody>
+</table></div>
+</section>
+
+<section id="backtest">
+<h2>Langfuse 回測：換成 harness 會有什麼改變</h2>
+<p>資料來自 Langfuse 上的 1,275 個正式環境 turn（2026-03 到 10-30，<code>production</code> 與早期的 <code>default</code> 環境）和 377 筆讚、倒讚。延遲和成本是實際量測值。品質的影響是估計：由模型依固定評分表判讀 268 個 turn 的紀錄，判斷「同樣的模型加上工作區、全文抓取、Read、Grep 和共用工作區的 subagent，結果會不會明顯變好」。這 268 個包括全部 148 個倒讚，以及 120 個 8 到 10 月的隨機抽樣。它不是重播實驗。</p>
+
+<h4>現況基準</h4>
+<div class="facts">
+  <div class="fact"><b>每個 turn 的延遲</b>p50 67 秒，p90 255 秒。有呼叫子 agent 的 turn，中位數有 57% 的時間花在 investigator 和 verifier，兩者單次呼叫的 p50 分別是 29 秒和 38 秒。<span class="src">Langfuse observations</span></div>
+  <div class="fact"><b>每個 turn 的成本</b>p50 0.04 美元，p90 0.22 美元。writer 佔總成本約 60%，verifier 佔 29%。<span class="src">calculatedTotalCost</span></div>
+  <div class="fact"><b>writer 每多一步</b>扣掉工具執行的時間後，Gemini 3 Flash 是 p50 5.4 秒、p90 16 秒，Claude Haiku 是 p50 5.9 秒、p90 30 秒。成本 p50 約 0.01 美元，p90 約 0.03 美元，而且 context 越長越貴。</div>
+  <div class="fact"><b>工作負載</b>隨機抽樣中，只有 53% 是「新訊息查核」，其餘是改稿、提問、提交。用到 PDF 或長文件的只有 4%，數字或資料表 15%，影音 17%。使用者訊息長度的中位數是 41 字，41% 是 Cofacts 文章連結。</div>
+</div>
+
+<h4>品質：harness 會變好的 turn 很少，而且多半已經用別的方式修掉了</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>樣本</th><th>turn 數</th><th>明顯變好</th><th>不確定（信心低）</th><th>不會改變</th></tr></thead>
+<tbody>
+<tr><th>隨機抽樣（8 到 10 月）</th><td>120</td><td class="w">4（3%）</td><td>17（14%）</td><td>99（83%）</td></tr>
+<tr><th>全部倒讚</th><td>148</td><td class="w">24（16%）</td><td>24（16%）</td><td>100（68%）</td></tr>
+<tr><th>其中 9/18 之後</th><td>81</td><td class="b">1（1%）</td><td colspan="2">其餘</td></tr>
+</tbody>
+</table></div>
+<ul>
+  <li><b>「會變好」的 28 個 turn 只來自 17 個 session，除了 1 個以外都在 9/18 之前。</b>最大的一群是同一個 session 的 5 個 turn（六位人物的助理身分，一次呼叫跑到 125 秒回空），這是 Cloudflare 125 秒閒置中斷造成的，#145 的 heartbeat 在 9/18 已經修好。另外好幾個是 verifier 對讀不到的頁面幻覺「支持」，發生在 verifier 修正和 #118 url-resolver 預取之前。</li>
+  <li><b>倒讚的主因 harness 修不到。</b>148 個倒讚中，出處與主張不符 53 個、引用沒看過或捏造的網址 34 個、沒抓到重點 31 個。這些是模型判斷和出處可信度的問題，對應的是 #144 的 provenance gate 和 writer 換模型（mrorz 的實驗顯示 Sonnet 在失敗案例幾乎都沒重犯）。</li>
+  <li><b>仍然成立的 harness 價值很窄：</b>使用者質疑「這頁或這本書根本沒有這句話」時，能拿全文 grep 確認；使用者要求引用某份 PDF 的條文時，能真的去讀那一頁。這兩種不需要完整的 harness，用一個「引文必須出現在抓取全文裡」的檢查，加上一個 PDF 分頁工具就能涵蓋。</li>
+  <li><b>proofreader 拿不到全文</b>（writer 只傳「上述草案」字樣）是工具契約的 bug，改 request 的組法就能修，不需要共用工作區。</li>
+</ul>
+
+<h4>速度與成本：受影響的 turn 會變慢、變貴</h4>
+<ul>
+  <li>最慢的環節是 investigator 和 verifier 的 Gemini grounding，harness 沒有改變這一段。</li>
+  <li>判讀為「會變好」的 turn，多半估計要多走 4 到 10 步。以每步 p50 約 6 秒、約 0.01 到 0.03 美元推算，每個這種 turn 會多 25 到 60 秒、0.05 到 0.3 美元。H1 還要加上 <code>claude</code> 子程序的冷啟動時間（未實測）。</li>
+  <li>多面向平行可以縮短時間，但不需要 harness：ADK 已經支援同一輪平行呼叫。現在有多次子 agent 呼叫的 turn 中，串行 456 個、平行 50 個，其中一部分是 investigator 到 verifier 本來就有的依賴，但仍然有用 prompt 就能挖的空間。</li>
+  <li>如果讓 harness 在每個 turn 都多走幾步（coding harness 的常態），延遲和成本會全面上升，而 83% 的 turn 在品質上沒有收穫。</li>
+</ul>
+
+<h4>查核協作者會有感覺嗎</h4>
+<p>幾乎不會。大部分 turn 是短訊息、Cofacts 連結和改稿，harness 不會改變結果。會變好的情境（質疑引文、PDF 條文）一個月大概只有一兩次。反而是變慢比較容易被感覺到：現在 p90 已經 255 秒了。協作者最容易感受到的改善是「出處可以相信」（#144、換 writer 模型），以及「關掉頁面不會白等」（問題二的背景執行）。</p>
+
+<div class="verdict">
+  <p><strong>建議：暫緩 H1 和 H3，把資源放在下面這些地方。</strong></p>
+  <ol>
+    <li>#144 的 provenance gate，針對倒讚的第一大主因。</li>
+    <li>writer 換 Sonnet 的完整流程 A/B（接 mrorz 的實驗）。</li>
+    <li>問題二的背景執行，改善「等待」的感受。</li>
+    <li>兩個小切片：「引文必須出現在 url-resolver 抓到的全文裡」的檢查，和給 verifier 用的 PDF 分頁工具。這也是 H3 共用元件的一部分，之後要做完整 harness 時不會白做。</li>
+  </ol>
+  <p>什麼時候該重新評估：PDF、資料表類的任務明顯變多，或者 cofacts.ai 要支援跨多份文件的研究、長期研究這種新用途時。</p>
+</div>
+
+<h4>這份回測的限制</h4>
+<ul class="small">
+  <li>品質影響是模型讀紀錄後的判斷，不是重播實驗。判讀者讀的是壓縮過的 digest，四個判讀者之間也有尺度差異（各批「會變好」分別是 14、4、4、6 個）。</li>
+  <li>9/18 之後只有 81 個樣本，「約 1%」的信賴區間很寬。</li>
+  <li>「更長、更深入的研究」沒被使用者嘗試過，所以數據反映的是現有的使用方式，而不是 harness 可能帶來的新用途。</li>
+  <li>如果要更紮實的證據，可以挑 10 到 15 個 9/18 之後、多面向或帶 PDF 的 turn 做重播實驗。</li>
+</ul>
+</section>
+
+<section id="plan">
+<h2>建議路線</h2>
+<ol class="steps">
+  <li><b>共用元件。</b>工作區目錄和 volume、<code>fetch_to_workspace</code>（含 manifest 和 SSRF 防護）、路徑守門、環境變數清理、配額，以及 GCS 同步和清理程式。這些和選哪個方案無關。</li>
+  <li><b>H3 的最小版。</b>在 <code>ai_writer</code> 上加 <code>ReadFile</code>（分段讀）、<code>glob</code>、<code>grep</code>、<code>read_pdf_pages</code>、<code>view_image</code>、<code>todo</code>，不開 shell，也先不做 writer 分身。用 cofacts-ai-eval 的 session replay 和現在的 writer 比較。</li>
+  <li><b>H1 的 spike。</b>用同一套工具和工作區，搭配同一組 eval 題目，量查核品質、延遲、成本、記憶體。</li>
+  <li><b>依 eval 結果決定。</b>H1 明顯勝出，就把它接到 feature flag 後面，補 Langfuse 和 UI。差距不大，就繼續強化 H3，再視需要加計算工具或沙箱 shell。</li>
+</ol>
+<p class="small">依 <code>CLAUDE.md</code>，工作區、沙箱策略和 agent 編排的變更都屬於應該寫成 decision record 的範圍。</p>
+</section>
+
+<section id="decide">
+<h2>請你決定</h2>
+<div class="decide"><ol>
+  <li><b>要不要讓 H3 和 H1 用 eval 比一場</b>，還是直接選定一邊？</li>
+  <li><b>計算能力要做到哪一級</b>：不開 shell、專用 CSV 工具，還是沙箱 shell？</li>
+  <li><b>工作區的保存期限</b>：本機保留多久、GCS 保留多久？這要和 Cofacts 的隱私政策對齊。</li>
+  <li><b>要不要先寫共用元件的 decision record</b>：工作區和沙箱策略。</li>
+</ol></div>
+</section>
+
+<section>
+<h2>尚未驗證</h2>
+<ul class="small">
+  <li>ADK token 門檻 compaction 在單一長 run 中途的實際行為與摘要品質。</li>
+  <li><code>EnvironmentToolset</code> 能不能依 session 切換工作區（toolset 是在 agent 定義時就建好的）。</li>
+  <li><code>claude</code> 子程序在 GCE 上實際的 RSS 和冷啟動時間。</li>
+  <li>bubblewrap 在 cofacts 的 docker 設定下能不能啟用。</li>
+</ul>
+</section>
+
+</main>
+</div>
+
+<!--claude-mermaid-runtime-begin:3477-->
+<style>.mermaid-diagram{margin-block:4px}.mermaid-diagram svg{display:block;margin:0 auto;max-width:100%;height:auto}</style>
+<script src="/_runtime/mermaid-11.16.1.min.js"></script>
+<script>(function(){
+var CFG={"palettes":{"light":{"surface":"#f4efe4","text":"#42392e","line":"#8a7f6d","border":"#7a6c52","bg":"#fffdf8"},"dark":{"surface":"#262b34","text":"#f2f3f5","line":"#a8adb8","border":"#9aa4b8","bg":"#1f232b"}}};
+if(typeof mermaid==='undefined')return;
+var pres=Array.prototype.slice.call(document.querySelectorAll('pre.mermaid')).filter(function(p){if(p.hasAttribute('data-claude-mermaid-claimed'))return false;p.setAttribute('data-claude-mermaid-claimed','1');return true;});
+if(!pres.length)return;
+var mq=window.matchMedia?window.matchMedia('(prefers-color-scheme: dark)'):null;
+var root=document.documentElement;
+var items=pres.map(function(pre){
+var mount=document.createElement('div');mount.className='mermaid-diagram';
+return {pre:pre,mount:mount,src:pre.textContent||''};
+});
+var seq=0;
+var renderGen=0;
+var lastKey='';
+function pageBg(fallback){
+var els=[document.body,document.documentElement];
+for(var i=0;i<els.length;i++){
+var c=els[i]&&getComputedStyle(els[i]).backgroundColor;
+if(c&&c!=='transparent'&&c!=='rgba(0, 0, 0, 0)')return c;
+}
+return fallback;
+}
+function render(){
+var theme=root.getAttribute('data-theme');
+var dark=theme==='dark'||(!!(mq&&mq.matches)&&theme!=='light');
+var pal=dark?CFG.palettes.dark:CFG.palettes.light;
+var bg=pageBg(pal.bg);
+var key=(dark?'d':'l')+'|'+bg;
+if(key===lastKey)return;
+lastKey=key;
+var gen=++renderGen;
+var font=getComputedStyle(document.body).fontFamily||'sans-serif';
+var nat={useMaxWidth:false};
+mermaid.initialize({
+startOnLoad:false,securityLevel:'strict',theme:'base',
+flowchart:nat,sequence:nat,er:nat,state:nat,class:nat,pie:nat,
+gantt:nat,journey:nat,timeline:nat,gitGraph:nat,mindmap:nat,xyChart:nat,
+quadrantChart:nat,sankey:nat,c4:nat,requirement:nat,block:nat,
+packet:nat,kanban:nat,architecture:nat,radar:nat,
+themeVariables:{background:bg,mainBkg:pal.surface,primaryColor:pal.surface,
+primaryTextColor:pal.text,lineColor:pal.line,primaryBorderColor:pal.border,
+nodeBorder:pal.border,clusterBorder:pal.border,edgeLabelBackground:bg,
+clusterBkg:'rgba(127,127,127,0.07)',titleColor:pal.text,
+darkMode:dark,rowOdd:bg,rowEven:'rgba(127,127,127,0.07)',
+attributeBackgroundColorOdd:bg,attributeBackgroundColorEven:'rgba(127,127,127,0.07)',
+fontSize:'16px',fontFamily:font},
+themeCSS:'.node rect, .node circle, .node polygon, .node path, .cluster rect { stroke-width: 2px; }'
+});
+items.forEach(function(it){
+var id='claude-mermaid-'+seq++;
+mermaid.render(id,it.src).then(function(r){
+if(gen!==renderGen)return;
+var prev=it.pre.previousElementSibling;
+if(prev&&prev.className==='mermaid-diagram'&&prev!==it.mount)return;
+it.mount.innerHTML=r.svg;
+if(!it.mount.parentNode)it.pre.parentNode.insertBefore(it.mount,it.pre);
+it.pre.style.display='none';
+},function(){
+var scratch=document.getElementById(id);
+if(scratch)scratch.parentNode.removeChild(scratch);
+scratch=document.getElementById('d'+id);
+if(scratch)scratch.parentNode.removeChild(scratch);
+if(gen!==renderGen)return;
+if(it.mount.parentNode)it.mount.parentNode.removeChild(it.mount);
+it.pre.style.display='';
+});
+});
+}
+render();
+if(mq&&mq.addEventListener)mq.addEventListener('change',render);
+if(typeof MutationObserver!=='undefined')new MutationObserver(render).observe(root,{attributes:true,attributeFilter:['data-theme']});
+})();</script>
+<!--claude-mermaid-runtime-end-->
+
+</body></html>

@@ -1,0 +1,742 @@
+<!doctype html><html><head><meta name="robots" content="noindex, nofollow"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>cofacts.ai 背景續跑</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column with a sticky section index on wide screens; each scenario pairs a sequence diagram with a numbered step table. Same visual family as the "cofacts.ai Harness 選型" page. */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --ink: #17202b;
+  --muted: #5a6573;
+  --rule: #dde2e8;
+  --accent: #c98a00;
+  --accent-soft: #fff3cf;
+  --good: #1f7a4d; --good-soft: #e3f4ea;
+  --warn: #9a5b00; --warn-soft: #fdf0d8;
+  --bad: #a3322a;  --bad-soft: #fbe5e2;
+  --code-bg: #eef1f5;
+  --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161d; --surface: #18202a; --ink: #e6ebf1; --muted: #9aa6b4; --rule: #2a3542;
+    --accent: #ffc233; --accent-soft: #3a2f12;
+    --good: #6fd19c; --good-soft: #15301f; --warn: #f2b65a; --warn-soft: #36280f; --bad: #f08a80; --bad-soft: #3a1a17;
+    --code-bg: #212b37; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161d; --surface: #18202a; --ink: #e6ebf1; --muted: #9aa6b4; --rule: #2a3542;
+  --accent: #ffc233; --accent-soft: #3a2f12;
+  --good: #6fd19c; --good-soft: #15301f; --warn: #f2b65a; --warn-soft: #36280f; --bad: #f08a80; --bad-soft: #3a1a17;
+  --code-bg: #212b37; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.75;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 64px;
+}
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 48px; }
+nav.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; font-size: 14px; }
+nav.toc ol { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+nav.toc a { color: var(--muted); text-decoration: none; }
+nav.toc a:hover, nav.toc a:focus-visible { color: var(--ink); }
+main { min-width: 0; }
+@media (max-width: 860px) { .wrap { grid-template-columns: minmax(0, 1fr); } nav.toc { display: none; } }
+
+h1 { font-size: clamp(28px, 4vw, 40px); font-weight: 900; line-height: 1.25; margin: 0 0 8px; text-wrap: balance; letter-spacing: 0.01em; }
+h2 { font-size: 24px; font-weight: 700; margin: 56px 0 12px; text-wrap: balance; padding-top: 12px; border-top: 1px solid var(--rule); }
+h3 { font-size: 19px; font-weight: 700; margin: 28px 0 8px; text-wrap: balance; }
+h4 { font-size: 15px; font-weight: 700; margin: 16px 0 4px; color: var(--muted); letter-spacing: 0.04em; }
+p { margin: 0 0 12px; max-width: 70ch; }
+.lede { color: var(--muted); font-size: 17px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+code { font-family: var(--font-mono); font-size: 0.88em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+pre.code { font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; overflow-x: auto; margin: 12px 0 16px; }
+pre.code code { background: none; padding: 0; font-size: inherit; overflow-wrap: normal; }
+a { color: var(--ink); text-decoration-color: var(--accent); text-underline-offset: 3px; }
+ul { margin: 0 0 12px; padding-left: 1.3em; max-width: 74ch; }
+li { margin: 3px 0; }
+
+.verdict { background: var(--surface); border: 1px solid var(--rule); border-left: 4px solid var(--accent); border-radius: 6px; padding: 20px 24px; margin: 24px 0 8px; }
+.verdict p:last-child { margin-bottom: 0; }
+.verdict ul { margin-bottom: 0; }
+
+.chip { display: inline-block; font-size: 12.5px; font-weight: 700; padding: 1px 9px; border-radius: 999px; letter-spacing: 0.03em; white-space: nowrap; }
+.chip.rec { background: var(--good-soft); color: var(--good); }
+.chip.alt { background: var(--warn-soft); color: var(--warn); }
+.chip.no  { background: var(--bad-soft);  color: var(--bad); }
+.chip.ref { background: var(--code-bg); color: var(--muted); }
+
+.callout { background: var(--warn-soft); border-radius: 8px; padding: 16px 20px; margin: 16px 0; }
+.callout p:last-child { margin-bottom: 0; }
+.callout b.t { display: block; color: var(--warn); margin-bottom: 4px; }
+
+.diagram { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 12px; margin: 12px 0 8px; }
+.diagram pre.mermaid { margin: 0; background: transparent; min-width: 620px; text-align: center; font-family: var(--font-body); }
+
+.table-wrap { overflow-x: auto; margin: 12px 0 20px; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 14.5px; line-height: 1.65; }
+th, td { text-align: left; vertical-align: top; padding: 9px 14px; border-bottom: 1px solid var(--rule); }
+thead th { font-size: 13px; color: var(--muted); font-weight: 700; background: var(--code-bg); white-space: nowrap; }
+tbody th { font-weight: 700; white-space: nowrap; }
+td.n { font-family: var(--font-mono); color: var(--accent); font-weight: 500; white-space: nowrap; font-variant-numeric: tabular-nums; }
+tr:last-child td, tr:last-child th { border-bottom: 0; }
+.g { color: var(--good); font-weight: 700; } .w { color: var(--warn); font-weight: 700; } .b { color: var(--bad); font-weight: 700; }
+
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 16px 0; }
+.fact { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; font-size: 14.5px; line-height: 1.65; min-width: 0; }
+.fact b { display: block; margin-bottom: 4px; font-size: 15px; }
+.fact .src { display: block; margin-top: 6px; font-family: var(--font-mono); font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+
+.decide { background: var(--accent-soft); border-radius: 8px; padding: 20px 24px; margin-top: 16px; }
+.decide ol { margin: 0; padding-left: 1.3em; }
+.decide li { margin: 8px 0; }
+.small { font-size: 14px; color: var(--muted); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+
+<div class="wrap">
+<nav class="toc" aria-label="段落">
+  <ol>
+    <li><a href="#background">背景</a></li>
+    <li><a href="#tldr">結論</a></li>
+    <li><a href="#redis">Redis 裡放什麼</a></li>
+    <li><a href="#handler">Stream handler</a></li>
+    <li><a href="#env">各環境的 Redis</a></li>
+    <li><a href="#capacity">能撐多少人</a></li>
+    <li><a href="#api">API 與 SSE 格式</a></li>
+    <li><a href="#wire">事件怎麼送到前端</a></li>
+    <li><a href="#client">Client 狀態</a></li>
+    <li><a href="#s1">情境一：關窗再回來</a></li>
+    <li><a href="#s2">情境二：兩個 client</a></li>
+    <li><a href="#s3">情境三：靜態 client 送出</a></li>
+    <li><a href="#edges">邊界情況</a></li>
+    <li><a href="#files">要改的檔案</a></li>
+    <li><a href="#decide">請你決定</a></li>
+    <li><a href="#unverified">未驗證</a></li>
+  </ol>
+</nav>
+<main>
+
+<div class="eyebrow">cofacts/ai · 架構設計 · 2026-10-30</div>
+<h1>cofacts.ai 背景續跑</h1>
+<p class="lede">讓 cofacts.ai 的 AI 查核助理在使用者關掉瀏覽器後繼續完成工作，重新打開時接回最新進度；同一個對話開在兩個視窗時，兩邊都能看到即時輸出。這頁說明現況為什麼做不到、打算怎麼改，以及用 Redis Streams 當 run registry 的細部設計。</p>
+
+<section id="background">
+<h2>背景：今天的 run 怎麼跑</h2>
+<p>cofacts.ai 是 Cofacts 的 AI 查核助理。使用者貼上一則可疑訊息，agent 會搜尋 Cofacts 資料庫和網路、核對來源，最後寫出一份附來源的查核回應。一次問答在系統裡叫一個 <b>turn</b>，執行一個 turn 的過程叫一個 <b>run</b>；同一串對話叫一個 <b>session</b>。</p>
+<div class="diagram"><pre class="mermaid">
+flowchart LR
+  B["瀏覽器"] -->|"POST /api/run-sse"| F["BFF (TanStack Start)"]
+  F -->|"POST /run_sse, 轉傳 request.signal"| A["ADK FastAPI (get_fast_api_app)"]
+  A --> W["ai_writer: Claude Haiku on Vertex"]
+  W -->|"AgentTool"| I["investigator, verifier: Gemini"]
+  W -->|"tools"| T["搜尋 Cofacts 資料庫、起草回應等"]
+  A --> PG[("Postgres: ADK sessions")]
+  A --> G[("GCS: 上傳檔案")]
+</pre></div>
+<ul>
+  <li><b>元件</b>：前端和 BFF 是 TanStack Start；後端是 Google ADK（Python）的 FastAPI server，session 存在 Postgres。</li>
+  <li><b>部署</b>：production 是 GCE 上 docker compose 裡的 <code>adk</code> 與 <code>cofacts-ai</code> 兩個容器，ADK 只跑一個 uvicorn process。dev.cofacts.ai 和 PR preview 是 Cloud Run 上的多容器 service，最多 3 個 instance。</li>
+  <li><b>一個 turn 會跑很久</b>：主 agent 會呼叫做網路搜尋的子 agent，單一次模型呼叫曾跑到 195 秒，Cloud Run 的 request timeout 因此調到 900 秒。</li>
+  <li><b>串流方式</b>：瀏覽器送出問題後開著一條 SSE 連線，ADK 的 <code>/run_sse</code> 一邊執行一邊把事件推回來。事件分兩種：<b>partial</b> 是逐字打出的文字片段，只用來即時顯示，不會存檔；<b>非 partial</b> 是完整的訊息、工具呼叫和工具結果，寫進 Postgres 後才送出。</li>
+</ul>
+
+<h3>問題：run 的壽命綁在 HTTP 連線上</h3>
+<p>使用者關掉分頁、手機切到背景太久，或網路斷線，瀏覽器的 fetch 就會中斷。BFF 把這個中斷（<code>request.signal</code>）轉傳給 ADK，ADK 接著取消整個 run。從 ADK 2.11 起，<code>/run_sse</code> 在 client 斷線時一定會中止 run，沒有選項可以關閉（google/adk-python issue #4029 仍開著）。</p>
+<div class="facts">
+  <div class="fact"><b>斷線後留下什麼</b>已經寫進 DB 的非 partial event 會保留；正在打的字全部遺失；ADK 另外補一筆 <code>INVOCATION_ABORTED</code>。使用者回來只看到一半的過程，沒有答案。</div>
+  <div class="fact"><b>ADK 的 resume 幫不上忙</b>前端有寫好但沒用到的 <code>resumeRun(invocationId)</code>。實測用 ADK 的 resume 接續被中斷的 turn，模型看到的工具結果是「Invocation was aborted」，不會接著把工作做完。</div>
+  <div class="fact"><b>同一個 session 開兩個視窗</b>今天沒有任何機制讓第二個視窗看到第一個視窗正在跑的內容，只能等跑完後重新整理。</div>
+</div>
+
+<h3>做法：把「執行 run」和「觀看 run」分開</h3>
+<ul>
+  <li>不用 ADK 內建的 <code>/run_sse</code>，改在 <code>adk/main.py</code> 自己建一個 <code>Runner</code>（沿用同一組 Postgres 和 GCS 服務），加上自訂的 HTTP route。</li>
+  <li>送出問題時，用 <code>asyncio.create_task</code> 在背景啟動 run，不依附在任何 HTTP 請求上。瀏覽器斷線只會少一個觀看者，run 照常跑完。</li>
+  <li>run 的每個事件寫進一個 <b>Redis Stream</b>，這就是 run registry。任何視窗都可以隨時接上：先補送 stream 裡這個 run 目前為止的事件，再阻塞等待後續事件。</li>
+  <li>停止鈕改成呼叫一個 cancel API，由 server 取消 run，不再靠中斷連線。</li>
+</ul>
+</section>
+
+<section id="tldr">
+<div class="verdict">
+  <p><strong>run registry 直接放在 Redis Streams，和 rumors-line-bot 共用既有的 Redis。</strong></p>
+  <ul>
+    <li><b>不用自己寫通知機制。</b>寫入端 <code>XADD</code>；SSE handler 用 <code>XREAD BLOCK</code> 等新事件。接上時先用 <code>XRANGE</code> 補送這個 run 目前為止的事件，再從最後一筆的 ID 接著 <code>XREAD</code>，中間不會漏也不會重複。慢的 client 只是讀得慢，不需要踢人的規則。</li>
+    <li><b>不用新增基礎設施。</b>production 的 GCE 上已經有 <code>redis</code> 容器，和 <code>adk</code> 在同一個 docker network。staging 的 LINE bot 連的是 Redis Cloud 上的免費機器，Cloud Run 的 dev 和 preview 可以連同一台。</li>
+    <li><b>比放在 ADK process 記憶體多三個好處。</b>Cloud Run 不必限制成只有一個 instance。owner 掛掉時鎖會自動過期，正在看的 client 馬上知道 run 中斷了。之後要開多個 uvicorn worker 時，設計不用改。</li>
+    <li><b>Redis 救不了 run 本身。</b>跑 run 的 ADK process 掛掉，run 就斷了。redeploy 時收到 SIGTERM 就立刻取消所有進行中的 run，把已打出的字補寫進 Postgres，前端顯示「中斷了」和重問按鈕。</li>
+  </ul>
+  <p><strong>多個 client：</strong>執行中的 client 各自讀同一個 stream，turn 結束時 server 關閉連線，client 就變成靜態。靜態的 client 不 polling，只在「載入頁面、分頁重新變成可見、自己要送出」這三個時機查一次狀態。</p>
+  <p><strong>要先處理一個現有程式的衝突：</strong>打開 session 時，前端會寫入 <code>lastOpenedAt</code>。這會讓正在跑的 run 死於 <code>StaleSessionError</code>，所以 run 進行中要先跳過這次寫入。</p>
+</div>
+</section>
+
+<section id="redis">
+<h2>Redis 裡放什麼</h2>
+<p>先定義兩個下面會一直用到的詞：</p>
+<ul>
+  <li><b>drain task</b>：<code>POST /runs</code> 用 <code>asyncio.create_task</code> 開的那個背景工作。ADK 的 <code>runner.run_async()</code> 是一個 async generator，要有人一筆一筆把事件拉出來，agent 才會往下跑。今天負責拉的是 <code>/run_sse</code> 的 HTTP 請求，所以請求一斷，run 就停了。改成由 drain task 拉：它把事件一路拉到結束（drain，抽乾），每拉到一筆就寫進 Redis，和有沒有人在看無關。</li>
+  <li><b>owner</b>：這個 drain task 所在的 ADK process。production 只有一個 ADK process，所以永遠是它；在 Cloud Run 上則是收到 <code>POST /runs</code> 的那一個 instance。只有 owner 記憶體裡有這個 task，所以只有它能直接取消 run、替鎖續約；它掛掉，run 就跟著中斷。鎖的內容會記下誰是 owner。</li>
+</ul>
+<p>SSE handler 不碰 runner，只讀 Redis，所以它們可以在任何一個 ADK process，甚至不同的 Cloud Run instance 上。</p>
+
+<div class="diagram"><pre class="mermaid">
+flowchart LR
+  CA["Client A"] -->|"SSE"| BFF["BFF"]
+  CB["Client B"] -->|"SSE"| BFF
+  BFF -->|"GET /runs/sid/stream 各一條"| H["ADK stream handlers"]
+  H -->|"XRANGE, XREAD BLOCK"| RS[("Redis Stream: cofacts-ai:stream:user:sid")]
+  D["drain task (owner)"] -->|"XADD"| RS
+  D -->|"SET NX, 續約"| L[("cofacts-ai:run:user:sid")]
+  D -->|"async for"| R["Runner.run_async"]
+  R -->|"非 partial event"| PG[("Postgres: ADK sessions")]
+</pre></div>
+
+<div class="table-wrap"><table>
+<thead><tr><th>Key</th><th>型別與內容</th><th>生命週期</th><th>用途</th></tr></thead>
+<tbody>
+<tr><th><code>cofacts-ai:run:{userId}:{sid}</code></th><td>string，<code>{invocationId, owner}</code></td><td><code>SET NX PX 30000</code>，owner 每 10 秒續約；run 結束時 owner 刪掉（只刪自己的）</td><td>每個 session 同時只能有一個 run；存在就表示正在跑。owner 掛掉後 30 秒內自動消失</td></tr>
+<tr><th><code>cofacts-ai:stream:{userId}:{sid}</code></th><td>stream，每筆 <code>{invocationId, type, partial, data}</code>；<code>type</code> 是 <code>event</code> 或 <code>done</code>（<code>done</code> 只是告訴 handler 該關連線，不會送到前端），<code>data</code> 是序列化後的 ADK Event</td><td>新的 run 取得鎖後先 <code>DEL</code> 再寫；執行中隨續約一起 <code>EXPIRE 60</code>；寫入 <code>done</code> 後 30 秒就消失</td><td>只服務進行中的 run：快照與直播的來源</td></tr>
+<tr><th><code>cofacts-ai:cancel:{userId}:{sid}</code></th><td>string，值是要取消的 <code>invocationId</code></td><td><code>EX 600</code></td><td>停止鈕打到的 ADK process 若不是 owner，就設這個旗標；owner 每秒檢查一次，值要和自己的 invocationId 相同才取消，避免太晚到的取消打到下一個 run</td></tr>
+</tbody>
+</table></div>
+
+<h3>為什麼鎖和 stream 是兩個 key</h3>
+<p><b>stream 只在 run 進行中有用。</b>run 一結束，所有事件都已經在 Postgres，新接上的 client 用 session API 就拿得到完整歷史。網路正常時，handler 都停在 <code>XREAD BLOCK</code>，事件一寫進來就讀走並送出，讀到 <code>done</code> 時 stream 已經沒用了。寫入 <code>done</code> 後還留 30 秒，是給網路慢的 client：handler 讀到事件後要等 <code>yield</code> 把 bytes 送出去，client 收得慢時，send 會被 TCP 回壓卡住（例如手機在弱訊號下收一大段補送的事件）。這段時間新的 entry 在 Redis 裡排隊，等 handler 回到下一次 <code>XREAD</code> 才讀。如果排隊期間 stream 就被刪掉，它會漏掉最後幾筆和 <code>done</code> 標記。落後超過 30 秒的話一樣會發生：handler 等到逾時、發現鎖不在，就直接關閉連線，client 照「連線結束」的規則查狀態、重抓歷史，畫面一樣正確。</p>
+<p><b>鎖還是要獨立一個 key。</b>「一個 session 只能有一個 run」要靠 <code>SET NX</code> 原子地保證，stream 沒有「不存在才建立」的指令。鎖的 TTL 只有 30 秒，owner 掛掉後很快就會消失。</p>
+<p><b>中斷之後怎麼知道中斷了。</b>一律看歷史，不靠 Redis。正在看的 client 會先遇到連線被關掉（handler 發現鎖不見了），接著照「連線結束」的規則查狀態、重抓歷史，結果和之後才打開的 client 一樣：</p>
+<ul>
+  <li>按停止或收到 SIGTERM 時，補寫的那筆 event 會在 <code>customMetadata</code> 記下 <code>cancelled</code> 或 <code>interrupted</code>。</li>
+  <li>process 直接當掉、來不及補寫時，歷史的最後一筆不會是 writer 的回答。</li>
+</ul>
+<p>這兩種情況，前端都顯示「中斷了」和重問按鈕。</p>
+<p>stream 用 session 當 key，handler 只靠 session id 就找得到，不必先讀鎖。代價是同一個 session 的下一個 run 會重用同一個 key（owner 當掉留下的 stream 最多再活 60 秒），所以每筆 entry 都帶 <code>invocationId</code>，handler 只看鎖裡那個 run 的 entry。這樣就算 handler 剛好在新 run 取得鎖、還沒 <code>DEL</code> 舊 stream 的瞬間讀到舊內容，也不會混進來。</p>
+
+<h3>寫入端：owner 的 drain task</h3>
+<ul>
+  <li>每個事件（partial 和非 partial 都算）append 一筆到 stream。</li>
+  <li>寫入不在 drain 迴圈裡逐筆 await：事件先放進 process 內的緩衝區，由 writer task 每 50 ms 用一個 pipeline 批次 <code>XADD</code>。在 GCE 上連本機的 Redis 時，這樣做沒有差別；但 Cloud Run 連 Redis Cloud 要走網際網路，逐筆等來回時間的話，上千個 partial 會把整個 turn 拖慢好幾秒到幾十秒。</li>
+  <li>run 結束時先把緩衝區寫完，再寫一筆 <code>done</code> 標記（handler 看到就關閉連線），最後刪鎖。</li>
+</ul>
+<pre class="code"><code>async def drain(run, agen):
+    try:
+        async for ev in agen:
+            run.writer.put(entry(ev))        # writer task 每 50 ms 以 pipeline 批次 XADD
+        status = "completed"
+    except asyncio.CancelledError:
+        await salvage_partial(run)           # 已打出的字補寫成非 partial event（ADK 2.13 實測可行）
+        status = "cancelled"
+    except Exception:
+        status = "failed"
+    finally:
+        await run.writer.flush()
+        await r.xadd(run.stream_key, {"type": "done", "data": status})
+        await r.expire(run.stream_key, 30)   # 只留給還沒讀完的 handler
+        await release_lock(run)              # 比對 owner 後才刪，避免刪到別人的鎖</code></pre>
+
+<h3>接上時為什麼從頭補送，不用 Last-Event-ID 續傳</h3>
+<p>Redis Stream 的 ID 本身就能拿來做 Last-Event-ID 續傳，但我們不需要：一個 run 從頭到尾都留在 stream 裡，接上時一律從這個 run 的開頭補送最簡單。補送的就是一般的 <code>data:</code> frame，handler 把它們串成一個 chunk、一次 <code>yield</code>。為了少送一點，已經有完整版的 partial 可以略過，只留最後一則還在打的訊息的 partial。client 接上時先清掉快取裡屬於這個 run 的事件，之後收到的全部照順序套用。重連、換裝置、第一次打開都走同一條路。</p>
+</section>
+
+<section id="handler">
+<h2>SSE handler 怎麼知道有新事件</h2>
+<p>handler 停在 <code>XREAD BLOCK</code>，直到 stream 有新的一筆，或者 20 秒逾時才返回。逾時就送一行 heartbeat，並確認鎖還在。這不是 polling：等待發生在 Redis 端，ADK 這邊沒事件時不佔 CPU。</p>
+<pre class="code"><code>@app.get("/runs/{sid}/stream")
+async def stream(sid: str, user_id: str = Depends(bff_user)):
+    async def gen():
+        lock = await read_lock(user_id, sid)
+        if lock is None:
+            return                                           # 沒有在跑：直接關閉連線
+        inv = lock.invocation_id
+        key = stream_key(user_id, sid)
+        raw = await r.xrange(key)                            # 目前全部
+        mine = [e for e in raw if e.invocation_id == inv]    # 只看這個 run 的 entry
+        if any(is_done(e) for e in mine):
+            return                                           # 剛好已經結束，歷史裡都有了
+        backlog = [sse_event(e.data) for e in compact(mine)]
+        if backlog:
+            yield b"".join(backlog)                          # 補送：一次送出很多個 data: frame
+        last = raw[-1].id if raw else "0-0"
+        while True:
+            res = await r.xread({key: last}, block=20_000)   # 有新事件或 20 秒後才返回
+            if not res:
+                if not await lock_held(user_id, sid, inv):
+                    return                                   # owner 掛了，或落後太多沒讀到 done
+                yield b": heartbeat\n\n"; continue
+            for e in entries_of(res):
+                last = e.id
+                if e.invocation_id != inv:
+                    continue
+                if is_done(e):
+                    return                                   # run 結束：關閉連線
+                yield sse_event(e.data)
+    return StreamingResponse(gen(), media_type="text/event-stream")</code></pre>
+<ul>
+  <li><b>不漏也不重複</b>：<code>XRANGE</code> 讀到的最後一個 ID 就是 <code>XREAD</code> 的起點。這兩步之間 owner 寫入的事件 ID 一定比較大，會在下一次 <code>XREAD</code> 讀到。</li>
+  <li><b>client 斷線</b>：Starlette 會 cancel 這個 generator，<code>XREAD</code> 被打斷。沒有訂閱名單要清，因為讀到哪裡只存在這個 handler 的區域變數裡。</li>
+  <li><b>連線數</b>：<code>XREAD BLOCK</code> 等待期間會佔住一條 Redis 連線，所以同時在看的 client 有幾個，就要幾條連線。連線池上限要依此設定；Redis Cloud 免費方案的連線上限也要先查（見下節）。</li>
+</ul>
+</section>
+
+<section id="env">
+<h2>各環境的 Redis</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>環境</th><th>Redis</th><th>ADK 的 <code>REDIS_URL</code></th><th>注意</th></tr></thead>
+<tbody>
+<tr><th>production（GCE）</th><td>docker compose 裡既有的 <code>redis</code>（<code>redis:alpine</code>），rumors-line-bot 也在用</td><td><code>redis://redis:6379</code>（<code>adk</code> 在 <code>default</code> network，連得到）</td><td>沒有 volume，沒有 <code>maxmemory</code>：我們的 key 一定要有 TTL</td></tr>
+<tr><th>dev.cofacts.ai 和 PR preview（Cloud Run）</th><td>staging LINE bot 用的 Redis Cloud 免費機器</td><td>放在 Secret Manager，<code>rediss://</code> 走 TLS</td><td>多個 instance、多個 revision 都連同一台，所以不必設 <code>maxScale 1</code>；但要關掉 CPU throttling，背景的 run 才有 CPU</td></tr>
+<tr><th>本機開發</th><td><code>docker-compose.yml</code> 多加一個 <code>redis</code> service</td><td><code>redis://redis:6379</code></td><td>—</td></tr>
+</tbody>
+</table></div>
+
+<h3>和 rumors-line-bot 共用要守的規則</h3>
+<ul>
+  <li><b>所有 key 都加 <code>cofacts-ai:</code> 前綴。</b>line-bot 直接用 LINE userId 當 key 存對話狀態（<code>redis.set(userId, context)</code>），Bull queue 用 <code>bull:</code> 開頭，前綴不會撞到。用前綴而不用 DB 編號區隔，是因為 Redis Cloud 不一定支援多個 DB。</li>
+  <li><b>每個 key 都要會過期。</b>GCE 上的 Redis 沒有 <code>maxmemory</code>，我們漏設 TTL 就會一直長，而這台 VM 還跑著 heap 16 GB 的 Elasticsearch。stream 另外加 <code>MAXLEN ~ 20000</code> 當保險。</li>
+  <li><b>程式裡不用 <code>KEYS</code>、<code>FLUSHDB</code>。</b>要找某個使用者正在跑的 run（每人並行上限），用 <code>SCAN MATCH cofacts-ai:run:{userId}:*</code>。</li>
+  <li><b>兩邊都能承受 Redis 重啟。</b>Redis 沒有持久化：重啟時 line-bot 會忘掉使用者的對話狀態，我們這邊則是正在跑的 run 失去鎖和 stream。owner 續約時發現鎖不見，就重新取得鎖，從下一個事件繼續寫；這時在看的 client 會被斷線，重連後從 Postgres 的歷史接回。</li>
+</ul>
+
+<h3>Redis Cloud 免費方案要先查的事</h3>
+<ul>
+  <li><b>容量上限</b>：一個 run 在 stream 裡大約幾百 KB 到 1 MB，結束 30 秒後就刪掉。staging 同時只有個位數的 run，應該放得下，但要扣掉 line-bot 已經在用的量。</li>
+  <li><b>連線上限</b>：每個在看的 client 佔一條連線，再加上 owner 寫入、續約各用的連線，以及 line-bot 自己的連線。</li>
+  <li><b>所在區域</b>：Cloud Run 在 asia-east1。離得越遠，批次寫入能省下的時間越多，這就是 writer task 要批次寫的原因。</li>
+</ul>
+<p class="small">如果免費方案放不下，退路是在 Cloud Run service 加一個 <code>redis:alpine</code> sidecar 並設 <code>maxScale 1</code>，程式不用改，只換 <code>REDIS_URL</code>。</p>
+
+<div class="callout"><b class="t">redeploy 時直接取消所有 run</b>
+<p>production 每次 redeploy 都會殺掉 ADK process。收到 SIGTERM 時不等 run 跑完，直接：</p>
+<ol>
+  <li>拒絕新的 run（回 503）。</li>
+  <li>cancel 這個 process 上所有的 drain task。</li>
+  <li>每個 run 都把已打出的字補寫進 Postgres，並在這筆 event 的 <code>customMetadata</code> 記下 <code>interrupted</code>（之後打開的 client 靠它知道要顯示重問按鈕）。然後寫入 <code>done</code> 標記、刪鎖，正在看的 client 會看到連線結束。</li>
+</ol>
+<p>這些只是幾筆 DB 和 Redis 寫入，幾秒內就做得完，docker compose 預設 10 秒的 <code>stop_grace_period</code> 和 Cloud Run 給的 10 秒都夠，不用調長。用 <code>interrupted</code> 而不是 <code>cancelled</code>，是為了讓前端分得出「使用者自己按停止」和「系統中斷」，後者要顯示重問按鈕。代價是 redeploy 當下正在跑的 turn 要請使用者重問；部署通常在流量低時進行，影響的 run 不多。</p></div>
+</section>
+
+<section id="capacity">
+<h2>這樣能撐多少人</h2>
+<p>先把「人」換成<b>同時進行中的 run 數</b>。用 Little's law 估算：同時 run 數 ≈ 每秒新 turn 數 × 平均 turn 長度。以下數字只是示範用的假設：尖峰每小時 300 個 turn、平均 90 秒，同時大約 7.5 個 run。真實數字可以從 Langfuse trace 的起訖時間算出來。</p>
+
+<div class="callout"><b class="t">registry 不是瓶頸</b>
+<p>runner 還是在同一個 ADK process、同一個 event loop 裡跑，和今天的 <code>/run_sse</code> 一樣，所以容量上限和今天差不多，取決於下表的資源。真正的差別是：今天關掉分頁會順便取消 run，等於替系統卸載；改成背景續跑後，被放著不管的 run 也會跑完。所以要加上 run 長度上限和每人並行上限。</p></div>
+
+<div class="table-wrap"><table>
+<thead><tr><th>資源</th><th>每個 run 的用量</th><th>會先撞到的情況</th><th>依據</th></tr></thead>
+<tbody>
+<tr><th>Redis 記憶體</th><td>幾百 KB 到 1 MB（partial 加上工具回傳內容），只在 run 進行中存在</td><td class="g">production 沒問題；Redis Cloud 免費方案要算</td><td>估算</td></tr>
+<tr><th>Redis 連線</th><td>每個在看的 client 一條，每個 run 另有寫入用的連線</td><td class="w">Redis Cloud 免費方案可能先撞到</td><td>要查方案上限</td></tr>
+<tr><th>Event loop（1 vCPU）</th><td>JSON 序列化、OTel / Langfuse span、SSE</td><td class="w">大量並行時延遲會上升，要實測</td><td><code>service.template.yaml:56-59</code>（Cloud Run）</td></tr>
+<tr><th>Vertex 配額</th><td>writer 是 Claude Haiku 5.5，investigator 和 verifier 是 Gemini 3 Flash</td><td class="w">最可能先撞到的上限，表現是 429</td><td><code>agent.py:321,376,860</code></td></tr>
+<tr><th>Postgres 連線</th><td>每次 append 都很短</td><td class="w">沒有設 pool，用的是 SQLAlchemy 預設值</td><td>repo 裡找不到 <code>pool_size</code></td></tr>
+<tr><th>url-resolver</th><td>headless 瀏覽器，最長 120 秒</td><td class="w">並行抓網頁時可能先滿</td><td><code>service.template.yaml:102,141-162</code></td></tr>
+<tr><th>若改用 Claude Agent SDK（評估中）</th><td>每個 run 一個 <code>claude</code> 子程序，官方建議至少 1 GiB</td><td class="b">2 GiB 的容器只能同時跑一兩個，需要排隊機制</td><td>Claude Agent SDK 官方部署建議</td></tr>
+</tbody>
+</table></div>
+
+<h3>上線前要量的三件事</h3>
+<ul>
+  <li>用假的 LLM 和工具（固定延遲、固定輸出）做負載測試，看 event loop 在 20、50、100 個並行 run 時的延遲。</li>
+  <li>從 Langfuse 算出過去 30 天的尖峰並行 trace 數。</li>
+  <li>查清楚 Vertex 上 Claude Haiku 與 Gemini 3 Flash 的 RPM / TPM 配額。</li>
+</ul>
+</section>
+
+<section id="api">
+<h2>API 與 SSE 格式</h2>
+<p>下表是 ADK 的路由；BFF 一對一轉發，路徑加上 <code>/api</code> 前綴，並帶入 userId 與 Bearer token。原本的 <code>/api/run-sse</code> 在過渡期保留，也是 Redis 連不上時的退路。</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Route（ADK）</th><th>做什麼</th><th>回應</th></tr></thead>
+<tbody>
+<tr><th><code>POST /runs</code></th><td><code>SET NX</code> 取得鎖，成功就在背景啟動 run。鎖已存在表示別處正在跑</td><td><code>202 {invocationId}</code>；已有 run 時 <code>409 {invocationId}</code></td></tr>
+<tr><th><code>GET /runs/{sid}/status</code></th><td>靜態 client 的「查一次」，只讀 Redis 的鎖。「有沒有新事件」不在這裡答，用 ADK 內建的 session API</td><td><code>{running, invocationId}</code></td></tr>
+<tr><th><code>GET /runs/{sid}/stream</code></th><td>接上直播（見上方 handler）。沒有進行中的 run 時直接關閉連線</td><td>SSE：先補送這個 run 已有的事件，接著直播；run 結束時 server 關閉連線</td></tr>
+<tr><th><code>POST /runs/{sid}/cancel</code></th><td>停止鈕。如果這個 process 就是 owner，直接 cancel task；否則設 cancel 旗標，owner 一秒內會看到</td><td><code>202</code>；所有在看的 client 先收到補寫的訊息（<code>customMetadata</code> 標記 <code>cancelled</code>），然後連線結束</td></tr>
+<tr><th><code>POST /sessions/{sid}/opened</code></th><td>取代現在直接 PATCH <code>lastOpenedAt</code>。鎖存在時不寫入</td><td><code>{deferred: true}</code> 時，client 在連線結束後再呼叫一次</td></tr>
+</tbody>
+</table></div>
+
+<div class="table-wrap"><table>
+<thead><tr><th>SSE frame</th><th>內容</th><th>Client 怎麼處理</th></tr></thead>
+<tbody>
+<tr><th><code>data:</code></th><td>ADK Event，和今天 <code>/run_sse</code> 的形狀相同。接上時先補送這個 run 已有的事件，之後是直播</td><td>照舊交給 <code>applyEventToState</code>；非 partial 的另外存進原始事件清單</td></tr>
+<tr><th>（連線結束）</th><td>run 結束後由 server 關閉；也可能是網路斷線</td><td>見下方「連線結束時」</td></tr>
+<tr><th><code>: heartbeat</code></th><td>20 秒沒有事件時送一行</td><td>忽略。保留它是因為 Cloudflare 125 秒沒有資料就斷線，而 AgentTool 子 agent 執行期間串流上一個字都沒有（<code>run-sse.ts:12-29</code>）</td></tr>
+</tbody>
+</table></div>
+
+<h3 id="wire">事件怎麼送到前端</h3>
+<p>全部都是一般的 <code>data:</code> frame，格式和今天的 <code>/run_sse</code> 一樣，前端的 parser 和 <code>applyEventToState</code> 都不用改。一條 stream 在線上長這樣：</p>
+<pre class="code"><code>data: {…這個 run 的使用者訊息…}
+
+data: {…writer 的工具呼叫…}
+
+data: {…工具結果…}
+
+data: {"invocationId":"e-7f3…","author":"ai_writer","partial":true,"content":{"role":"model","parts":[{"text":"根據"}]}}
+
+（以上是接上時一次補送的部分，以下是直播）
+
+data: {…下一個 ADK Event…}
+
+: heartbeat
+
+data: {…writer 的最終回答…}
+
+（run 結束，server 關閉連線）</code></pre>
+<ul>
+  <li><b>序列化</b>：寫進 Redis 的 <code>data</code> 就是 ADK <code>/run_sse</code> 送出的同一種 JSON（camelCase 欄位，省略空值），handler 不用再轉換，前端看到的形狀和今天一模一樣。</li>
+  <li><b>補送</b>：一次 <code>yield</code> 可以包含很多個 frame，前端的 parser 本來就是用空行切 frame（<code>chatCache.ts:139-148</code>），不用改。舊的 <code>/api/run-sse</code> 和新的 stream 共用同一個 parser。</li>
+  <li><b>順序</b>：每個 handler 依 stream ID 的順序送出，和 owner 寫入的順序相同。BFF 只轉發 bytes，沿用 <code>withHeartbeat</code> 只在 frame 邊界插 heartbeat 的邏輯。</li>
+</ul>
+
+<h4>為什麼 partial 要原樣重播，不能只送累積好的文字</h4>
+<p>前端處理串流的方式是「接尾巴」：</p>
+<ul>
+  <li>partial 事件是增量，前端把它接在最後一則仍在串流的訊息後面（<code>chatCache.ts:403-436</code>）。</li>
+  <li>完整的非 partial 訊息到達時，如果最後一則還在串流，前端<b>不讀它的文字</b>，只補上工具呼叫並標記完成（<code>chatCache.ts:386-400</code>）。</li>
+</ul>
+<p>所以中途接上的 client 只要漏掉前面的 partial，這則訊息就會一直缺開頭，直到重新整理。partial 裡還可能有工具呼叫、多個 text part，或不同 author 的片段，與其讓 server 重做一次前端的合併規則，不如把這些 partial 原樣重播，結果就和從頭看到尾的 client 完全相同。一則長回答的 partial 可能有上千筆、約一兩百 KB，而且只在接上時送一次。</p>
+
+<h4>補送的事件怎麼和已載入的歷史合併</h4>
+<p>歷史一律用 ADK 內建的 session API（<code>GET /apps/{app}/users/{user}/sessions/{id}</code>，前端今天就在用），不另寫 API。合併只有一條規則：<b>正在跑的那個 invocation 只信 stream，其他 invocation 只信歷史</b>。所以歷史和 stream 誰先到都沒關係，前端也不用逐筆去重（前端訊息的 id 是自己產生的 <code>genId()</code>，本來就沒存 ADK event id）：</p>
+<ol>
+  <li>快取除了算好的畫面狀態，另外存一份<b>原始的非 partial ADK events</b>。畫面本來就是從 events 算出來的（<code>convertAdkSessionToChatState</code>）。</li>
+  <li>接上 stream 時（<code>invocationId</code> 從 status、202 或 409 的回應得知）：從原始 events 拿掉這個 invocation 的事件並重算畫面，之後 stream 送來的事件全部照順序套用。歷史如果比較晚回來，也先濾掉這個 invocation 的事件。</li>
+  <li>收到一般的非 partial 事件：加進原始 events，照舊 <code>applyEventToState</code>。</li>
+  <li>連線結束：見下一段。</li>
+</ol>
+<p><b>為什麼補送還要包含非 partial 事件？</b>這些事件確實早就在 Postgres，內建的 session API 拿得到。但拿歷史和接上 stream 是兩個不同時間點的請求，Postgres 和 Redis 又不是同時寫入（先寫 Postgres，最多晚 50 ms 才寫 Redis）。如果只補送 partial，就得靠「歷史最後一筆」和「stream 的位置」對齊：歷史拿得太早會漏掉中間幾筆完整訊息；拿得太晚，則會先看到完整訊息、又疊上同一則訊息的 partial，變成重複。從這個 run 的開頭補送、整段替換，就不用處理這些競態。代價是接上時重送一次這個 run 的工具結果，大約幾百 KB。之後若嫌多，可以讓 client 帶上它歷史裡最後一筆 event id，server 只送那之後的部分。</p>
+<p>自己送出問題時樂觀加上的使用者訊息，也會在接上 stream、清掉這個 invocation 的事件時，被 server 補送的正式版本取代。</p>
+
+<h4>連線結束時</h4>
+<p>不送專門的結束事件：run 結束時，server 在最後一筆事件之後關閉連線；連線還在，就表示還有事件。但連線也可能因為網路斷掉（手機換網路、Cloudflare 斷線），而且可能剛好斷在一筆完整事件之後，所以 client 不能只憑「斷在哪裡」判斷，規則是：</p>
+<ul>
+  <li><b>最後一筆是 writer 的最終回答</b>（非 partial、沒有工具呼叫），或是停止、中斷時補寫的訊息（<code>customMetadata</code> 標記 <code>cancelled</code> 或 <code>interrupted</code>）：不用查，直接變成靜態、刷新側欄。標記 <code>interrupted</code> 的顯示重問按鈕。</li>
+  <li><b>其他情況</b>（斷在 partial、工具呼叫或工具結果之後）：查一次 <code>GET /runs/{sid}/status</code>。還在跑就重新接上，會再補送一次；沒在跑就重抓歷史，最後一筆不是最終回答時顯示「中斷了」和重問按鈕。</li>
+</ul>
+<p>這等於把今天 <code>startChatStream</code> 的 <code>finally</code> 擴充成「判斷要不要重接」。</p>
+</section>
+
+<section id="client">
+<h2>Client 的三個狀態</h2>
+<p>每個分頁對每個 session 只有三種狀態。<b>靜態時不 polling</b>，只有三個時機會「查一次」：載入頁面或重新整理、分頁從隱藏變成可見（<code>visibilitychange</code>）、使用者按送出。</p>
+<div class="diagram"><pre class="mermaid">
+stateDiagram-v2
+  state "靜態" as Static
+  state "查一次" as Check
+  state "直播中" as Live
+  [*] --> Check: 載入頁面
+  Static --> Check: 分頁變成可見
+  Check --> Live: running
+  Check --> Static: 沒有 run, 有新事件就重抓歷史
+  Static --> Live: 自己送出, 202 或 409
+  Live --> Static: 連線結束, 最後一筆是最終回答
+  Live --> Check: 連線結束, 其他情況
+</pre></div>
+<div class="table-wrap"><table>
+<thead><tr><th>觸發</th><th>呼叫</th><th>結果</th></tr></thead>
+<tbody>
+<tr><th>載入或重新整理</th><td>一次拿 <code>GET session</code>（歷史）和 <code>GET /runs/{sid}/status</code></td><td>running：接上 stream。沒有 run：顯示歷史</td></tr>
+<tr><th>分頁變成可見</th><td><code>GET /runs/{sid}/status</code>，加上重抓 ADK 內建的 session 列表（側欄本來就在用，每個 session 帶 <code>lastEventTime</code>）</td><td>running：接上 stream。這個 session 的 <code>lastEventTime</code> 比本地新：重抓歷史。都一樣：什麼都不做</td></tr>
+<tr><th>分頁變成隱藏</th><td>不呼叫</td><td>直播中的連線保留；手機瀏覽器可能自己斷掉，回來時走「連線斷了」那條</td></tr>
+<tr><th>按送出</th><td><code>POST /runs</code></td><td>202：接上 stream，同時用內建 API 重抓歷史（補上別的視窗新增的 turn）。409：別處正在跑，直接接上它的 stream</td></tr>
+<tr><th>按停止</th><td><code>POST /runs/{sid}/cancel</code></td><td>等 server 補寫停止前的文字並關閉連線，不再中斷 fetch</td></tr>
+<tr><th>連線結束</th><td>最後一筆是最終回答就不呼叫，否則 <code>GET /runs/{sid}/status</code>；若先前的 opened 被延後，補呼叫一次</td><td>靜態，或重新接上</td></tr>
+</tbody>
+</table></div>
+<p class="small">「有沒有新事件」比對 session state 裡的 <code>lastEventTime</code>（每個 turn 結束時由 <code>after_agent_callback</code> 寫入），不能用 ADK 的 <code>lastUpdateTime</code>：前端寫入 <code>lastOpenedAt</code> 也會讓它變動（<code>agent.py:66-71</code> 的註解寫了這件事）。</p>
+</section>
+
+<section id="s1">
+<h2>情境一：關掉視窗，之後再回來</h2>
+<div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant A as Client A
+  participant H as ADK routes
+  participant D as drain task (owner)
+  participant RD as Redis
+  participant DB as Postgres
+  A->>H: POST /runs (sid, message)
+  H->>RD: SET NX 鎖
+  H->>D: create_task
+  H-->>A: 202 invocationId
+  A->>H: GET /runs/sid/stream
+  H->>RD: XRANGE (空)
+  H-->>A: 補送 (還沒有事件)
+  D->>DB: 非 partial event 照常 append
+  D->>RD: XADD (每 50 ms 一批)
+  RD-->>H: XREAD BLOCK 返回
+  H-->>A: event
+  Note over A: 使用者關掉分頁
+  A--xH: 連線中斷, handler 結束
+  D->>RD: run 繼續, XADD 照常
+  Note over A: 幾分鐘後重新打開
+  A->>H: GET session + GET status
+  H->>RD: GET 鎖
+  H-->>A: 歷史 + running
+  A->>H: GET /runs/sid/stream
+  H->>RD: XRANGE (目前全部)
+  H-->>A: 補送本 run 已有的事件 + partial events
+  RD-->>H: XREAD BLOCK 返回
+  H-->>A: event ... 直播
+  D->>RD: XADD done, 刪鎖
+  H-->>A: 最後一筆事件, 關閉連線
+  Note over A: 變成靜態
+</pre></div>
+<div class="table-wrap"><table>
+<thead><tr><th>#</th><th>誰</th><th>做什麼</th><th>Redis</th><th>Client A</th></tr></thead>
+<tbody>
+<tr><td class="n">1–4</td><td>A → ADK</td><td>送出訊息。取得鎖後在背景啟動 run</td><td>鎖建立；stream 還沒有內容</td><td>送出中</td></tr>
+<tr><td class="n">5–7</td><td>A → ADK</td><td>接上 stream，還沒有事件可補送，handler 停在 <code>XREAD BLOCK</code></td><td>—</td><td>直播中</td></tr>
+<tr><td class="n">8–11</td><td>owner</td><td>非 partial event 照常寫進 Postgres；所有事件批次寫進 stream；handler 被叫醒後轉送</td><td>stream 增長，鎖每 10 秒續約</td><td>看到字逐漸打出</td></tr>
+<tr><td class="n">12–14</td><td>A</td><td>分頁關閉。handler 被 cancel，沒有其他東西要清；run 不受影響</td><td>照常增長</td><td>不存在</td></tr>
+<tr><td class="n">15–17</td><td>A → ADK</td><td>重新打開，同時拿歷史和 run 狀態</td><td>鎖還在</td><td>查一次</td></tr>
+<tr><td class="n">18–22</td><td>A → ADK</td><td>接上 stream。補送的事件有些已經在歷史裡，所以先清掉這個 invocation 的部分，再照順序套用補送和直播的事件</td><td>—</td><td>直播中，畫面和沒關過一樣</td></tr>
+<tr><td class="n">23–24</td><td>owner</td><td>run 結束：寫入 <code>done</code> 標記、刪鎖。<code>after_agent_callback</code> 已更新 <code>lastEventTime</code></td><td>鎖刪除；stream 30 秒後消失</td><td>最後一筆是最終回答，連線結束後直接變成靜態</td></tr>
+</tbody>
+</table></div>
+<p class="small">如果第 15 步發生在 run 結束之後，鎖已經不在，<code>status</code> 會回 <code>running: false</code>，完整結果已經在歷史裡，不用接 stream。側欄的未讀點（<code>lastEventTime &gt; lastOpenedAt</code>）會告訴使用者這個 session 在他不在時完成了。</p>
+</section>
+
+<section id="s2">
+<h2>情境二：兩個 client 看同一個 session</h2>
+<p>A 是桌機，B 是手機，兩者在同一個 session。A 送出問題，B 在執行中途打開，然後 B 按了停止。在 Cloud Run 上，A 和 B 的請求可能落在不同 instance，流程一樣。</p>
+<div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant A as Client A
+  participant B as Client B
+  participant H as ADK routes
+  participant RD as Redis
+  participant D as drain task (owner)
+  A->>H: POST /runs, GET stream
+  H-->>A: 補送 (還沒有事件), 開始直播
+  B->>H: GET session + GET status
+  H-->>B: 歷史 + running
+  B->>H: GET stream
+  H->>RD: XRANGE
+  H-->>B: 補送已有事件 + partial events
+  D->>RD: XADD
+  par 兩個 handler 各自 XREAD
+    RD-->>A: event
+  and
+    RD-->>B: event
+  end
+  B->>H: POST cancel
+  alt 這個 process 就是 owner
+    H->>D: task.cancel
+  else 不是 owner
+    H->>RD: SET cancel 旗標
+    D->>RD: 每秒檢查, 看到旗標
+  end
+  D->>RD: 補寫停止前的文字, XADD done 標記, 刪鎖
+  RD-->>A: 補寫的訊息, 關閉連線
+  RD-->>B: 補寫的訊息, 關閉連線
+  Note over A,B: 兩邊都變成靜態, 不 polling
+  B->>H: 分頁重新可見, GET status
+  H-->>B: running false, lastEventTime 與本地相同
+</pre></div>
+<div class="table-wrap"><table>
+<thead><tr><th>#</th><th>誰</th><th>做什麼</th><th>Redis</th><th>A</th><th>B</th></tr></thead>
+<tbody>
+<tr><td class="n">1–2</td><td>A</td><td>開始 run 並接上直播</td><td>鎖建立</td><td>直播</td><td>—</td></tr>
+<tr><td class="n">3–4</td><td>B</td><td>打開 session：歷史只有 A 的提問，status 說 running</td><td>—</td><td>直播</td><td>查一次</td></tr>
+<tr><td class="n">5–7</td><td>B</td><td>接上 stream，補送已經發生的事件和半句話</td><td>—</td><td>直播</td><td>直播，畫面和 A 相同</td></tr>
+<tr><td class="n">8–10</td><td>owner</td><td>寫一次，兩個 handler 各自讀到。B 的網路慢只會讓 B 的 handler 讀得慢，不影響 A 和 owner</td><td>stream 增長</td><td>直播</td><td>直播</td></tr>
+<tr><td class="n">11–15</td><td>B</td><td>按停止。由 server 取消，不靠斷線；不在 owner 上時透過旗標轉達</td><td>可能多一個 cancel 旗標</td><td>直播</td><td>直播</td></tr>
+<tr><td class="n">16–18</td><td>owner</td><td>補寫已打出的字、寫入 <code>done</code> 標記、刪鎖；兩邊的連線結束</td><td>鎖刪除</td><td>靜態</td><td>靜態</td></tr>
+<tr><td class="n">19–20</td><td>B</td><td>分頁重新可見，查一次，沒有變化</td><td>—</td><td>靜態</td><td>靜態</td></tr>
+</tbody>
+</table></div>
+</section>
+
+<section id="s3">
+<h2>情境三：靜態的 client 想送出，或另一端已經多了一個 turn</h2>
+<p>A 和 B 都是靜態。A 又問了一題，跑完了。B 的分頁一直開著也一直可見，所以不知道這件事。這是「靜態時不 polling」的代價，靠送出時的檢查補回來。</p>
+<div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant A as Client A
+  participant B as Client B (畫面停在舊的)
+  participant H as ADK routes
+  participant RD as Redis
+  A->>H: POST /runs (第二題)
+  H->>RD: SET NX 成功
+  H-->>A: 202
+  Note over A: 直播, 然後連線結束
+  Note over B: 一直可見, 沒有觸發查詢
+  B->>H: POST /runs (B 的新問題)
+  H->>RD: SET NX
+  alt A 的 run 還在跑
+    RD-->>H: 鎖已存在
+    H-->>B: 409 invocationId
+    B->>H: GET stream
+    H-->>B: 補送 + 直播
+    Note over B: 提示「另一個視窗正在執行」, 輸入框保留 B 的草稿
+  else A 的 run 已經結束
+    RD-->>H: 取得鎖
+    H-->>B: 202 invocationId
+    B->>H: GET session (內建 API, 重抓歷史) + GET stream
+    H-->>B: 歷史含 A 的第二題, 補送 + 直播
+  end
+</pre></div>
+<div class="table-wrap"><table>
+<thead><tr><th>#</th><th>情況</th><th>Server</th><th>B 的畫面</th></tr></thead>
+<tbody>
+<tr><td class="n">6–9</td><td>B 送出，A 的 run 還在跑</td><td><code>SET NX</code> 失敗，回 409。不排隊，B 的訊息不送出</td><td>接上 A 的直播，提示另一個視窗正在執行，B 打的字留在輸入框</td></tr>
+<tr><td class="n">10–13</td><td>B 送出，A 的 run 已結束</td><td>取得鎖，照常開始 B 的 run</td><td>接上時一律重抓歷史，A 的第二題和回答出現在 B 的問題前面</td></tr>
+<tr><td class="n">—</td><td>B 不送出，切走再切回來</td><td>session 列表裡的 <code>lastEventTime</code> 比本地新</td><td>重抓歷史</td></tr>
+</tbody>
+</table></div>
+<p class="small">情況二有個小缺點：B 送出時，畫面上還看不到 A 的第二題。對 agent 沒影響，因為 agent 讀的是 server 端完整的 session，只是 B 的使用者沒先看到上一題。如果想避免，可以讓 <code>POST /runs</code> 帶上 <code>expectedLastEventId</code>，不符合就回 409 要求先更新。這會讓送出多一次來回，先不做。</p>
+</section>
+
+<section id="edges">
+<h2>邊界情況</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>情況</th><th>會發生什麼</th><th>處理方式</th></tr></thead>
+<tbody>
+<tr><th>打開 session 時寫入 <code>lastOpenedAt</code></th><td class="b">每次打開 session，前端都會 PATCH session state（<code>session.$sessionId.tsx:76</code>、<code>chatSessions.functions.ts:183-203</code>）。如果 run 正在跑，下一次 append 就會丟 <code>StaleSessionError</code>，run 直接死掉。背景續跑之後，「run 進行中打開 session」會變成常見的路徑</td><td>改打 <code>POST /sessions/{sid}/opened</code>：鎖存在就不寫，回 <code>deferred</code>；client 在連線結束後再呼叫一次</td></tr>
+<tr><th>owner process 當掉</th><td>run 中斷，已寫入 Postgres 的 event 保留；正在打、還沒完成的那則訊息遺失</td><td>鎖 30 秒內過期。handler 發現鎖不見就關閉連線，正在看的 client 查狀態、重抓歷史；之後才打開的 client 也是看歷史。歷史的最後一筆不是 writer 的回答，所以都顯示「中斷了」和重問按鈕</td></tr>
+<tr><th>redeploy</th><td>同上</td><td>SIGTERM 時立刻取消所有 run、補寫已打出的字、補寫的訊息標記 <code>interrupted</code> 後關閉連線；前端顯示「中斷了」和重問按鈕</td></tr>
+<tr><th>Redis 重啟</th><td>鎖和 stream 都消失（line-bot 的對話狀態也一樣）</td><td>owner 續約時重新取得鎖並繼續寫；在看的 client 斷線後從 Postgres 歷史接回，這個 run 之前的 partial 會看不到</td></tr>
+<tr><th>Redis 連不上</th><td>無法取得鎖</td><td><code>POST /runs</code> 回 503，前端退回舊的 <code>/api/run-sse</code>（過渡期保留）</td></tr>
+<tr><th>沒人看的 run 一直跑</th><td>今天關分頁會取消，以後不會</td><td>owner 在 15 分鐘時自行 cancel 並補寫（和 Cloud Run 現在的 900 秒一致）</td></tr>
+<tr><th>一個人同時開很多 session 跑</th><td>今天沒有任何速率或並行限制</td><td>啟動前 <code>SCAN</code> 這個使用者的鎖，超過 2 到 3 個就回 429</td></tr>
+<tr><th>JWT</th><td>token 存在 ContextVar；<code>create_task</code> 會複製當下的 context，middleware 之後 reset 的是原 request 的 context，不影響 task</td><td>建立 task 時仍明確把 token 帶進去比較清楚。JWT 有效期 14 天，run 期間過期的機率可以忽略</td></tr>
+<tr><th>權限</th><td>stream 和 cancel 只帶 session id</td><td>鎖和 stream 的 key 都包含 <code>userId</code>，由 BFF 解析後帶入，別人猜到 session id 也接不上</td></tr>
+<tr><th>Cloud Run 的 CPU</th><td>預設只在處理請求時配置 CPU，回應結束後背景的 run 會被限速</td><td>設 <code>run.googleapis.com/cpu-throttling: "false"</code>；scale-in 時 instance 會收到 SIGTERM，同樣立刻取消該 instance 上的 run</td></tr>
+<tr><th>Cloudflare 125 秒</th><td>stream 是長連線</td><td>handler 每 20 秒沒有事件就送 heartbeat；BFF 現在的 <code>withHeartbeat</code> 可以保留</td></tr>
+</tbody>
+</table></div>
+</section>
+
+<section id="files">
+<h2>要改的檔案</h2>
+<div class="facts">
+  <div class="fact"><b>ADK</b>新增 <code>run_bus.py</code>（<code>redis.asyncio</code>：鎖、writer task、stream handler、cancel 旗標）。<code>main.py</code> 自建 <code>Runner</code>、掛上五個 route、收到 SIGTERM 時取消所有 run。<code>pyproject.toml</code> 加 <code>redis</code>。<span class="src">adk/main.py · adk/cofacts_ai/ · adk/pyproject.toml</span></div>
+  <div class="fact"><b>BFF</b>新增 runs 的 start、status、stream、cancel 與 opened 五個 route。stream 沿用 <code>withHeartbeat</code>，<code>request.signal</code> 只用來斷開觀看。<span class="src">src/routes/api/ · run-sse.ts</span></div>
+  <div class="fact"><b>前端快取</b>parser 不用改；快取多存原始 events，接上 stream 時清掉這個 <code>invocationId</code> 的事件再照順序套用；連線結束時判斷要不要查狀態、重接；<code>abortControllers</code> 改成只管觀看連線。<span class="src">src/lib/chatCache.ts</span></div>
+  <div class="fact"><b>前端 hook</b>加上載入時與 <code>visibilitychange</code> 時的查一次；停止鈕改打 cancel；刪掉沒用到的 <code>resumeRun</code>。<span class="src">src/hooks/useChat.ts</span></div>
+  <div class="fact"><b>打開 session</b><code>markSessionOpened</code> 改打新的 opened route，被延後時於連線結束後重送。<span class="src">chatSessions.functions.ts · session.$sessionId.tsx</span></div>
+  <div class="fact"><b>Cloud Run</b>加 <code>REDIS_URL</code> secret、關掉 CPU throttling。本機 <code>docker-compose.yml</code> 加 <code>redis</code>。<span class="src">service.template.yaml · docker-compose.yml</span></div>
+  <div class="fact"><b>GCE</b><code>env-files/adk</code> 加 <code>REDIS_URL=redis://redis:6379</code>。<span class="src">rumors-deploy 的 docker-compose · devops GCE.md</span></div>
+</div>
+</section>
+
+<section id="decide">
+<h2>請你決定</h2>
+<div class="decide"><ol>
+  <li><b>Redis Cloud 免費方案</b>：容量、連線數和所在區域夠 staging 用嗎？不夠的話，Cloud Run 改用 sidecar 加 <code>maxScale 1</code>。</li>
+  <li><b>上限</b>：每個 run 最長 15 分鐘、每個使用者最多幾個並行 run？</li>
+  <li><b>靜態時真的完全不查？</b>目前的設計是靠「分頁變成可見」和「送出前」補檢查。如果希望同一畫面一直開著的 client 也能看到別處開始的 run，最便宜的做法是可見時每 30 秒查一次 status。</li>
+  <li><b>decision record</b>：這會同時改到前後端、session 寫入時機與部署，依 <code>CLAUDE.md</code> 應該寫一份。要我起草嗎？</li>
+</ol></div>
+</section>
+
+<section id="unverified">
+<h2>尚未驗證</h2>
+<ul class="small">
+  <li>production 上實際的 Redis 設定（版本、<code>maxmemory</code>、有沒有掛 volume）。上面的描述來自 rumors-deploy 的 <code>docker-compose.sample.yml</code>，機器上的 <code>docker-compose.yml</code> 沒有進版控。</li>
+  <li>staging LINE bot 連的是 Redis Cloud 免費機器：這點來自團隊的記憶，devops 文件沒有記載；方案的容量、連線上限與區域都還沒查。</li>
+  <li>ADK 的 PATCH session 確實走 <code>append_event</code> 並觸發 <code>StaleSessionError</code>。外部 <code>append_event</code> 會讓 run 死掉這點已在 ADK 2.12（SQLite）實測，PATCH 這條路徑還沒實測。</li>
+  <li>容量表中的 event loop 上限、SQLAlchemy 連線池預設值在高並行下的表現，以及 Vertex 配額。</li>
+  <li>每個 run 在 stream 裡佔幾百 KB 到 1 MB 是推估，沒有量過。</li>
+</ul>
+</section>
+
+</main>
+</div>
+
+<!--claude-mermaid-runtime-begin:3477-->
+<style>.mermaid-diagram{margin-block:4px}.mermaid-diagram svg{display:block;margin:0 auto;max-width:100%;height:auto}</style>
+<script src="/_runtime/mermaid-11.16.1.min.js"></script>
+<script>(function(){
+var CFG={"palettes":{"light":{"surface":"#f4efe4","text":"#42392e","line":"#8a7f6d","border":"#7a6c52","bg":"#fffdf8"},"dark":{"surface":"#262b34","text":"#f2f3f5","line":"#a8adb8","border":"#9aa4b8","bg":"#1f232b"}}};
+if(typeof mermaid==='undefined')return;
+var pres=Array.prototype.slice.call(document.querySelectorAll('pre.mermaid')).filter(function(p){if(p.hasAttribute('data-claude-mermaid-claimed'))return false;p.setAttribute('data-claude-mermaid-claimed','1');return true;});
+if(!pres.length)return;
+var mq=window.matchMedia?window.matchMedia('(prefers-color-scheme: dark)'):null;
+var root=document.documentElement;
+var items=pres.map(function(pre){
+var mount=document.createElement('div');mount.className='mermaid-diagram';
+return {pre:pre,mount:mount,src:pre.textContent||''};
+});
+var seq=0;
+var renderGen=0;
+var lastKey='';
+function pageBg(fallback){
+var els=[document.body,document.documentElement];
+for(var i=0;i<els.length;i++){
+var c=els[i]&&getComputedStyle(els[i]).backgroundColor;
+if(c&&c!=='transparent'&&c!=='rgba(0, 0, 0, 0)')return c;
+}
+return fallback;
+}
+function render(){
+var theme=root.getAttribute('data-theme');
+var dark=theme==='dark'||(!!(mq&&mq.matches)&&theme!=='light');
+var pal=dark?CFG.palettes.dark:CFG.palettes.light;
+var bg=pageBg(pal.bg);
+var key=(dark?'d':'l')+'|'+bg;
+if(key===lastKey)return;
+lastKey=key;
+var gen=++renderGen;
+var font=getComputedStyle(document.body).fontFamily||'sans-serif';
+var nat={useMaxWidth:false};
+mermaid.initialize({
+startOnLoad:false,securityLevel:'strict',theme:'base',
+flowchart:nat,sequence:nat,er:nat,state:nat,class:nat,pie:nat,
+gantt:nat,journey:nat,timeline:nat,gitGraph:nat,mindmap:nat,xyChart:nat,
+quadrantChart:nat,sankey:nat,c4:nat,requirement:nat,block:nat,
+packet:nat,kanban:nat,architecture:nat,radar:nat,
+themeVariables:{background:bg,mainBkg:pal.surface,primaryColor:pal.surface,
+primaryTextColor:pal.text,lineColor:pal.line,primaryBorderColor:pal.border,
+nodeBorder:pal.border,clusterBorder:pal.border,edgeLabelBackground:bg,
+clusterBkg:'rgba(127,127,127,0.07)',titleColor:pal.text,
+darkMode:dark,rowOdd:bg,rowEven:'rgba(127,127,127,0.07)',
+attributeBackgroundColorOdd:bg,attributeBackgroundColorEven:'rgba(127,127,127,0.07)',
+fontSize:'16px',fontFamily:font},
+themeCSS:'.node rect, .node circle, .node polygon, .node path, .cluster rect { stroke-width: 2px; }'
+});
+items.forEach(function(it){
+var id='claude-mermaid-'+seq++;
+mermaid.render(id,it.src).then(function(r){
+if(gen!==renderGen)return;
+var prev=it.pre.previousElementSibling;
+if(prev&&prev.className==='mermaid-diagram'&&prev!==it.mount)return;
+it.mount.innerHTML=r.svg;
+if(!it.mount.parentNode)it.pre.parentNode.insertBefore(it.mount,it.pre);
+it.pre.style.display='none';
+},function(){
+var scratch=document.getElementById(id);
+if(scratch)scratch.parentNode.removeChild(scratch);
+scratch=document.getElementById('d'+id);
+if(scratch)scratch.parentNode.removeChild(scratch);
+if(gen!==renderGen)return;
+if(it.mount.parentNode)it.mount.parentNode.removeChild(it.mount);
+it.pre.style.display='';
+});
+});
+}
+render();
+if(mq&&mq.addEventListener)mq.addEventListener('change',render);
+if(typeof MutationObserver!=='undefined')new MutationObserver(render).observe(root,{attributes:true,attributeFilter:['data-theme']});
+})();</script>
+<!--claude-mermaid-runtime-end-->
+
+</body></html>
