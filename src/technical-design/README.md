@@ -14,6 +14,7 @@ timestamp: "2026-06-24T00:00:00+08:00"
 > [!TIP]
 > Latest design docs first
 
+- [影音（VIDEO / AUDIO）thumbnail 與 preview 產生流程](video-audio-thumbnail-preview.md)
 - [Cofacts Topic Classifier 可行性評估與實測（Jev、Clef、Haiku 比較）](jev-topic-classifier-evaluation.md)
 - [Cofacts.ai Phase 3：網站遷移與前端架構](cofacts.ai/Phase%203%20網站遷移與前端架構.md)
 - [Authentication](cofacts.ai/Authentication.md)
