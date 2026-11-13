@@ -44,7 +44,7 @@ timestamp: "2026-11-13T20:00:00+08:00"
 - `variant` 參數有 `ORIGINAL`、`PREVIEW`、`THUMBNAIL`。
 - 只有 `articleType === 'IMAGE'` 會對應到 `webp600w`（preview）與 `jpg240h`（thumbnail）。VIDEO 與 AUDIO 會落到 `original`。
 - `original` 只在 `user.appId === 'WEBSITE'` 時回傳，其他情況回傳 `null`。
-- 回傳的是 GCS V4 signed URL，有效期限進位到「從現在起 1 天後的當日零時」，讓同一天內的 URL 穩定、方便快取。這裡的零時是 UTC，即台灣時間早上 8 點（`Math.ceil(Date.now() / 86400000)`）。
+- 回傳的是 GCS V4 signed URL，到期時間是 `(Math.ceil(Date.now() / 86400000) + 1) * 86400000`（`ATTACHMENT_URL_DURATION_DAY = 1`）：先進位到下一個 UTC 零時，再加 1 天。實際有效 24 到 48 小時，同一天內給出的 URL 相同，方便快取。UTC 零時即台灣時間早上 8 點。
 - resolver 不檢查變體檔案是否存在，只負責簽名。
 
 **線上實測（2026-11-10，匿名呼叫 `https://api.cofacts.tw/graphql`）：**
@@ -69,7 +69,7 @@ media entry 在 Elasticsearch 與 DB 裡沒有任何紀錄。它是 GCS 上的�
 - rumors-api 的上傳入口是 [`uploadMedia`（`src/graphql/util.js`）](https://github.com/cofacts/rumors-api/blob/9f1cde8/src/graphql/util.js)。它對 IMAGE 用 `sharp` 在串流中產生 `jpg240h` 與 `webp600w`，對其他類型只存 `original`。上傳完成後會把每個變體的 `cacheControl` 設成 `public, max-age=31536000, immutable`。
 - 呼叫端有 `CreateMediaArticle`、`ListArticles` 的 `mediaUrl` 查詢（透過 `getOrUploadMedia`）、`replaceMedia` script。
 
-新流程接在 **GCS 上 `original` 檔案建立完成之後**。rumors-api 的上傳程式不用改。
+新流程接在 **GCS 上 `original` 檔案建立完成之後**。若以 GCS 事件觸發（§4.5），rumors-api 的上傳程式不用改。若由 rumors-api 直接呼叫 `createJob`，上傳流程要加一個呼叫（§10）。
 
 另外，rumors-api master 目前沒有任何 ffmpeg 或 fluent-ffmpeg 依賴（`package.json` 與 `src/` 中皆無）。#326 內文提到「ffmpeg is already included」是 2024 年的狀態，已過時。
 
@@ -115,7 +115,7 @@ media entry 在 Elasticsearch 與 DB 裡沒有任何紀錄。它是 GCS 上的�
 
 Penpot 中所有圖片位置填的都是同一張示意照片（600 × 815），沒有針對影片或聲音另外設計。
 
-**Penpot 沒有的東西：** 以名稱搜尋 `play`、`播放`、`waveform`、`duration`、`時長`、`gif`、`volume` 等關鍵字沒有命中。只找到 `Doubious Message-1440` 裡的 `Base / Badge` 有「影片」與「語音訊息」兩個文字標籤。換句話說，**播放鈕、時長標示、聲音的呈現方式、preview 是否自動播放與是否靜音，設計稿都沒有**。這些列為待確認（§11），由設計師回答。
+**Penpot 沒有的東西：** 以名稱搜尋 `play`、`播放`、`waveform`、`duration`、`時長`、`gif`、`volume` 等關鍵字沒有命中。只找到 `Doubious Message-1440` 裡的 `Base / Badge` 有「影片」與「語音訊息」兩個文字標籤。換句話說，**播放鈕、時長標示、聲音的呈現方式、preview 是否自動播放與是否靜音，設計稿都沒有**。這些列為待確認（§11 #8），由設計師回答。
 
 ### 2.5 規模
 
@@ -186,6 +186,7 @@ R4 的強度與 #326 原文不同：#326 寫的是「hopefully audio」（§2.7�
   - 輸出檔名由 mux stream 的 `fileName` 與 sprite 的 `filePrefix` 決定，sprite 會在前綴後加上流水號與副檔名。能否產出 media-manager 慣用的無副檔名變體名稱，**待確認**（§5.4）。
   - 官方文件說明可以輸出純音訊，但是否接受純音訊的輸入檔（例如 LINE 上傳的 m4a），**待確認**。不支援時，AUDIO 的 preview 也做不出來。
   - 計價頁沒有說明 sprite 與縮圖是否另外計費（**待確認**）。
+  - 輸入影片沒有音軌時，job 設了音訊串流會成功、失敗，還是輸出無聲檔案，文件沒有說明（**待確認**）。
   - 沒有把聲音畫成波形圖的功能。AUDIO 的 thumbnail 改為回傳 `null`（§5.2）。
 
 ### 4.2 方案 B：Cloudflare Stream
@@ -199,7 +200,7 @@ R4 的強度與 #326 原文不同：#326 寫的是「hopefully audio」（§2.7�
 
 ### 4.3 方案 C：Cloud Run + GCS 事件觸發 + ffmpeg
 
-- **做法：** GCS 在 `production/(video|audio)/*/original` 出現時，經 Eventarc 觸發一個 Cloud Run 服務。服務內以 ffmpeg 產生 thumbnail 與 preview，寫回同一個目錄。濾鏡設定取自 #334（§2.3）。
+- **做法：** GCS 在 `production/(video|audio)/*/original` 出現時，經 Eventarc 觸發一個 Cloud Run 服務。服務內以 ffmpeg 產生 thumbnail 與 preview，寫回同一個目錄。處理細節見 §7.5。
 - **優點：** ffmpeg 一個工具涵蓋所有需求，包含單張 poster frame、依 Penpot 尺寸裁切、聲音波形圖（`showwavespic`）。
 - **缺點：** 要自己維護容器映像、ffmpeg 版本、記憶體與逾時設定、觸發器與重試。這延續了 #334 的顧慮：轉檔移出 API server，影響範圍隔離了，但吃 CPU 的工作仍由我們維運。
 
@@ -232,13 +233,13 @@ R4 的強度與 #326 原文不同：#326 寫的是「hopefully audio」（§2.7�
 4. **方案 C 的規格優勢對使用者影響小。** C 能做、A 做不到的有兩項：
    - AUDIO 的波形縮圖。120 × 120 的語音波形彼此幾乎一樣，傳達的資訊有限。改為 THUMBNAIL 回傳 `null`，網站顯示聲音圖示，LINE bot 維持純文字（§5.2）。
    - 挑選代表幀。A 只能在固定時間點取幀，片頭是黑畫面時縮圖會是黑的。這影響品質，不影響功能，在 PoC 中統計比例。
-5. **鎖定程度相同。** 兩者的產出都是 GCS 上的普通檔案，日後換方案只要改產生端，rumors-api 不用動。
+5. **換方案的成本低。** 兩者的產出都是 GCS 上的普通檔案，日後換方案只要改產生端，rumors-api 不用動。
 
 必須先做 PoC，驗收線如下。任何一項不過就改採方案 C（流程見 §7.5）：
 
 - 以 `spriteSheets` 產生單張、高 240 的 JPEG。輸出檔名要能對應到 media-manager 的變體慣例，或能在 resolver 以對照表處理（§5.4）。
 - 以 production 的真實 AUDIO 檔為輸入，產生前 30 秒的 m4a。
-- 用 20 支涵蓋短片、長片、直式、橫式、無 faststart 的真實 production 影片跑完整流程。全部成功，或失敗的都是壞檔。
+- 用 20 支涵蓋短片、長片、直式、橫式、無 faststart、無聲的真實 production 影片跑完整流程。全部成功，或失敗的都是壞檔。
 - 從帳單確認 sprite 是否另外計費，總成本仍在 §8 的量級。
 
 同一批影片也要統計黑畫面縮圖的比例。比例偏高時，先調整取幀時間點。
@@ -267,7 +268,7 @@ R4 的強度與 #326 原文不同：#326 寫的是「hopefully audio」（§2.7�
 
 **THUMBNAIL 必須是 JPEG 或 PNG。** LINE bot 把 `THUMBNAIL` 直接放進 Flex Message 的 image 元件（§2.6）。依 [LINE Messaging API 的 OpenAPI 定義](https://github.com/line/line-openapi/blob/main/messaging-api.yml)（`FlexImage.url`），限制是：HTTPS（TLS 1.2 以上）、JPEG 或 PNG、最大 1024 × 1024 px、最大 10 MB、URL 最長 2,000 字元。`jpg240h` 符合以上全部。現行 signed URL 約 700 字元。日後若要把 THUMBNAIL 改成 webp、GIF 或短片，LINE bot 會壞，必須另開變體。
 
-編碼選 H.264 而不是 #334 的 AV1。LIFF 文章頁會用 `<video>` 直接播放 `PREVIEW`（§2.6），執行環境是 LINE 的內建瀏覽器（iOS 為 WKWebView）。H.264 加 AAC 的 mp4 在 iOS 與 Android 都能直接播放。AV1 需要較新的裝置與系統版本，Cofacts 的使用者有許多舊手機。H.264 檔案較大，但在 §8 的假設下儲存與傳輸成本可以忽略。
+編碼選 H.264 而不是 #334 的 AV1。LIFF 文章頁會用 `<video>` 直接播放 `PREVIEW`（§2.6），執行環境是 LINE 的內建瀏覽器（iOS 為 WKWebView）。H.264 加 AAC 的 mp4 在 iOS 與 Android 都能直接播放。AV1 在舊裝置上不一定能硬體解碼，實際的裝置分布**待確認**。H.264 檔案較大，但在 §8 的假設下儲存與傳輸成本可以忽略。
 
 編碼參數（rate control 模式、位元率或 CRF 值）在 PoC 中調整。Transcoder 輸出的 mp4 是否預設把 moov 放在檔頭，**待確認**（PoC）。
 
@@ -282,15 +283,17 @@ Penpot 沒有聲音的專屬設計。列表卡 120 × 120 的聲音圖示樣式�
 
 LINE 聊天室的候選訊息維持現狀：AUDIO 的 `THUMBNAIL` 是 `null`，所以不放 hero 圖，只顯示文字（§2.6）。`m4a-30s` 由 LIFF 文章頁的 `<audio controls>` 播放。
 
-### 5.3 不採用的型態
+### 5.3 第一版不做的型態
 
-| 型態 | 不採用的理由 |
+設計稿目前沒有影音專屬的設計（§2.4），列表卡是否要動態效果尚未確定（§11 #8）。下面三種型態第一版先不做，理由是需求與技術限制：
+
+| 型態 | 第一版不做的理由 |
 | --- | --- |
-| 動態 GIF | 檔案大（研究文件的筆記提到 Cloudflare 的 GIF 可能十幾 MB，未實測），列表頁一次載入多張時負擔過重 |
-| sprite sheet | Penpot 沒有時間軸預覽的設計 |
-| 5 秒 2 倍速短片當 thumbnail（#334 做法） | 列表卡是 120 × 120 的小圖，靜態圖足夠。短片要多載入與解碼，也沒有設計稿支援動態效果 |
+| 動態 GIF | LINE bot 的 `THUMBNAIL` 只能是 JPEG 或 PNG（§5.1），所以不能放在 THUMBNAIL 下，要另開變體。檔案大小也未知（研究文件的筆記提到 Cloudflare 的 GIF 可能十幾 MB，未實測，**待確認**） |
+| sprite sheet（多張圖拼成一張） | #326 與合約沒有要求。前端要依時間軸切圖才有用 |
+| 5 秒 2 倍速短片當 thumbnail（#334 做法） | 同樣不符合 LINE 的 `THUMBNAIL` 限制。短片比靜態圖多載入與解碼的負擔，也需要另開變體 |
 
-若設計師要求列表卡有動態效果，再於 preview 之外新增變體，不影響本文其他部分。
+第一版只做靜態 JPEG，是因為它是 LINE bot 唯一能用的 `THUMBNAIL` 型態。列表卡是否要動態效果，由設計師決定（§11 #8）。決定後再於 preview 之外新增變體，不影響本文其他部分。
 
 ### 5.4 變體名稱
 
@@ -323,7 +326,7 @@ Transcoder 的實際輸出檔名能否與上列一致，**待確認**（PoC）�
 建議**沿用現有做法**：
 
 - **儲存位置：** 與 original 同一個 bucket、同一個目錄（§5.4）。
-- **URL 形式：** 與 IMAGE 相同的 GCS V4 signed URL。有效期限進位到 1 天後的當日零時，每個變體各自簽名。
+- **URL 形式：** 與 IMAGE 相同的 GCS V4 signed URL。有效期限 24 到 48 小時（§2.1），每個變體各自簽名。
 - **權限控制：** 由 `Article.attachmentUrl` resolver 決定要不要簽名。只有 `ORIGINAL` 加上 `appId === 'WEBSITE'` 才會簽 original 的 URL。其他請求拿不到 original 的 URL。
 
 ### 6.3 前提：bucket 不開放匿名讀取（已查證）
@@ -343,7 +346,10 @@ rumors-api 的 `.env.sample` 寫「Make data public」，與 API 回傳 signed U
 | VIDEO 的 `original` | 403 |
 | 列出 `production/video/` 前綴 | 403 |
 
-匿名使用者（allUsers）無法讀取，R2 目前已成立。allAuthenticatedUsers 是否有讀取權仍需看 IAM（`gcloud storage buckets get-iam-policy gs://cofacts-media-collection`），風險低，不阻塞實作。
+匿名使用者（allUsers）無法讀取上面四個物件，R2 目前成立。以下兩點需要有權限的人確認，風險低，不阻塞實作：
+
+- allAuthenticatedUsers 是否有讀取權：`gcloud storage buckets get-iam-policy gs://cofacts-media-collection`。
+- 是否啟用 uniform bucket-level access：`gcloud storage buckets describe gs://cofacts-media-collection`。未啟用時，個別物件可能有自己的公開 ACL，上面只測了四個物件，不能涵蓋。
 
 ### 6.4 替代方案（不建議在第一版採用）
 
@@ -356,15 +362,15 @@ rumors-api 的 `.env.sample` 寫「Make data public」，與 API 回傳 signed U
 文章被封鎖或刪除後，thumbnail 與 preview 能不能再被取得，取決於 resolver 是否還會為它簽 URL，而不是檔案是否還在：
 
 - bucket 不開放匿名讀取（§6.3），沒有簽名就拿不到檔案。
-- 已經發出的 signed URL 在到期前仍然有效，最長約一天多（§6.2）。這段時間無法收回。
+- 已經發出的 signed URL 在到期前仍然有效，最長 48 小時（§2.1）。這段時間無法收回。
 - 封鎖或刪除的文章是否仍能經由 API 查到 `attachmentUrl`，**待確認**（§11 #17）。
 
 建議**沿用 IMAGE 的現行做法，不刪除變體檔案**。理由有二：
 
 - 封鎖可以解除。刪掉檔案後，解除封鎖時要重新產生。
-- 同一個 `attachmentHash` 可能被多篇文章引用（**待確認**）。刪除檔案會影響其他仍然正常的文章。
+- 同一個 `attachmentHash` 可能被多篇文章引用。`Article.js` 的程式碼註解寫明，同時建立的兩篇文章可能因 race condition 有相同的 `attachmentHash`（rumors-api `9f1cde8`）。刪除檔案會影響其他仍然正常的文章。
 
-若審查者認為 VIDEO 的 30 秒 preview 風險高於 IMAGE，需要在下架時立即無法取得，對策是讓 resolver 對封鎖或刪除的文章一律回傳 `null`，而不是刪檔。
+若審查者認為 VIDEO 的 30 秒 preview 風險高於 IMAGE，需要在下架時立即無法取得，對策是讓 resolver 對封鎖或刪除的文章一律回傳 `null`，而不是刪檔。這個做法以文章為單位判斷，同一個 `attachmentHash` 若被另一篇正常的文章引用，那篇文章仍然會取得該檔案的 URL。
 
 ## 7. 流程設計（方案 A）
 
@@ -399,10 +405,10 @@ job 的紀錄另外放在 `variant-jobs/<video|audio>/<hash>.json`，內容是 j
 
 | 情況 | 處理 |
 | --- | --- |
-| `createJob` 呼叫失敗（網路、配額） | 不影響上傳。由 §9 的 script 定期補建 |
+| `createJob` 呼叫失敗（網路、配額） | 不影響上傳。由 §9 的 script 定期補建，最久延遲到下一次排程執行（§9.1） |
 | job 仍在執行 | script 讀到 job 紀錄，且 `jobs.get` 回傳 PENDING 或 RUNNING 時跳過 |
 | job 失敗（壞檔、不支援的編碼） | script 讀到 FAILED 時，在 job 紀錄寫入錯誤摘要並標記失敗。之後略過，除非加 `--retry-failed` |
-| job 成功但變體不存在 | 視為 bug，寫 log 並告警 |
+| job 成功但變體不存在 | 視為 bug，寫 log 並告警。不自動重建，以免掩蓋輸出路徑或設定的錯誤 |
 | 變體尚未產生完成時使用者就請求 | resolver 回傳 `null`，前端顯示 placeholder（§10） |
 
 Transcoder 保留 job 狀態的期限**待確認**。script 的執行間隔必須短於這個期限，否則失敗的 job 會被當成從未建立而一再重建。
@@ -418,7 +424,7 @@ PoC 未達標時，產生端換成 Cloud Run 上的 ffmpeg，其他部分（變�
 
 - GCS 事件經 Eventarc 觸發 Cloud Run 服務（concurrency 1，max instances 設上限以限制花費）。服務以 ffmpeg 產生變體，以「不覆蓋」條件寫回 GCS（`ifGenerationMatch=0`），讓重複送達的事件不會重複寫入。
 - ffmpeg 輸入用 signed URL 或 GCS FUSE，不要先下載整檔到 `/tmp`。Cloud Run 的檔案系統是記憶體檔案系統，下載長影片會吃掉記憶體配額。
-- THUMBNAIL 改用 ffmpeg 的 `thumbnail` 濾鏡挑代表幀。AUDIO 若需要 thumbnail，用 `showwavespic` 產生波形圖。
+- THUMBNAIL 改用 ffmpeg 的 `thumbnail` 濾鏡挑代表幀。AUDIO 第一版沒有 thumbnail（§5）。日後若需要，可用 `showwavespic` 產生波形圖。
 - 壞檔寫入失敗標記並回傳 2xx 停止重試。一直失敗的事件送到 Pub/Sub dead-letter topic 並告警。
 - 採用前的驗收線：20 支真實影片在 2 vCPU、2 GiB 上，每支處理時間中位數 ≤ 60 秒、p95 ≤ 180 秒，沒有 OOM。
 
@@ -498,7 +504,7 @@ signed URL 每天換一次簽名，瀏覽器與 CDN 的快取命中會受影響�
 | 方案 | 補產（一次性） | 每月固定成本 | 備註 |
 | --- | --- | --- | --- |
 | A | 約 US$163 | 約 US$3.3（轉檔 2.5 加儲存 0.8） | sprite 是否計費待確認 |
-| B | 0 | US$110 到 540 加傳輸 | 持續增加 |
+| B | 0 | US$110 到 540 加播放費 | 持續增加 |
 | C | US$34 到 206 | 約 US$1.4 到 4.1（轉檔 0.55 到 3.3 加儲存 0.8） | 處理時間待實測。未計入 Eventarc、Pub/Sub、Artifact Registry 的費用，量級預期很小，待確認 |
 
 ## 9. 既有檔案補產（backfill）與上線
@@ -564,12 +570,12 @@ rumors-api 一開始回傳 VIDEO 與 AUDIO 的 URL，LINE bot 的聊天室與 LI
 | 檔案 | 變更 |
 | --- | --- |
 | `src/util/mediaManager.js` | 新增常數 `VIDEO_THUMBNAIL`、`VIDEO_PREVIEW`、`AUDIO_PREVIEW`，值為 §5.4 的變體名稱，或 Transcoder 的實際輸出檔名（PoC 決定）。AUDIO 沒有 THUMBNAIL |
-| 上傳流程（只在選擇直接呼叫時） | VIDEO 與 AUDIO 上傳完成後呼叫 `createJob`，失敗只寫 log，不影響上傳結果。新增 `@google-cloud/video-transcoder` 依賴 |
+| `src/graphql/util.js` 的 `onUploadStop`（只在選擇直接呼叫時） | VIDEO 與 AUDIO 上傳完成後呼叫 `createJob`，失敗只寫 log，不影響上傳結果。新增 `@google-cloud/video-transcoder` 依賴 |
 | `src/graphql/models/Article.js` | `attachmentUrl` 改以 `${articleType}_${variant}` 查表（如同 #334）。`PREVIEW` 與 `THUMBNAIL` 的 GraphQL 描述改成涵蓋 VIDEO 與 AUDIO |
-| 同上 | **只在變體檔案存在時才回傳 URL，否則回傳 `null`。** 目前 resolver 不檢查檔案是否存在。VIDEO 與 AUDIO 的變體會晚於 original 才出現，簽出不存在的 URL 會得到 404 |
-| 檢查檔案存在的方式 | 用 DataLoader 批次，key 為 `attachmentHash + variant`，並快取結果（存在的結果可長快取，不存在的結果短快取）。GCS 的 metadata 讀取是 Class B 操作，US$0.0004 / 1,000 次。**這項是必要的。** 網站可以用 `<img onerror>` 退回 placeholder，但 LINE bot 的 Flex Message 沒有這種機制，URL 指向不存在的檔案時聊天室會出現破圖（§2.6）。壞檔永遠不會有變體，所以這不只是產生期間的短暫問題 |
+| 同上 | **只在變體檔案存在時才回傳 URL，否則回傳 `null`。** resolver 目前只從 context 取 `user`，要多取 `loaders`。 目前 resolver 不檢查檔案是否存在。VIDEO 與 AUDIO 的變體會晚於 original 才出現，簽出不存在的 URL 會得到 404 |
+| `src/graphql/dataLoaders/`（新增 factory，並在 `index.ts` 註冊） | 檢查檔案存在的方式：用 DataLoader 批次，key 為 `attachmentHash + variant`，並快取結果（存在的結果可長快取，不存在的結果短快取）。GCS 的 metadata 讀取是 Class B 操作，US$0.0004 / 1,000 次。**這項是必要的。** 網站可以用 `<img onerror>` 退回 placeholder，但 LINE bot 的 Flex Message 沒有這種機制，URL 指向不存在的檔案時聊天室會出現破圖（§2.6）。壞檔永遠不會有變體，所以這不只是產生期間的短暫問題 |
 | 同上 | 新增開關 `VIDEO_AUDIO_VARIANTS_ENABLED`，預設關閉。關閉時 VIDEO 與 AUDIO 的 `THUMBNAIL`、`PREVIEW` 回傳 `null`（§9.5）。同時加進 `.env.sample` |
-| `src/graphql/__tests__`、schema 文件 | 補單元測試，更新 schema 與文件 |
+| 測試、schema 文件 | 補單元測試，更新 schema 與文件。既有的 attachmentUrl 相關測試與 snapshot 也要檢查：`src/graphql/__tests__/media-integration.js`、`queries/__tests__/GetReplyAndGetArticle.js`、`queries/__tests__/ListArticles.js`、`mutations/__tests__/CreateMediaArticle.js`。DataLoader 的測試放 `dataLoaders/__tests__` |
 | `src/scripts/` | 新增 §9 的 ensure-variants script |
 
 另外：
@@ -584,13 +590,13 @@ rumors-api 一開始回傳 VIDEO 與 AUDIO 的 URL，LINE bot 的聊天室與 LI
 | # | 項目 | 為什麼重要 | 誰能回答 | 阻塞 |
 | --- | --- | --- | --- | --- |
 | 1 | **GCP 權限：** 啟用 Transcoder API、建立 job 的 IAM 角色、Transcoder service agent 對 bucket 的讀寫權限。若用 Eventarc 觸發，另需 Eventarc 與 Cloud Run functions。若改採方案 C，另需 Cloud Run、Eventarc、Pub/Sub、Artifact Registry | 方案 A 的前提。**尚未向 Johnson 確認，本文不假設已具備** | Johnson | 是 |
-| 2 | bucket `cofacts-media-collection` 是否公開可讀 | **已查證（2026-11-13）：匿名請求一律 403**，R2 已成立（§6.3）。剩 allAuthenticatedUsers 需看 IAM | 有 GCP IAM 權限的人（Johnson） | 否 |
+| 2 | bucket `cofacts-media-collection` 是否公開可讀 | **已查證（2026-11-13）：匿名請求一律 403**，R2 已成立（§6.3）。剩 allAuthenticatedUsers 與 uniform bucket-level access 需看 IAM 與 bucket 設定（§6.3） | 有 GCP IAM 權限的人（Johnson） | 否 |
 | 3 | 審查者是否核定「在 Cloud Run 上跑 ffmpeg」 | 只在改採方案 C 時需要。合約只排除 API server 內轉檔，沒有明文允許 Cloud Run | Johnson | 否 |
 | 4 | PoC 結果：能否輸出單張 JPEG 縮圖並控制檔名、是否接受純音訊輸入、20 支真實影片的成功率與 job 處理時間、sprite 是否計費、job 狀態保留多久、黑畫面縮圖的比例 | 決定方案 A 能否採用（§4.5 驗收線），以及 §9 的時間 | 方案 A 的 PoC | 是 |
 | 5 | bucket 所在的 region | 影響 Transcoder（改採 C 時為 Cloud Run 與 Eventarc）的區域選擇與跨區傳輸費 | 有 GCP 權限的人 | 否 |
 | 6 | 既有 VIDEO 與 AUDIO 的平均長度與 `original` 總容量（`gcloud storage du`） | H3 的實際值。只影響方案 B 的成本與 job 處理時間 | 有 GCP 權限的人 | 否 |
 | 7 | 實際流量：列表頁曝光、訊息頁 preview 播放次數 | H7。目前只有單位成本 | GA4 或日誌的管理者 | 否 |
-| 8 | Penpot 沒有影片與聲音的專屬設計：播放控制、時長標示、聲音（波形或圖示）、preview 是否自動播放與靜音、載入中 placeholder | §5 的規格是依通用圖片位置推出的建議 | 設計師（Penpot 檔案維護者） | 否，但影響 AUDIO 規格 |
+| 8 | Penpot 沒有影片與聲音的專屬設計：播放控制、時長標示、聲音（波形或圖示）、preview 是否自動播放與靜音、載入中 placeholder、列表卡是否要動態效果 | §5 的規格是依通用圖片位置推出的建議 | 設計師（Penpot 檔案維護者） | 否，但影響 AUDIO 規格 |
 | 9 | LINE bot 與其他非 WEBSITE client 取得 thumbnail 與 preview 是否合適 | **已釐清：** #326 原文即要求 thumbnail 給 LINE bot 列表，LINE bot 也已在查詢這兩個變體（§2.6、§2.7） | | 否 |
 | 10 | AV1 vs H.264 | **已決定用 H.264**：LIFF 在 LINE 內建瀏覽器以 `<video>` 播放 preview（§5.1）。#334 用 AV1 的理由與 CPU 量測數據沒有留下 | | 否 |
 | 11 | `ListArticles` 的 `totalCount` 是否包含已封鎖或已刪除的文章 | §2.5 的檔案量可能略高估 | rumors-api 維護者 | 否 |
@@ -599,7 +605,7 @@ rumors-api 一開始回傳 VIDEO 與 AUDIO 的 URL，LINE bot 的聊天室與 LI
 | 14 | job 設定、script 的排程執行環境、Eventarc 函式（若採用）放在哪個 repo | 決定部署方式與維運紀錄的位置 | Johnson | 否 |
 | 15 | 合約驗收標準是否要求 AUDIO thumbnail 由檔案產生，或前端圖示即可 | #326 原文是「hopefully audio」，與 R4 的強度不同（§3）。若要求由檔案產生，方案 A 做不到，須改採 C | Johnson | 否，但可能改變 §4.5 的結論 |
 | 16 | 觸發方式：rumors-api 直接呼叫 `createJob`，或 Eventarc 加函式 | §4.5 的兩種做法，影響上傳流程是否要改與所需權限 | mrorz、Johnson | 否 |
-| 17 | 封鎖或刪除的文章是否仍能經由 API 查到 `attachmentUrl`；同一個 `attachmentHash` 是否可能被多篇文章引用；VIDEO preview 是否需要比 IMAGE 更嚴的下架處理 | 決定 §6.5 沿用 IMAGE 做法是否足夠 | rumors-api 維護者（mrorz） | 否 |
+| 17 | 封鎖或刪除的文章是否仍能經由 API 查到 `attachmentUrl`；VIDEO preview 是否需要比 IMAGE 更嚴的下架處理。同一個 `attachmentHash` 可被多篇文章引用，已由程式碼註解確認（§6.5） | 決定 §6.5 沿用 IMAGE 做法是否足夠 | rumors-api 維護者（mrorz） | 否 |
 
 **已辨識的風險：**
 
