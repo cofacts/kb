@@ -3,19 +3,19 @@ type: DesignDoc
 title: "影音（VIDEO / AUDIO）thumbnail 與 preview 產生流程"
 resource: "https://github.com/cofacts/kb/blob/main/src/technical-design/video-audio-thumbnail-preview.md"
 tags: [cofacts, design-docs, technical-design, rumors-api, multimedia]
-timestamp: "2026-11-10T17:40:00+08:00"
+timestamp: "2026-11-13T16:00:00+08:00"
 ---
 
 # 影音（VIDEO / AUDIO）thumbnail 與 preview 產生流程
 
 > [!NOTE]
-> **狀態：初稿（2026-11-10），待審查定案。** 對應 [rumors-api#326](https://github.com/cofacts/rumors-api/issues/326)。審查定案前不寫實作程式碼。
+> **狀態：初稿（2026-11-10），2026-11-13 補充查證，待審查定案。** 對應 [rumors-api#326](https://github.com/cofacts/rumors-api/issues/326)（[Cofacts.ai (nDX) project](https://github.com/orgs/cofacts/projects/12)，第三階段）。審查定案前不寫實作程式碼。
 >
 > 本文所有數字標明來源。沒有親眼看到、或查不到的內容，一律標為「**待確認**」，並在 §11 列出誰能回答。
 
 ## 1. 背景與目標
 
-`Article.attachmentUrl` 目前只有 IMAGE 有 `THUMBNAIL` 與 `PREVIEW` 變體。VIDEO 與 AUDIO 只有 original，而 original 只給登入的網站使用者。因此未登入時，文章列表中的影片與聲音訊息沒有任何圖可以顯示。
+`Article.attachmentUrl` 目前只有 IMAGE 有 `THUMBNAIL` 與 `PREVIEW` 變體。VIDEO 與 AUDIO 只有 original，而 original 只給登入的網站使用者。因此未登入時，文章列表中的影片與聲音訊息沒有任何圖可以顯示。cofacts.ai 的列表頁票 [cofacts/ai#183](https://github.com/cofacts/ai/issues/183) 已把這件事排除在範圍外，並寫明 #326 完成前，未登入時列表中的影片只能顯示「尚未登入」。
 
 本文要決定四件事：
 
@@ -26,7 +26,9 @@ timestamp: "2026-11-10T17:40:00+08:00"
 
 **限制：不得在 rumors-api 的 API server 內用 ffmpeg 轉檔。** 這個做法已評估並放棄，原因是 CPU 飆高（[rumors-api#334 的關閉說明](https://github.com/cofacts/rumors-api/pull/334)：「After testing, we conclude that this adds too much load to the server and should not be merged.」）。
 
-**不在範圍：** LINE bot 端的呈現、網站前端 UI、影片逐字稿與內容分析。
+**不在範圍：** 網站前端 UI、LINE bot 的程式修改、影片逐字稿與內容分析。
+
+**受影響但不用改程式的 client：** LINE bot。它已經會查詢 VIDEO 與 AUDIO 的 `THUMBNAIL` 與 `PREVIEW`，rumors-api 一開始回傳 URL，聊天室與 LIFF 的呈現就會跟著改變（§2.6）。因此本文的規格必須同時符合 LINE 的限制。
 
 ## 2. 現況（已查證）
 
@@ -37,7 +39,8 @@ timestamp: "2026-11-10T17:40:00+08:00"
 - `variant` 參數有 `ORIGINAL`、`PREVIEW`、`THUMBNAIL`。
 - 只有 `articleType === 'IMAGE'` 會對應到 `webp600w`（preview）與 `jpg240h`（thumbnail）。VIDEO 與 AUDIO 會落到 `original`。
 - `original` 只在 `user.appId === 'WEBSITE'` 時回傳，其他情況回傳 `null`。
-- 回傳的是 GCS V4 signed URL，有效期限進位到「從現在起 1 天後的當日零時」，讓同一天內的 URL 穩定、方便快取。
+- 回傳的是 GCS V4 signed URL，有效期限進位到「從現在起 1 天後的當日零時」，讓同一天內的 URL 穩定、方便快取。這裡的零時是 UTC，即台灣時間早上 8 點（`Math.ceil(Date.now() / 86400000)`）。
+- resolver 不檢查變體檔案是否存在，只負責簽名。
 
 **線上實測（2026-11-10，匿名呼叫 `https://api.cofacts.tw/graphql`）：**
 
@@ -125,6 +128,31 @@ Penpot 中所有圖片位置填的都是同一張示意照片（600 × 815），
 
 `totalCount` 是否包含已封鎖或已刪除的文章，**待確認**。平均長度與 original 總容量，我沒有權限查，**待確認**（§11）。
 
+### 2.6 LINE bot 的現況
+
+程式碼：[cofacts/rumors-line-bot](https://github.com/cofacts/rumors-line-bot) master（2026-11-13 讀取）。
+
+| 位置 | 查詢的變體 | 有 URL 時的呈現 | 沒有 URL 時 |
+| --- | --- | --- | --- |
+| 聊天室候選訊息 carousel（`src/webhook/handlers/utils.ts`，`ListArticlesInInitState` 與 `ListArticlesInProcessMedia`，後者含 `[TEXT, IMAGE, AUDIO, VIDEO]`） | `THUMBNAIL` | Flex bubble 的 hero 圖（`type: 'image'`），不看 `articleType` | 不放 hero，內文顯示較多行 |
+| LIFF 文章頁（`src/liff/pages/Article.svelte` 與 `components/ArticleCard.svelte`） | `PREVIEW` | VIDEO 用 `<video controls>`，AUDIO 用 `<audio controls>` | 顯示「Preview not supported yet」 |
+| LIFF 瀏覽紀錄（`components/ViewedArticle.svelte`） | `THUMBNAIL` | VIDEO 與 AUDIO 一律顯示文字，不受影響 | 同左 |
+
+這代表三件事：
+
+1. rumors-api 一回傳 VIDEO 與 AUDIO 的 URL，LINE bot 不用改程式就會開始顯示。
+2. `THUMBNAIL` 會被放進 Flex Message 的 image 元件，必須符合它的限制（§5.1）。
+3. Flex Message 是交給 LINE App 繪製的 JSON，無法像網頁的 `<img onerror>` 那樣在載入失敗時換成預設圖。URL 指向不存在的檔案時，聊天室只會出現破圖（§10）。
+
+LINE bot 不是 `WEBSITE` client，所以 LIFF 文章頁本來就拿不到 original，只能用 `PREVIEW`。
+
+### 2.7 #326 的討論脈絡
+
+- [#326](https://github.com/cofacts/rumors-api/issues/326)（mrorz，2023-12）的原文：thumbnail 給「website & LINE bot list page」，preview 給「website detail before login」。需求寫的是「handle video and hopefully audio」。
+- mrorz 在 2024-03-11 的留言：「ffmpeg is quite CPU intensive. New proposal is to use Transcoding API + Google cloud function that listens on GCS change.」也就是方案 A 搭配 GCS 事件觸發（§4.1）。
+- 2024-03-04 會議記錄（[20240304](../meetings/2024/20240304.md)）討論過 Cloudflare Stream 與 Transcoder 兩條路線，也記下 nonumpa 的顧慮：色情影片在未登入時看不到，但預覽圖被 Google 抓到的機率更大。
+- 2022-06-29 會議記錄（[20220629](../meetings/2022/20220629.md)）說明 original 只給登入者的原因之一是 GCS 對外傳輸費用。
+
 ## 3. 需求整理
 
 | # | 需求 | 出處 |
@@ -137,6 +165,8 @@ Penpot 中所有圖片位置填的都是同一張示意照片（600 × 815），
 | R6 | 新上傳的檔案要自動產生 | 合約 |
 | R7 | 成本要落在審查核定的範圍 | 合約 |
 
+R4 的強度與 #326 原文不同：#326 寫的是「hopefully audio」（§2.7）。合約驗收標準是否要求 AUDIO 的 thumbnail 必須由檔案產生，或回傳固定圖示也可以，**待確認**。R3 之外，thumbnail 也要符合 LINE Flex Message 的限制（§2.6）。
+
 ## 4. 方案比較
 
 三個方案都滿足 R1。Cloud Run 不在 API server 內，所以不違反合約限制，但仍需審查核定。
@@ -144,7 +174,7 @@ Penpot 中所有圖片位置填的都是同一張示意照片（600 × 815），
 ### 4.1 方案 A：Google Transcoder API
 
 - **做法：** 上傳完成後建立一個 Transcoder job。輸入是 `gs://…/video/<hash>/original`，輸出寫回同一個 GCS 目錄。preview 用 job 的剪輯功能輸出 30 秒 SD mp4（計價頁範例 2 說明剪輯後只計輸出長度）。縮圖用 `spriteSheets`。
-- **觸發方式有兩種：** rumors-api 在 `onUploadStop` 後直接呼叫 `createJob`（一次 API 呼叫，不吃 CPU，不需要 Cloud Run）；或 GCS 事件經 Eventarc 觸發小函式再呼叫 `createJob`。
+- **觸發方式有兩種：** rumors-api 在 `onUploadStop` 後直接呼叫 `createJob`（一次 API 呼叫，不吃 CPU，不需要 Cloud Run）；或 GCS 事件經 Eventarc 觸發小函式再呼叫 `createJob`。後者就是 mrorz 在 #326 提出的方向（§2.7）。
 - **已知缺口：**
   - 官方 sprite 文件只描述「均勻分佈張數」與「每 n 秒一張」兩種模式，沒有說明單張指定時間點的靜態圖。要拿 poster frame 可能得用 `totalCount = 1` 的 sprite，行為**待確認**（需 PoC）。
   - 計價頁沒有說明 sprite 與縮圖是否另外計費（**待確認**）。
@@ -216,7 +246,9 @@ Penpot 中所有圖片位置填的都是同一張示意照片（600 × 815），
 
 **沿用 IMAGE 的 `jpg240h` 名稱**，讓 THUMBNAIL 對 IMAGE 與 VIDEO 的處理邏輯相同。
 
-編碼選 H.264 而不是 #334 的 AV1。AV1 的硬體解碼支援因裝置而異，Cofacts 的使用者有許多舊手機與 LINE 內建瀏覽器，相容性要先驗證才能用（**待確認**，需查 caniuse 與實機測試）。H.264 的相容性沒有疑慮，檔案較大，但在 §8 的假設下儲存與傳輸成本可以忽略。
+**THUMBNAIL 必須是 JPEG 或 PNG。** LINE bot 把 `THUMBNAIL` 直接放進 Flex Message 的 image 元件（§2.6）。依 [LINE Messaging API 的 OpenAPI 定義](https://github.com/line/line-openapi/blob/main/messaging-api.yml)（`FlexImage.url`），限制是：HTTPS（TLS 1.2 以上）、JPEG 或 PNG、最大 1024 × 1024 px、最大 10 MB、URL 最長 2,000 字元。`jpg240h` 符合以上全部。現行 signed URL 約 700 字元。日後若要把 THUMBNAIL 改成 webp、GIF 或短片，LINE bot 會壞，必須另開變體。
+
+編碼選 H.264 而不是 #334 的 AV1。LIFF 文章頁會用 `<video>` 直接播放 `PREVIEW`（§2.6），執行環境是 LINE 的內建瀏覽器（iOS 為 WKWebView）。H.264 加 AAC 的 mp4 在 iOS 與 Android 都能直接播放。AV1 需要較新的裝置與系統版本，Cofacts 的使用者有許多舊手機。H.264 檔案較大，但在 §8 的假設下儲存與傳輸成本可以忽略。
 
 CRF、preset 的起始值（例如 CRF 28、`-preset veryfast`）在 PoC 中調整。
 
@@ -228,6 +260,8 @@ CRF、preset 的起始值（例如 CRF 28、`-preset veryfast`）在 PoC 中調�
 | `m4a-30s`（PREVIEW） | m4a（AAC） | 取前 30 秒，64 kbps 單聲道 |
 
 Penpot 沒有聲音的專屬設計。列表卡 120 × 120 要放什麼（波形圖、圖示加時長，或只用「語音訊息」badge），由設計師決定。若決定不用波形圖，AUDIO 只需產生 preview，這對流程沒有影響。
+
+這個決定也會出現在 LINE 聊天室：`THUMBNAIL` 有 URL 時，AUDIO 的候選訊息會多一張 hero 圖；回傳 `null` 時維持純文字（§2.6）。`m4a-30s` 由 LIFF 文章頁的 `<audio controls>` 播放。
 
 ### 5.3 不採用的型態
 
@@ -262,7 +296,7 @@ production/audio/<hash>/m4a-30s
 | `PREVIEW` | 可取得 | 可取得 |
 | `ORIGINAL` | **不可取得（回傳 `null`）** | 可取得 |
 
-這與 IMAGE 目前的行為相同（§2.1 線上實測）。LINE bot 等非 WEBSITE 的 client 也會拿到 thumbnail 與 preview，這是現有 IMAGE 的行為，延伸到 VIDEO 與 AUDIO 是否合適，**待確認**。
+這與 IMAGE 目前的行為相同（§2.1 線上實測）。LINE bot 等非 WEBSITE 的 client 也會拿到 thumbnail 與 preview。這是 #326 原本的需求（thumbnail 給 LINE bot 列表），LINE bot 的程式碼也已經在查詢這兩個變體（§2.6、§2.7）。
 
 ### 6.2 儲存位置與 URL 形式
 
@@ -272,7 +306,7 @@ production/audio/<hash>/m4a-30s
 - **URL 形式：** 與 IMAGE 相同的 GCS V4 signed URL。有效期限進位到 1 天後的當日零時，每個變體各自簽名。
 - **權限控制：** 由 `Article.attachmentUrl` resolver 決定要不要簽名。只有 `ORIGINAL` 加上 `appId === 'WEBSITE'` 才會簽 original 的 URL。其他請求拿不到 original 的 URL。
 
-### 6.3 一個必須先查證的前提
+### 6.3 前提：bucket 不開放匿名讀取（已查證）
 
 上述控制只有在 **bucket 本身不開放公開讀取** 時才完整。理由是：
 
@@ -280,7 +314,16 @@ production/audio/<hash>/m4a-30s
 - original 的路徑可以直接由它組出來：`production/video/<hash>/original`。
 - 如果 bucket 設為 allUsers 可讀，任何人都能不經 API 直接取得 original。
 
-線索互相矛盾：rumors-api 的 `.env.sample` 寫「Make data public」，但 API 實際回傳的是 signed URL（§2.1）。bucket 實際的 IAM 與 public access prevention 設定，我沒有權限查（**待確認**，需有 GCP IAM 權限的人用 `gcloud storage buckets get-iam-policy gs://cofacts-media-collection` 檢查）。這項要在實作開始前確認，因為它決定 R2 是否已經被滿足。
+rumors-api 的 `.env.sample` 寫「Make data public」，與 API 回傳 signed URL 的行為矛盾，所以實測確認（2026-11-13）。以 API 取得的真實 `attachmentHash` 組出路徑，不帶簽名直接請求 `storage.googleapis.com/cofacts-media-collection/...`：
+
+| 請求 | 結果 |
+| --- | --- |
+| IMAGE 的 `original` | 403 |
+| IMAGE 的 `jpg240h` | 403 |
+| VIDEO 的 `original` | 403 |
+| 列出 `production/video/` 前綴 | 403 |
+
+匿名使用者（allUsers）無法讀取，R2 目前已成立。allAuthenticatedUsers 是否有讀取權仍需看 IAM（`gcloud storage buckets get-iam-policy gs://cofacts-media-collection`），風險低，不阻塞實作。
 
 ### 6.4 替代方案（不建議在第一版採用）
 
@@ -456,7 +499,7 @@ script 的步驟 3 改為建立 Transcoder job（批次模式，併發上限 10�
 | `src/util/mediaManager.js` | 新增常數 `VIDEO_THUMBNAIL = 'jpg240h'`、`VIDEO_PREVIEW = 'mp4-600w30s'`、`AUDIO_THUMBNAIL = 'jpg240h'`、`AUDIO_PREVIEW = 'm4a-30s'` |
 | `src/graphql/models/Article.js` | `attachmentUrl` 改以 `${articleType}_${variant}` 查表（如同 #334）。`PREVIEW` 與 `THUMBNAIL` 的 GraphQL 描述改成涵蓋 VIDEO 與 AUDIO |
 | 同上 | **只在變體檔案存在時才回傳 URL，否則回傳 `null`。** 目前 resolver 不檢查檔案是否存在。VIDEO 與 AUDIO 的變體會晚於 original 才出現，簽出不存在的 URL 會得到 404 |
-| 檢查檔案存在的方式 | 建議用 DataLoader 批次，key 為 `attachmentHash + variant`，並快取結果（存在的結果可長快取，不存在的結果短快取）。GCS 的 metadata 讀取是 Class B 操作，US$0.0004 / 1,000 次。替代做法是不檢查，由前端 `onError` 退回 placeholder，實作較簡單，但每次都會多一個失敗請求。哪一種待審查者決定 |
+| 檢查檔案存在的方式 | 用 DataLoader 批次，key 為 `attachmentHash + variant`，並快取結果（存在的結果可長快取，不存在的結果短快取）。GCS 的 metadata 讀取是 Class B 操作，US$0.0004 / 1,000 次。**這項是必要的。** 網站可以用 `<img onerror>` 退回 placeholder，但 LINE bot 的 Flex Message 沒有這種機制，URL 指向不存在的檔案時聊天室會出現破圖（§2.6）。壞檔永遠不會有變體，所以這不只是產生期間的短暫問題 |
 | `src/graphql/__tests__`、schema 文件 | 補單元測試，更新 schema 與文件 |
 | `src/scripts/` | 新增 §9 的 ensure-variants script |
 
@@ -472,15 +515,16 @@ script 的步驟 3 改為建立 Transcoder job（批次模式，併發上限 10�
 | # | 項目 | 為什麼重要 | 誰能回答 | 阻塞 |
 | --- | --- | --- | --- | --- |
 | 1 | **GCP 權限：** Cloud Run、Eventarc、Pub/Sub、Artifact Registry（及 Cloud Build，若要在 GCP 上建置映像）、GCS 的 IAM。若退回方案 A，另需啟用 Transcoder API 與 IAM 角色 | 方案 C 的前提。**尚未向 Johnson 確認，本文不假設已具備** | Johnson | 是 |
-| 2 | **bucket `cofacts-media-collection` 是否公開可讀**（allUsers、public access prevention、uniform bucket-level access） | 決定 R2 是否已被滿足（§6.3）。`attachmentHash` 公開，若 bucket 公開，original 可被直接取得 | 有 GCP IAM 權限的人（Johnson） | 是 |
+| 2 | bucket `cofacts-media-collection` 是否公開可讀 | **已查證（2026-11-13）：匿名請求一律 403**，R2 已成立（§6.3）。剩 allAuthenticatedUsers 需看 IAM | 有 GCP IAM 權限的人（Johnson） | 否 |
 | 3 | 審查者是否核定「在 Cloud Run 上跑 ffmpeg」 | 合約只排除 API server 內轉檔，沒有明文允許 Cloud Run | Johnson | 是 |
 | 4 | PoC：ffmpeg 在 Cloud Run 的實際處理時間、記憶體、輸出大小；Eventarc 路徑比對與重試行為 | 決定方案 C 能否採用（§4.5 驗收線），以及 §8、§9 的數字 | 實作者 | 是 |
 | 5 | bucket 所在的 region | 影響 Cloud Run、Eventarc 與 Transcoder（若退回 A）的區域選擇與跨區傳輸費 | 有 GCP 權限的人 | 否 |
 | 6 | 既有 VIDEO 與 AUDIO 的平均長度與 `original` 總容量（`gcloud storage du`） | H3 的實際值。只影響方案 B 的成本與 ffmpeg 處理時間 | 有 GCP 權限的人 | 否 |
 | 7 | 實際流量：列表頁曝光、訊息頁 preview 播放次數 | H7。目前只有單位成本 | GA4 或日誌的管理者 | 否 |
 | 8 | Penpot 沒有影片與聲音的專屬設計：播放控制、時長標示、聲音（波形或圖示）、preview 是否自動播放與靜音、載入中 placeholder | §5 的規格是依通用圖片位置推出的建議 | 設計師（Penpot 檔案維護者） | 否，但影響 AUDIO 規格 |
-| 9 | LINE bot 與其他非 WEBSITE client 取得 thumbnail 與 preview 是否合適 | 現有 IMAGE 已如此，延伸到 VIDEO 與 AUDIO 是 §6.1 的預設 | Johnson | 否 |
-| 10 | AV1 vs H.264：目標瀏覽器對 AV1 的支援程度 | 本文預設 H.264（§5.1）。#334 用 AV1 的理由與 CPU 量測數據沒有留下 | 實作者查 caniuse 與實機 | 否 |
+| 9 | LINE bot 與其他非 WEBSITE client 取得 thumbnail 與 preview 是否合適 | **已釐清：** #326 原文即要求 thumbnail 給 LINE bot 列表，LINE bot 也已在查詢這兩個變體（§2.6、§2.7） | | 否 |
+| 10 | AV1 vs H.264 | **已決定用 H.264**：LIFF 在 LINE 內建瀏覽器以 `<video>` 播放 preview（§5.1）。#334 用 AV1 的理由與 CPU 量測數據沒有留下 | | 否 |
+| 15 | 合約驗收標準是否要求 AUDIO thumbnail 由檔案產生，或固定圖示即可 | #326 原文是「hopefully audio」，與 R4 的強度不同（§3） | Johnson | 否，但影響 §4 的方案比較 |
 | 11 | `ListArticles` 的 `totalCount` 是否包含已封鎖或已刪除的文章 | §2.5 的檔案量可能略高估 | rumors-api 維護者 | 否 |
 | 12 | 若退回方案 A：sprite 與縮圖是否計費、單張 poster 的做法、job 失敗與重試行為 | 方案 A 的完整成本與可行性 | 實作者（PoC）或 Google 的計價 SKU 查詢 | 否 |
 | 13 | 方案 B 的 token 能否限縮成只能存取 thumbnail、是否支援純音訊、靜態縮圖是否計費 | 方案 B 的存取控制與成本 | 實作者（Cloudflare 文件或試用帳號） | 否 |
@@ -491,7 +535,8 @@ script 的步驟 3 改為建立 Transcoder job（批次模式，併發上限 10�
 - **處理時間超出假設：** 若 PoC 的 p95 超過 180 秒，成本與補產時間都會放大。對策是 §4.5 的退場條件。
 - **壞檔：** LINE 與使用者上傳的影片格式不一。對策是失敗標記與告警（§7.3）。
 - **補產期間的花費尖峰：** 對策是限制 max instances、併發與小批次先驗證（§9.2）。
-- **bucket 設定與預期不符：** 見項目 2。
+- **LINE bot 出現破圖：** resolver 若回傳不存在的檔案，Flex Message 無法退回預設圖。對策是 §10 的存在檢查。
+- **公開預覽的內容風險：** 未登入者與搜尋引擎都能取得 thumbnail 與 preview。30 秒的 preview 對多數短片而言接近全片，可能包含不當內容（§2.7 nonumpa 的顧慮）。IMAGE 的 thumbnail 與 preview 已有同樣情況，本文沿用現行做法，是否需要額外對策待審查者決定。
 
 ## 12. 參考資料
 
@@ -502,6 +547,10 @@ script 的步驟 3 改為建立 Transcoder job（批次模式，併發上限 10�
 - [OCR and AI transcripts](ocr-and-ai-transcripts.md)
 - [rumors-api#326](https://github.com/cofacts/rumors-api/issues/326)
 - [rumors-api#334](https://github.com/cofacts/rumors-api/pull/334)（分支 `video-thumbnail`，head `fb5362c`）
+- [cofacts/ai#183](https://github.com/cofacts/ai/issues/183)（Phase 3 / Track 1 列表、篩選與搜尋）
+- [Cofacts.ai (nDX) project](https://github.com/orgs/cofacts/projects/12)
+- [rumors-line-bot](https://github.com/cofacts/rumors-line-bot)：`src/webhook/handlers/utils.ts`、`src/liff/pages/Article.svelte`、`src/liff/components/ArticleCard.svelte`、`src/liff/components/ViewedArticle.svelte`
+- 會議記錄：[20220629](../meetings/2022/20220629.md)（GCS 圖片對外）、[20240304](../meetings/2024/20240304.md)（Thumbnails for video and audio）
 
 **官方文件與定價（2026-11-10 查詢）：**
 
@@ -514,3 +563,4 @@ script 的步驟 3 改為建立 Transcoder job（批次模式，併發上限 10�
 - [Cloudflare Stream pricing](https://developers.cloudflare.com/stream/pricing/)
 - [Cloudflare Stream：thumbnails](https://developers.cloudflare.com/stream/viewing-videos/displaying-thumbnails/)
 - [Cloudflare Stream：signed URLs](https://developers.cloudflare.com/stream/viewing-videos/securing-your-stream/)
+- [LINE Messaging API OpenAPI 定義](https://github.com/line/line-openapi/blob/main/messaging-api.yml)（`FlexImage`，2026-11-13 查詢）
