@@ -538,28 +538,28 @@ script 的步驟 3 與 4 改為呼叫 Cloud Run 服務（與日常事件觸發�
 - Transcoder job 設定、script 的排程執行環境，以及 Eventarc 函式（若採用）放在哪裡，**待確認**。
 - rumors-api 不需要 ffmpeg，CI 也不需要 #334 當時換過的 ffmpeg 建置版本。單元測試 mock GCS 與 Transcoder 的 client，端對端的產生流程在 PoC 與 staging 驗證。
 
-## 11. 風險與待辦
+## 11. 待確認事項與風險
 
-下表以「待確認」為主。標示「阻塞」的項目，沒有答案就不能進入實作。
+下表列出還沒有答案的問題，以及誰能回答。標示「阻塞」的項目，沒有答案就不能進入實作。由誰在何時處理，另以 GitHub issue 追蹤，不記在本文。
 
 | # | 項目 | 為什麼重要 | 誰能回答 | 阻塞 |
 | --- | --- | --- | --- | --- |
 | 1 | **GCP 權限：** 啟用 Transcoder API、建立 job 的 IAM 角色、Transcoder service agent 對 bucket 的讀寫權限。若用 Eventarc 觸發，另需 Eventarc 與 Cloud Run functions。若改採方案 C，另需 Cloud Run、Eventarc、Pub/Sub、Artifact Registry | 方案 A 的前提。**尚未向 Johnson 確認，本文不假設已具備** | Johnson | 是 |
 | 2 | bucket `cofacts-media-collection` 是否公開可讀 | **已查證（2026-11-13）：匿名請求一律 403**，R2 已成立（§6.3）。剩 allAuthenticatedUsers 需看 IAM | 有 GCP IAM 權限的人（Johnson） | 否 |
 | 3 | 審查者是否核定「在 Cloud Run 上跑 ffmpeg」 | 只在改採方案 C 時需要。合約只排除 API server 內轉檔，沒有明文允許 Cloud Run | Johnson | 否 |
-| 4 | PoC：單張 JPEG 縮圖與輸出檔名、純音訊輸入、20 支真實影片的成功率與 job 處理時間、sprite 計費、job 狀態的保留期限、黑畫面縮圖比例 | 決定方案 A 能否採用（§4.5 驗收線），以及 §9 的時間 | 實作者 | 是 |
+| 4 | PoC 結果：能否輸出單張 JPEG 縮圖並控制檔名、是否接受純音訊輸入、20 支真實影片的成功率與 job 處理時間、sprite 是否計費、job 狀態保留多久、黑畫面縮圖的比例 | 決定方案 A 能否採用（§4.5 驗收線），以及 §9 的時間 | 方案 A 的 PoC | 是 |
 | 5 | bucket 所在的 region | 影響 Transcoder（改採 C 時為 Cloud Run 與 Eventarc）的區域選擇與跨區傳輸費 | 有 GCP 權限的人 | 否 |
 | 6 | 既有 VIDEO 與 AUDIO 的平均長度與 `original` 總容量（`gcloud storage du`） | H3 的實際值。只影響方案 B 的成本與 job 處理時間 | 有 GCP 權限的人 | 否 |
 | 7 | 實際流量：列表頁曝光、訊息頁 preview 播放次數 | H7。目前只有單位成本 | GA4 或日誌的管理者 | 否 |
 | 8 | Penpot 沒有影片與聲音的專屬設計：播放控制、時長標示、聲音（波形或圖示）、preview 是否自動播放與靜音、載入中 placeholder | §5 的規格是依通用圖片位置推出的建議 | 設計師（Penpot 檔案維護者） | 否，但影響 AUDIO 規格 |
 | 9 | LINE bot 與其他非 WEBSITE client 取得 thumbnail 與 preview 是否合適 | **已釐清：** #326 原文即要求 thumbnail 給 LINE bot 列表，LINE bot 也已在查詢這兩個變體（§2.6、§2.7） | | 否 |
 | 10 | AV1 vs H.264 | **已決定用 H.264**：LIFF 在 LINE 內建瀏覽器以 `<video>` 播放 preview（§5.1）。#334 用 AV1 的理由與 CPU 量測數據沒有留下 | | 否 |
+| 11 | `ListArticles` 的 `totalCount` 是否包含已封鎖或已刪除的文章 | §2.5 的檔案量可能略高估 | rumors-api 維護者 | 否 |
+| 12 | 若改採方案 C：ffmpeg 在 Cloud Run 的處理時間、記憶體、輸出大小；Eventarc 路徑比對與重試行為 | 方案 C 的可行性（§7.5 驗收線）與 §8 的數字 | 方案 C 的 PoC | 否 |
+| 13 | 方案 B 的 token 能否限縮成只能存取 thumbnail、是否支援純音訊、靜態縮圖是否計費 | 方案 B 的存取控制與成本 | 實作者（Cloudflare 文件或試用帳號） | 否 |
+| 14 | job 設定、script 的排程執行環境、Eventarc 函式（若採用）放在哪個 repo | 決定部署方式與維運紀錄的位置 | Johnson | 否 |
 | 15 | 合約驗收標準是否要求 AUDIO thumbnail 由檔案產生，或前端圖示即可 | #326 原文是「hopefully audio」，與 R4 的強度不同（§3）。若要求由檔案產生，方案 A 做不到，須改採 C | Johnson | 否，但可能改變 §4.5 的結論 |
 | 16 | 觸發方式：rumors-api 直接呼叫 `createJob`，或 Eventarc 加函式 | §4.5 的兩種做法，影響上傳流程是否要改與所需權限 | mrorz、Johnson | 否 |
-| 11 | `ListArticles` 的 `totalCount` 是否包含已封鎖或已刪除的文章 | §2.5 的檔案量可能略高估 | rumors-api 維護者 | 否 |
-| 12 | 若改採方案 C：ffmpeg 在 Cloud Run 的處理時間、記憶體、輸出大小；Eventarc 路徑比對與重試行為 | 方案 C 的可行性（§7.5 驗收線）與 §8 的數字 | 實作者 | 否 |
-| 13 | 方案 B 的 token 能否限縮成只能存取 thumbnail、是否支援純音訊、靜態縮圖是否計費 | 方案 B 的存取控制與成本 | 實作者（Cloudflare 文件或試用帳號） | 否 |
-| 14 | job 設定、script 的排程執行環境、Eventarc 函式（若採用）放哪個 repo，部署與告警怎麼接 | 維運紀錄的內容 | Johnson 與實作者 | 否 |
 
 **已辨識的風險：**
 
