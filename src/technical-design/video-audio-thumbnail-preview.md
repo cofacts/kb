@@ -8,10 +8,15 @@ timestamp: "2026-11-13T20:00:00+08:00"
 
 # 影音（VIDEO / AUDIO）thumbnail 與 preview 產生流程
 
-> [!NOTE]
-> **狀態：初稿（2026-11-10），2026-11-13 補充查證並改為方案 A 優先，待審查定案。** 對應 [rumors-api#326](https://github.com/cofacts/rumors-api/issues/326)（[Cofacts.ai (nDX) project](https://github.com/orgs/cofacts/projects/12)，第三階段）。審查定案前不寫實作程式碼。
->
-> 本文所有數字標明來源。沒有親眼看到、或查不到的內容，一律標為「**待確認**」，並在 §11 列出誰能回答。
+## 摘要
+
+- **建議：** 用 Google Transcoder API（方案 A）產生變體，以 PoC 結果作為採用條件。PoC 未達標時改用 Cloud Run 上的 ffmpeg（方案 C）。不建議 Cloudflare Stream（方案 B）。理由見 §4.5。
+- **產出：** VIDEO 有高 240 的 JPEG thumbnail 與前 30 秒的 H.264 mp4 preview。AUDIO 只有前 30 秒的 m4a preview，thumbnail 回傳 `null`，由前端顯示聲音圖示（§5）。
+- **存取：** 與 IMAGE 相同。未登入者可以取得 thumbnail 與 preview，不能取得 original。resolver 只在變體檔案存在時回傳 URL（§6、§10）。
+- **成本：** 既有檔案補產約 US$163，之後每月幾美元（§8）。
+- **上線：** rumors-api 一回傳 URL，LINE bot 的呈現就會改變，所以 resolver 加上預設關閉的開關，變體產生並驗證後才開啟（§9.5）。
+- **阻塞實作的項目：** GCP 權限（§11 #1）與方案 A 的 PoC（§11 #4）。
+- **需要審查者決定：** 合約是否要求 AUDIO thumbnail 由檔案產生（§11 #15，可能改變建議），以及觸發方式（§11 #16）。
 
 ## 1. 背景與目標
 
@@ -346,6 +351,21 @@ rumors-api 的 `.env.sample` 寫「Make data public」，與 API 回傳 signed U
 
 流量大到傳輸成本變得明顯時，再考慮這個方案。以 §8 的估算，目前不需要。
 
+### 6.5 文章封鎖或刪除後的變體
+
+文章被封鎖或刪除後，thumbnail 與 preview 能不能再被取得，取決於 resolver 是否還會為它簽 URL，而不是檔案是否還在：
+
+- bucket 不開放匿名讀取（§6.3），沒有簽名就拿不到檔案。
+- 已經發出的 signed URL 在到期前仍然有效，最長約一天多（§6.2）。這段時間無法收回。
+- 封鎖或刪除的文章是否仍能經由 API 查到 `attachmentUrl`，**待確認**（§11 #17）。
+
+建議**沿用 IMAGE 的現行做法，不刪除變體檔案**。理由有二：
+
+- 封鎖可以解除。刪掉檔案後，解除封鎖時要重新產生。
+- 同一個 `attachmentHash` 可能被多篇文章引用（**待確認**）。刪除檔案會影響其他仍然正常的文章。
+
+若審查者認為 VIDEO 的 30 秒 preview 風險高於 IMAGE，需要在下架時立即無法取得，對策是讓 resolver 對封鎖或刪除的文章一律回傳 `null`，而不是刪檔。
+
 ## 7. 流程設計（方案 A）
 
 ### 7.1 概念
@@ -481,7 +501,7 @@ signed URL 每天換一次簽名，瀏覽器與 CDN 的快取命中會受影響�
 | B | 0 | US$110 到 540 加傳輸 | 持續增加 |
 | C | US$34 到 206 | 約 US$1.4 到 4.1（轉檔 0.55 到 3.3 加儲存 0.8） | 處理時間待實測。未計入 Eventarc、Pub/Sub、Artifact Registry 的費用，量級預期很小，待確認 |
 
-## 9. 既有檔案補產（backfill）
+## 9. 既有檔案補產（backfill）與上線
 
 ### 9.1 做法
 
@@ -519,6 +539,24 @@ signed URL 每天換一次簽名，瀏覽器與 CDN 的快取命中會受影響�
 
 script 的步驟 3 與 4 改為呼叫 Cloud Run 服務（與日常事件觸發使用同一個處理端點），失敗狀態改讀 §7.5 的失敗標記。併發改由 Cloud Run 的 max instances 限制。其餘邏輯不變。
 
+### 9.5 上線順序與關閉方式
+
+rumors-api 一開始回傳 VIDEO 與 AUDIO 的 URL，LINE bot 的聊天室與 LIFF 就會跟著改變（§2.6），網站也一樣。這些 client 沒有自己的開關，所以開關放在 rumors-api：新增環境變數 `VIDEO_AUDIO_VARIANTS_ENABLED`，預設關閉。關閉時，resolver 對 VIDEO 與 AUDIO 的 `THUMBNAIL` 與 `PREVIEW` 一律回傳 `null`，行為與現在相同。
+
+上線順序：
+
+1. **部署 rumors-api，開關關閉。** 內容包括變體常數、存在檢查與開關（§10）。對外行為不變。
+2. **開始產生變體。** 啟用觸發方式（§4.5），並以 `--limit 50` 跑 script 驗證設定與輸出（§9.2）。
+3. **在 staging 開啟開關。** 以 LINE bot 與網站的 staging 確認聊天室 Flex Message、LIFF 與網站列表的呈現，包含直式影片、AUDIO 與變體尚未產生的文章。
+4. **在 production 開啟開關。** 因為有存在檢查，不必等補產完成：已有變體的文章開始顯示，其餘維持現狀。補產由新到舊進行，最常被看到的文章會最先有變體。
+5. **跑完整補產**，完成後依 §9.3 驗收。
+
+關閉方式：
+
+- **停止顯示：** 關閉開關並重新部署（或重新啟動）rumors-api。LINE bot 與網站立即回到現狀。已發出的 signed URL 在到期前仍可使用。
+- **停止產生：** 停用觸發方式與排程的 script。已送出的 Transcoder job 會跑完，不會再有新的 job。
+- 已產生的變體檔案留在 GCS，不必刪除。重新開啟時直接沿用。
+
 ## 10. rumors-api 的變更範圍
 
 主要動 `Article.attachmentUrl` 與周邊。觸發方式若選「rumors-api 直接呼叫」（§4.5），上傳流程也要改。
@@ -530,6 +568,7 @@ script 的步驟 3 與 4 改為呼叫 Cloud Run 服務（與日常事件觸發�
 | `src/graphql/models/Article.js` | `attachmentUrl` 改以 `${articleType}_${variant}` 查表（如同 #334）。`PREVIEW` 與 `THUMBNAIL` 的 GraphQL 描述改成涵蓋 VIDEO 與 AUDIO |
 | 同上 | **只在變體檔案存在時才回傳 URL，否則回傳 `null`。** 目前 resolver 不檢查檔案是否存在。VIDEO 與 AUDIO 的變體會晚於 original 才出現，簽出不存在的 URL 會得到 404 |
 | 檢查檔案存在的方式 | 用 DataLoader 批次，key 為 `attachmentHash + variant`，並快取結果（存在的結果可長快取，不存在的結果短快取）。GCS 的 metadata 讀取是 Class B 操作，US$0.0004 / 1,000 次。**這項是必要的。** 網站可以用 `<img onerror>` 退回 placeholder，但 LINE bot 的 Flex Message 沒有這種機制，URL 指向不存在的檔案時聊天室會出現破圖（§2.6）。壞檔永遠不會有變體，所以這不只是產生期間的短暫問題 |
+| 同上 | 新增開關 `VIDEO_AUDIO_VARIANTS_ENABLED`，預設關閉。關閉時 VIDEO 與 AUDIO 的 `THUMBNAIL`、`PREVIEW` 回傳 `null`（§9.5）。同時加進 `.env.sample` |
 | `src/graphql/__tests__`、schema 文件 | 補單元測試，更新 schema 與文件 |
 | `src/scripts/` | 新增 §9 的 ensure-variants script |
 
@@ -560,6 +599,7 @@ script 的步驟 3 與 4 改為呼叫 Cloud Run 服務（與日常事件觸發�
 | 14 | job 設定、script 的排程執行環境、Eventarc 函式（若採用）放在哪個 repo | 決定部署方式與維運紀錄的位置 | Johnson | 否 |
 | 15 | 合約驗收標準是否要求 AUDIO thumbnail 由檔案產生，或前端圖示即可 | #326 原文是「hopefully audio」，與 R4 的強度不同（§3）。若要求由檔案產生，方案 A 做不到，須改採 C | Johnson | 否，但可能改變 §4.5 的結論 |
 | 16 | 觸發方式：rumors-api 直接呼叫 `createJob`，或 Eventarc 加函式 | §4.5 的兩種做法，影響上傳流程是否要改與所需權限 | mrorz、Johnson | 否 |
+| 17 | 封鎖或刪除的文章是否仍能經由 API 查到 `attachmentUrl`；同一個 `attachmentHash` 是否可能被多篇文章引用；VIDEO preview 是否需要比 IMAGE 更嚴的下架處理 | 決定 §6.5 沿用 IMAGE 做法是否足夠 | rumors-api 維護者（mrorz） | 否 |
 
 **已辨識的風險：**
 
@@ -568,7 +608,7 @@ script 的步驟 3 與 4 改為呼叫 Cloud Run 服務（與日常事件觸發�
 - **補產的花費：** Transcoder 依輸出分鐘計費，總額上限約 US$163 加上 sprite 費用（§8.3），沒有執行個體數量失控的問題。仍先用 `--limit 50` 驗證設定（§9.2）。
 - **黑畫面縮圖：** 固定時間點取幀可能取到片頭黑畫面。對策是在 PoC 與補產抽樣時統計比例，必要時調整取幀時間點。
 - **LINE bot 出現破圖：** resolver 若回傳不存在的檔案，Flex Message 無法退回預設圖。對策是 §10 的存在檢查。
-- **公開預覽的內容風險：** 未登入者與搜尋引擎都能取得 thumbnail 與 preview。30 秒的 preview 對多數短片而言接近全片，可能包含不當內容（§2.7 nonumpa 的顧慮）。IMAGE 的 thumbnail 與 preview 已有同樣情況，本文沿用現行做法，是否需要額外對策待審查者決定。
+- **公開預覽的內容風險：** 未登入者與搜尋引擎都能取得 thumbnail 與 preview。30 秒的 preview 對多數短片而言接近全片，可能包含不當內容（§2.7 nonumpa 的顧慮）。IMAGE 的 thumbnail 與 preview 已有同樣情況，本文沿用現行做法，是否需要額外對策待審查者決定。文章封鎖或刪除後的處理見 §6.5。
 
 ## 12. 參考資料
 
