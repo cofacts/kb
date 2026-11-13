@@ -3,13 +3,13 @@ type: DesignDoc
 title: "影音（VIDEO / AUDIO）thumbnail 與 preview 產生流程"
 resource: "https://github.com/cofacts/kb/blob/main/src/technical-design/video-audio-thumbnail-preview.md"
 tags: [cofacts, design-docs, technical-design, rumors-api, multimedia]
-timestamp: "2026-11-13T16:00:00+08:00"
+timestamp: "2026-11-13T20:00:00+08:00"
 ---
 
 # 影音（VIDEO / AUDIO）thumbnail 與 preview 產生流程
 
 > [!NOTE]
-> **狀態：初稿（2026-11-10），2026-11-13 補充查證，待審查定案。** 對應 [rumors-api#326](https://github.com/cofacts/rumors-api/issues/326)（[Cofacts.ai (nDX) project](https://github.com/orgs/cofacts/projects/12)，第三階段）。審查定案前不寫實作程式碼。
+> **狀態：初稿（2026-11-10），2026-11-13 補充查證並改為方案 A 優先，待審查定案。** 對應 [rumors-api#326](https://github.com/cofacts/rumors-api/issues/326)（[Cofacts.ai (nDX) project](https://github.com/orgs/cofacts/projects/12)，第三階段）。審查定案前不寫實作程式碼。
 >
 > 本文所有數字標明來源。沒有親眼看到、或查不到的內容，一律標為「**待確認**」，並在 §11 列出誰能回答。
 
@@ -87,7 +87,7 @@ media entry 在 Elasticsearch 與 DB 裡沒有任何紀錄。它是 GCS 上的�
 - 它假設輸入是 mp4（`.inputFormat('mp4')`）。
 - 編碼器選 SVT-AV1。壓縮率高，編碼也慢，是 CPU 飆高的合理嫌疑，但關閉說明沒有附量測數據（**待確認**）。
 
-本文沿用它的**濾鏡與時間長度設定**，不沿用「在 Node 程序內串流轉檔」的結構，也不沿用 AV1。
+本文沿用它的**時間長度設定**（preview 取前 30 秒），不沿用「在 Node 程序內串流轉檔」的結構，也不沿用 AV1。
 
 ### 2.4 Penpot 中影音的呈現
 
@@ -169,7 +169,7 @@ R4 的強度與 #326 原文不同：#326 寫的是「hopefully audio」（§2.7�
 
 ## 4. 方案比較
 
-三個方案都滿足 R1。Cloud Run 不在 API server 內，所以不違反合約限制，但仍需審查核定。
+方案 A 與 B 不跑 ffmpeg，由代管服務轉檔。方案 C 在 Cloud Run 上跑 ffmpeg，符合 R1 的字面要求（不在 API server 內），但沒有處理 #334 的根本顧慮：吃 CPU 的轉檔工作仍要由我們自己維運（§4.5）。
 
 ### 4.1 方案 A：Google Transcoder API
 
@@ -177,8 +177,11 @@ R4 的強度與 #326 原文不同：#326 寫的是「hopefully audio」（§2.7�
 - **觸發方式有兩種：** rumors-api 在 `onUploadStop` 後直接呼叫 `createJob`（一次 API 呼叫，不吃 CPU，不需要 Cloud Run）；或 GCS 事件經 Eventarc 觸發小函式再呼叫 `createJob`。後者就是 mrorz 在 #326 提出的方向（§2.7）。
 - **已知缺口：**
   - 官方 sprite 文件只描述「均勻分佈張數」與「每 n 秒一張」兩種模式，沒有說明單張指定時間點的靜態圖。要拿 poster frame 可能得用 `totalCount = 1` 的 sprite，行為**待確認**（需 PoC）。
+  - sprite 依固定時間點取幀，不能像 ffmpeg 的 `thumbnail` 濾鏡那樣挑出代表幀。片頭是黑畫面時，縮圖會是黑的。
+  - 輸出檔名由 mux stream 的 `fileName` 與 sprite 的 `filePrefix` 決定，sprite 會在前綴後加上流水號與副檔名。能否產出 media-manager 慣用的無副檔名變體名稱，**待確認**（§5.4）。
+  - 官方文件說明可以輸出純音訊，但是否接受純音訊的輸入檔（例如 LINE 上傳的 m4a），**待確認**。不支援時，AUDIO 的 preview 也做不出來。
   - 計價頁沒有說明 sprite 與縮圖是否另外計費（**待確認**）。
-  - 沒有把聲音畫成波形圖的功能，AUDIO 的 thumbnail 做不出來。
+  - 沒有把聲音畫成波形圖的功能。AUDIO 的 thumbnail 改為回傳 `null`（§5.2）。
 
 ### 4.2 方案 B：Cloudflare Stream
 
@@ -193,7 +196,7 @@ R4 的強度與 #326 原文不同：#326 寫的是「hopefully audio」（§2.7�
 
 - **做法：** GCS 在 `production/(video|audio)/*/original` 出現時，經 Eventarc 觸發一個 Cloud Run 服務。服務內以 ffmpeg 產生 thumbnail 與 preview，寫回同一個目錄。濾鏡設定取自 #334（§2.3）。
 - **優點：** ffmpeg 一個工具涵蓋所有需求，包含單張 poster frame、依 Penpot 尺寸裁切、聲音波形圖（`showwavespic`）。
-- **缺點：** 要自己維護容器映像、ffmpeg 版本、記憶體與逾時設定、觸發器與重試。
+- **缺點：** 要自己維護容器映像、ffmpeg 版本、記憶體與逾時設定、觸發器與重試。這延續了 #334 的顧慮：轉檔移出 API server，影響範圍隔離了，但吃 CPU 的工作仍由我們維運。
 
 ### 4.4 逐項比較
 
@@ -207,31 +210,42 @@ R4 的強度與 #326 原文不同：#326 寫的是「hopefully audio」（§2.7�
 | **與現有 GCP 整合** | 高。輸入輸出都是 GCS，與目前 bucket 結構相容。需啟用 API、授權 service account | 低。資料要離開 GCP。影片在兩邊各一份 | 高。同 bucket、同目錄，與 media-manager 的目錄慣例一致。需要 Cloud Run、Eventarc、Pub/Sub 權限（待確認） |
 | **供應商鎖定** | 中。job 設定是 Google 專屬，但產出是 GCS 上的一般檔案，換方案時檔案可沿用 | 高。內容以 Stream 的 video UID 定址，player 與 thumbnail URL 都綁 Cloudflare | 低。ffmpeg 是開源工具，容器可搬到任何地方 |
 | **失敗與重試** | job 有狀態（含失敗）可查。重試要自己重新建立 job。失敗行為文件未詳述（待確認）。API 配額：mutation 100 次每分鐘 | 轉碼失敗狀態可由 API 查。重試要重新上傳或重新抓取。細節待確認 | Eventarc 對非 2xx 回應自動重試（細節待確認）。處理程式要冪等，並對壞檔寫失敗標記以停止重試（§7.3） |
-| **能否滿足 R4（AUDIO thumbnail）** | 否（無波形） | 待確認（是否支援純音訊） | 是（`showwavespic`） |
-| **規格彈性（R3）** | 受 job 設定欄位限制，單張 poster 待 PoC | 受 Stream 的固定 URL 參數限制 | 完全可控 |
+| **R1 的根本顧慮（自行維運轉檔）** | 不涉及 | 不涉及 | 仍在，只是移出 API server |
+| **所需權限** | Transcoder API 與 IAM。若用 Eventarc 觸發，另需 Eventarc 與 Cloud Run functions | Cloudflare 帳號與 API token | Cloud Run、Eventarc、Pub/Sub、Artifact Registry |
+| **能否滿足 R4** | VIDEO 可以。AUDIO 的 preview 待確認（純音訊輸入）。AUDIO 的 thumbnail 無波形，回傳 `null` 由前端顯示圖示 | 待確認（是否支援純音訊） | 是（`showwavespic`） |
+| **規格彈性（R3）** | 受 job 設定欄位限制，單張 poster 與輸出檔名待 PoC。取固定時間點，無法避開黑畫面 | 受 Stream 的固定 URL 參數限制 | 完全可控 |
 
 ### 4.5 建議
 
-**建議採用方案 C（Cloud Run + GCS 事件 + ffmpeg），以 PoC 實測結果作為採用條件；PoC 未達標時退回方案 A。不建議方案 B。**
+**建議採用方案 A（Google Transcoder API），以 PoC 結果作為採用條件。PoC 未達標，或合約要求 AUDIO 的 thumbnail 必須由檔案產生（§11 #15）時，改採方案 C。不建議方案 B。**
 
 理由：
 
-1. **只有方案 C 明確滿足 R3 與 R4。** Penpot 要的是 120 × 120 的列表縮圖與 658 寬的詳細頁預覽，AUDIO 也要有 thumbnail。ffmpeg 可以在同一個工具裡做單張 poster、短片與波形圖。方案 A 缺 AUDIO thumbnail，單張 poster 也要靠 sprite 變通。
-2. **成本最低，且不隨影片長度成長。** 方案 B 的儲存費會隨總分鐘數持續增加，平均長度 3 分鐘時一年超過 US$3,900。方案 A 與 C 的補產都在數十到兩百美元，之後每月只有幾美元。
-3. **沿用 #334 的濾鏡設定。** 時間長度與縮放參數已有一次驗證過的版本，只需移到容器中並改成讀寫檔案。
-4. **鎖定最低。** 產出是 GCS 上的普通檔案，日後要換成方案 A 只要改產生端，rumors-api 不用動。
-5. **變體命名與目錄結構與現有一致。** rumors-api 只需改 `attachmentUrl` 的對應表（§10）。
+1. **它直接處理 #334 的根本顧慮。** #334 的問題不只是拖慢 API server，而是吃 CPU 的轉檔工作要由我們自己扛。方案 C 把 ffmpeg 搬到 Cloud Run，隔離了影響範圍，但機器規格、記憶體、逾時、OOM 與壞檔重試仍由我們維運。mrorz 在 #326 面對同一個顧慮時，提的是改用代管的 Transcoder，而不是把 ffmpeg 搬到另一個服務（§2.7）。
+2. **需要的權限最少，也不必另外核定。** 由 rumors-api 直接呼叫 `createJob` 時，只需啟用 Transcoder API 並設定 IAM。方案 C 需要 Cloud Run、Eventarc、Pub/Sub、Artifact Registry，而且「在 Cloud Run 上跑 ffmpeg」是否符合 R1 需要審查者確認（§11）。
+3. **成本差距可以忽略。** 補產方案 A 約 US$163，方案 C 約 US$34 到 206。之後兩者每月都只有幾美元（§8.6）。
+4. **方案 C 的規格優勢對使用者影響小。** C 能做、A 做不到的有兩項：
+   - AUDIO 的波形縮圖。120 × 120 的語音波形彼此幾乎一樣，傳達的資訊有限。改為 THUMBNAIL 回傳 `null`，網站顯示聲音圖示，LINE bot 維持純文字（§5.2）。
+   - 挑選代表幀。A 只能在固定時間點取幀，片頭是黑畫面時縮圖會是黑的。這影響品質，不影響功能，在 PoC 中統計比例。
+5. **鎖定程度相同。** 兩者的產出都是 GCS 上的普通檔案，日後換方案只要改產生端，rumors-api 不用動。
 
-必須先做 PoC，驗收線如下。任何一項不過就改採方案 A，並重新評估 AUDIO thumbnail 的呈現方式：
+必須先做 PoC，驗收線如下。任何一項不過就改採方案 C（流程見 §7.5）：
 
-- 用 20 支涵蓋短片、長片、直式、橫式、無 faststart 的真實 production 影片，在 Cloud Run（建議 2 vCPU、2 GiB）上跑完整流程。
-- 每支處理時間的中位數 ≤ 60 秒，p95 ≤ 180 秒。
-- 沒有 OOM，且壞檔會被標記而不是無限重試。
+- 以 `spriteSheets` 產生單張、高 240 的 JPEG。輸出檔名要能對應到 media-manager 的變體慣例，或能在 resolver 以對照表處理（§5.4）。
+- 以 production 的真實 AUDIO 檔為輸入，產生前 30 秒的 m4a。
+- 用 20 支涵蓋短片、長片、直式、橫式、無 faststart 的真實 production 影片跑完整流程。全部成功，或失敗的都是壞檔。
+- 從帳單確認 sprite 是否另外計費，總成本仍在 §8 的量級。
 
-兩個提醒：
+同一批影片也要統計黑畫面縮圖的比例。比例偏高時，先調整取幀時間點。
 
-- 方案 C 需要 Cloud Run、Eventarc、Pub/Sub、Artifact Registry 的權限，**尚未向 Johnson 確認**（§11）。拿不到時，方案 A 的「rumors-api 直接呼叫 `createJob`」只需啟用 Transcoder API 與一個 IAM 角色，是較不依賴這些權限的退路。
-- 方案 C 要核定的是「在 Cloud Run 上跑 ffmpeg」。它不在 API server 內，但合約沒有明講允許，需要審查者確認。
+**觸發方式**由審查者決定（§11 #16）：
+
+| 方式 | 優點 | 缺點 |
+| --- | --- | --- |
+| rumors-api 在上傳完成後直接呼叫 `createJob` | 權限最少，不必部署新服務 | 要改上傳流程。呼叫失敗時，由 §9 的 script 定期補上 |
+| GCS 事件經 Eventarc 觸發函式，由函式呼叫 `createJob`（mrorz 在 #326 的提議） | 上傳流程不用改，Eventarc 會重試 | 需要 Eventarc 與 Cloud Run functions 的權限，多一個要部署的函式 |
+
+兩種方式都由 §9 的 ensure-variants script 補漏，差別只在新上傳的檔案多快能拿到變體。
 
 ## 5. thumbnail 與 preview 規格
 
@@ -241,8 +255,8 @@ R4 的強度與 #326 原文不同：#326 寫的是「hopefully audio」（§2.7�
 
 | 變體 | 型態 | 規格 | 對應的 Penpot 位置 |
 | --- | --- | --- | --- |
-| `jpg240h`（THUMBNAIL） | 靜態 JPEG | 高 240 px，等比縮放，不放大，品質比照現有 IMAGE 的 `jpg240h`。取自前 10 秒內以 ffmpeg `thumbnail` 濾鏡選出的代表幀，避開黑畫面 | 列表卡 120 × 120（2 倍螢幕 240 × 240）。前端用 `object-fit: cover` 裁成方形，與 IMAGE 的處理一致 |
-| `mp4-600w30s`（PREVIEW） | mp4（H.264 + AAC，`-movflags +faststart`） | 取前 30 秒（不足則全長）。寬不超過 600、高不超過 800，等比縮小，不放大。目標檔案大小約 2 MB 以下（假設）。保留聲音，AAC 64 kbps | 訊息頁欄寬 658、手機 303。寬度 600 與 IMAGE 的 `webp600w` 一致 |
+| `jpg240h`（THUMBNAIL） | 靜態 JPEG | 高 240 px，等比縮放，不放大，品質比照現有 IMAGE 的 `jpg240h`。由 Transcoder 的 `spriteSheets` 在固定時間點取一幀（起始值 1 秒，影片更短時取第一幀），無法自動避開黑畫面（§4.1） | 列表卡 120 × 120（2 倍螢幕 240 × 240）。前端用 `object-fit: cover` 裁成方形，與 IMAGE 的處理一致 |
+| `mp4-600w30s`（PREVIEW） | mp4（H.264 + AAC，moov 在檔頭以便邊下載邊播放） | 取前 30 秒（不足則全長）。寬不超過 600、高不超過 800，等比縮小，不放大。目標檔案大小約 2 MB 以下（假設）。保留聲音，AAC 64 kbps | 訊息頁欄寬 658、手機 303。寬度 600 與 IMAGE 的 `webp600w` 一致 |
 
 **沿用 IMAGE 的 `jpg240h` 名稱**，讓 THUMBNAIL 對 IMAGE 與 VIDEO 的處理邏輯相同。
 
@@ -250,18 +264,18 @@ R4 的強度與 #326 原文不同：#326 寫的是「hopefully audio」（§2.7�
 
 編碼選 H.264 而不是 #334 的 AV1。LIFF 文章頁會用 `<video>` 直接播放 `PREVIEW`（§2.6），執行環境是 LINE 的內建瀏覽器（iOS 為 WKWebView）。H.264 加 AAC 的 mp4 在 iOS 與 Android 都能直接播放。AV1 需要較新的裝置與系統版本，Cofacts 的使用者有許多舊手機。H.264 檔案較大，但在 §8 的假設下儲存與傳輸成本可以忽略。
 
-CRF、preset 的起始值（例如 CRF 28、`-preset veryfast`）在 PoC 中調整。
+編碼參數（rate control 模式、位元率或 CRF 值）在 PoC 中調整。Transcoder 輸出的 mp4 是否預設把 moov 放在檔頭，**待確認**（PoC）。
 
 ### 5.2 AUDIO
 
 | 變體 | 型態 | 規格 |
 | --- | --- | --- |
-| `jpg240h`（THUMBNAIL） | 靜態 JPEG，聲音波形圖 | ffmpeg `showwavespic`，高 240。寬度與底色待設計確認 |
-| `m4a-30s`（PREVIEW） | m4a（AAC） | 取前 30 秒，64 kbps 單聲道 |
+| THUMBNAIL | 不產生，resolver 回傳 `null` | 網站顯示聲音圖示。若 §11 #15 確認合約要求由檔案產生，改用方案 C 的 `showwavespic` 波形圖 |
+| `m4a-30s`（PREVIEW） | m4a（AAC） | 取前 30 秒，64 kbps 單聲道，由 Transcoder 輸出純音訊。純音訊輸入是否支援，待 PoC（§4.1） |
 
-Penpot 沒有聲音的專屬設計。列表卡 120 × 120 要放什麼（波形圖、圖示加時長，或只用「語音訊息」badge），由設計師決定。若決定不用波形圖，AUDIO 只需產生 preview，這對流程沒有影響。
+Penpot 沒有聲音的專屬設計。列表卡 120 × 120 的聲音圖示樣式（圖示加時長，或只用「語音訊息」badge）由設計師決定，不需要後端產生檔案。
 
-這個決定也會出現在 LINE 聊天室：`THUMBNAIL` 有 URL 時，AUDIO 的候選訊息會多一張 hero 圖；回傳 `null` 時維持純文字（§2.6）。`m4a-30s` 由 LIFF 文章頁的 `<audio controls>` 播放。
+LINE 聊天室的候選訊息維持現狀：AUDIO 的 `THUMBNAIL` 是 `null`，所以不放 hero 圖，只顯示文字（§2.6）。`m4a-30s` 由 LIFF 文章頁的 `<audio controls>` 播放。
 
 ### 5.3 不採用的型態
 
@@ -282,9 +296,10 @@ production/video/<hash>/original
 production/video/<hash>/jpg240h
 production/video/<hash>/mp4-600w30s
 production/audio/<hash>/original
-production/audio/<hash>/jpg240h
 production/audio/<hash>/m4a-30s
 ```
+
+Transcoder 的實際輸出檔名能否與上列一致，**待確認**（PoC）。sprite 一定會在前綴後加上流水號與副檔名。若檔名無法控制，就讓 resolver 以對照表把變體名稱對應到實際檔名（§10），不必另外搬移檔案。
 
 ## 6. 存取範圍
 
@@ -331,48 +346,61 @@ rumors-api 的 `.env.sample` 寫「Make data public」，與 API 回傳 signed U
 
 流量大到傳輸成本變得明顯時，再考慮這個方案。以 §8 的估算，目前不需要。
 
-## 7. 流程設計（方案 C）
+## 7. 流程設計（方案 A）
 
 ### 7.1 概念
 
 ```
 使用者上傳
-  → rumors-api（不變）：media-manager 寫 temp/…/original，算 hash 後 move 到 production/video/<hash>/original
-  → GCS 事件（object finalize）
-  → Eventarc（以路徑比對過濾，只留 production/(video|audio)/*/original）
-  → Cloud Run 服務（concurrency 1，max instances 設上限以限制花費）
-      1. 檢查目標變體是否已存在，存在就跳過
-      2. 以 ffmpeg 讀 original，產生 thumbnail 與 preview
-      3. 以「不覆蓋」條件寫回 GCS（ifGenerationMatch=0）
+  → rumors-api：media-manager 寫 temp/…/original，算 hash 後 move 到 production/<video|audio>/<hash>/original
+  → 觸發（二擇一，§4.5）
+      a. rumors-api 在上傳完成後呼叫 createJob
+      b. GCS 事件（object finalize）→ Eventarc → 函式呼叫 createJob
+  → 建立 job 前先檢查變體是否已存在，存在就跳過
+  → Transcoder job
+      輸入：gs://…/production/<video|audio>/<hash>/original
+      輸出：同一目錄下的 thumbnail 與 preview
   → rumors-api 的 attachmentUrl 在變體存在時回傳 signed URL
 ```
 
 幾個細節：
 
-- **事件過濾必須排除 `temp/`。** media-manager 先把檔案寫在 `temp/`，`move` 後才在正式路徑出現。觸發器只比對 `production/(video|audio)/*/original`。Eventarc 路徑比對的語法與支援情況**待確認**。
-- **ffmpeg 輸入用 signed URL 或 GCS FUSE，不要先下載整檔到 `/tmp`。** Cloud Run 的檔案系統是記憶體檔案系統，下載長影片會吃掉記憶體配額。preview 只需要前 30 秒，用輸入端 `-ss`／`-t` 搭配 HTTP range 讀取即可（此行為待 PoC 驗證）。
-- **容器：** 靜態編譯的 ffmpeg 加一個小的 HTTP 服務（Node 或 Python 皆可）。語言選擇不影響設計。
+- **job 設定：** VIDEO 是一個 H.264 視訊串流加一個 AAC 音訊串流，mux 成 mp4，以 `editList` 只取前 30 秒，另加一個 `totalCount = 1`、高 240 的 JPEG sprite。AUDIO 只有 AAC 音訊串流，沒有 sprite。實際欄位在 PoC 確定。
+- **Transcoder 直接讀寫 `gs://`，不經過我們的機器。** 方案 C 要處理的記憶體、暫存檔與逾時問題在這裡都不存在。Transcoder 的 service agent 需要該 bucket 的讀寫權限（§11 #1）。
+- **若採 Eventarc 觸發，事件過濾必須排除 `temp/`。** media-manager 先把檔案寫在 `temp/`，`move` 後才在正式路徑出現。觸發器只比對 `production/(video|audio)/*/original`。Eventarc 路徑比對的語法與支援情況**待確認**。
 
 ### 7.2 狀態怎麼記
 
 不新增資料庫欄位。**變體是否存在，以 GCS 上檔案是否存在為準**，與 media-manager 現在的作法一致。好處是補產、重試與日常觸發共用同一套邏輯：「缺哪個變體就補哪個」。
 
+job 的紀錄另外放在 `variant-jobs/<video|audio>/<hash>.json`，內容是 job 名稱、建立時間與最後讀到的狀態。它不放在 `<hash>/` 目錄下，以免被 media-manager 當成變體列出。
+
 ### 7.3 失敗與重試
 
 | 情況 | 處理 |
 | --- | --- |
-| 暫時性錯誤（逾時、GCS 5xx） | 回傳非 2xx，讓 Eventarc 重試（重試次數與保留時間待確認） |
-| 事件重複送達 | 步驟 1 與 `ifGenerationMatch=0` 讓處理程式冪等，不會重複寫入 |
-| 壞檔或不支援的編碼（ffmpeg 回傳非零） | 寫入失敗標記檔（例如 `<hash>/_failed.json`，內容含錯誤摘要）並回傳 2xx，不再重試 |
-| 一直失敗的事件 | Pub/Sub dead-letter topic 加 Cloud Monitoring 告警 |
+| `createJob` 呼叫失敗（網路、配額） | 不影響上傳。由 §9 的 script 定期補建 |
+| job 仍在執行 | script 讀到 job 紀錄，且 `jobs.get` 回傳 PENDING 或 RUNNING 時跳過 |
+| job 失敗（壞檔、不支援的編碼） | script 讀到 FAILED 時，在 job 紀錄寫入錯誤摘要並標記失敗。之後略過，除非加 `--retry-failed` |
+| job 成功但變體不存在 | 視為 bug，寫 log 並告警 |
 | 變體尚未產生完成時使用者就請求 | resolver 回傳 `null`，前端顯示 placeholder（§10） |
 
-`_failed.json` 會被 media-manager 當成名叫 `_failed.json` 的變體列出，不影響功能，但實作時要在 resolver 與 script 中略過。
+Transcoder 保留 job 狀態的期限**待確認**。script 的執行間隔必須短於這個期限，否則失敗的 job 會被當成從未建立而一再重建。
 
 ### 7.4 觀測
 
-- 每次處理輸出一行結構化 log：`hash`、輸入大小、時長、處理秒數、輸出大小、結果。
-- 以 log-based metric 追蹤失敗數與處理時間，供費用監控（交付項目：維運紀錄）。
+- script 每次執行輸出統計：新建、執行中、成功、失敗、仍缺變體的數量。
+- 失敗數與每支 job 的處理時間寫成結構化 log，以 log-based metric 追蹤，供費用監控（交付項目：維運紀錄）。
+
+### 7.5 若改採方案 C
+
+PoC 未達標時，產生端換成 Cloud Run 上的 ffmpeg，其他部分（變體名稱、狀態以 GCS 為準、resolver、§9 的 script）不變：
+
+- GCS 事件經 Eventarc 觸發 Cloud Run 服務（concurrency 1，max instances 設上限以限制花費）。服務以 ffmpeg 產生變體，以「不覆蓋」條件寫回 GCS（`ifGenerationMatch=0`），讓重複送達的事件不會重複寫入。
+- ffmpeg 輸入用 signed URL 或 GCS FUSE，不要先下載整檔到 `/tmp`。Cloud Run 的檔案系統是記憶體檔案系統，下載長影片會吃掉記憶體配額。
+- THUMBNAIL 改用 ffmpeg 的 `thumbnail` 濾鏡挑代表幀。AUDIO 若需要 thumbnail，用 `showwavespic` 產生波形圖。
+- 壞檔寫入失敗標記並回傳 2xx 停止重試。一直失敗的事件送到 Pub/Sub dead-letter topic 並告警。
+- 採用前的驗收線：20 支真實影片在 2 vCPU、2 GiB 上，每支處理時間中位數 ≤ 60 秒、p95 ≤ 180 秒，沒有 OOM。
 
 ## 8. 成本估算
 
@@ -460,43 +488,45 @@ signed URL 每天換一次簽名，瀏覽器與 CDN 的快取命中會受影響�
 寫一支可重複執行的 script「ensure variants」，放在 rumors-api 的 `src/scripts/`，沿用 [`backfillVertexEmbeddings.ts`](https://github.com/cofacts/rumors-api/blob/9f1cde8/src/scripts/migrations/backfillVertexEmbeddings.ts) 的模式（`getAllDocs` scroll、`cli-progress`、`--limit`、`--concurrency`、`--from`、指數退避重試）。
 
 1. 以 scroll 走訪 `articles` 中 `articleType` 為 VIDEO 或 AUDIO 的文件。
-2. 對每個 `attachmentHash` 呼叫 `mediaManager.get()`，檢查缺少哪些變體，也略過已有 `_failed.json` 的項目（除非加 `--retry-failed`）。
-3. 對缺少變體的項目呼叫 Cloud Run 服務（與日常事件觸發使用同一個處理端點）。
-4. 輸出結果 JSONL（成功、略過、失敗），讓失敗項目可以只重跑那一批。
+2. 對每個 `attachmentHash` 呼叫 `mediaManager.get()`，檢查缺少哪些變體。
+3. 讀取該項目的 job 紀錄（§7.2），依 §7.3 的規則更新狀態。執行中或已標記失敗的項目略過。
+4. 對其餘缺少變體的項目建立 Transcoder job，並寫入 job 紀錄。
+5. 輸出結果 JSONL（新建、略過、成功、失敗），讓失敗項目可以只重跑那一批。
 
-這樣補產、失敗重跑與新上傳共用同一套處理邏輯，狀態都以 GCS 為準，script 隨時中斷、隨時重跑都安全。
+同一支 script 也以排程定期執行（例如每日一次），負責補上日常觸發漏掉的項目，並更新 job 狀態。排程的執行環境**待確認**（§11 #14）。這樣補產、失敗重跑與新上傳共用同一套邏輯，狀態都以 GCS 為準，script 隨時中斷、隨時重跑都安全。
 
 ### 9.2 順序與節奏
 
 - **由新到舊**（`createdAt` 降冪）。新文章最常被看到，先補。
-- **併發 10 到 20，並限制 Cloud Run 的 max instances**，避免對 GCS 與花費造成尖峰。
-- **在離峰時段執行**，先用 `--limit 50` 小批次驗證，再放大。
-- **預估時間**（21,922 項，假設併發數 10／20）：
+- **用批次模式，分批送出。** 批次模式每個 region 同時執行上限 10 個 job，排隊上限 10,000 個（§4.4）。script 依排隊量分批建立 job，不要一次送出 21,922 個。日常上傳若用互動模式，兩者不會互相搶配額（此行為待確認）。
+- **先用 `--limit 50` 小批次驗證**設定與輸出，再放大。
+- **預估時間**（21,922 項）：
 
-| 每支處理秒數 | 併發 10 | 併發 20 |
+| 每個 job 的處理時間 | 同時 10 個（批次模式） | 同時 20 個（若申請提高配額） |
 | --- | --- | --- |
-| 30 | 約 18 小時 | 約 9 小時 |
-| 60 | 約 37 小時 | 約 18 小時 |
-| 180 | 約 110 小時 | 約 55 小時 |
+| 1 分鐘 | 約 37 小時 | 約 18 小時 |
+| 2 分鐘 | 約 73 小時 | 約 37 小時 |
+| 5 分鐘 | 約 183 小時（7.6 天） | 約 91 小時（3.8 天） |
 
-估算式：項目數 × 每支秒數 ÷ 併發數。處理秒數待 PoC 實測。
+估算式：項目數 × 每個 job 的分鐘數 ÷ 同時執行數。處理時間待 PoC 實測，配額能否提高待確認。
 
 ### 9.3 驗收
 
-- script 結束後以另一個查詢統計仍缺變體的項目數與 `_failed.json` 數量，附在維運紀錄中。
-- 抽樣 50 支，人工確認 thumbnail 與 preview 內容正確（含直式影片、無聲影片、極短影片）。
+- script 結束後統計仍缺變體的項目數與標記失敗的數量，附在維運紀錄中。
+- 抽樣 50 支，人工確認 thumbnail 與 preview 內容正確（含直式影片、無聲影片、極短影片），並記下黑畫面縮圖的比例。
 
-### 9.4 若退回方案 A
+### 9.4 若改採方案 C
 
-script 的步驟 3 改為建立 Transcoder job（批次模式，併發上限 10，待命上限 10,000 個）。其餘邏輯不變。
+script 的步驟 3 與 4 改為呼叫 Cloud Run 服務（與日常事件觸發使用同一個處理端點），失敗狀態改讀 §7.5 的失敗標記。併發改由 Cloud Run 的 max instances 限制。其餘邏輯不變。
 
 ## 10. rumors-api 的變更範圍
 
-只動 `Article.attachmentUrl` 與周邊，不動上傳流程。
+主要動 `Article.attachmentUrl` 與周邊。觸發方式若選「rumors-api 直接呼叫」（§4.5），上傳流程也要改。
 
 | 檔案 | 變更 |
 | --- | --- |
-| `src/util/mediaManager.js` | 新增常數 `VIDEO_THUMBNAIL = 'jpg240h'`、`VIDEO_PREVIEW = 'mp4-600w30s'`、`AUDIO_THUMBNAIL = 'jpg240h'`、`AUDIO_PREVIEW = 'm4a-30s'` |
+| `src/util/mediaManager.js` | 新增常數 `VIDEO_THUMBNAIL`、`VIDEO_PREVIEW`、`AUDIO_PREVIEW`，值為 §5.4 的變體名稱，或 Transcoder 的實際輸出檔名（PoC 決定）。AUDIO 沒有 THUMBNAIL |
+| 上傳流程（只在選擇直接呼叫時） | VIDEO 與 AUDIO 上傳完成後呼叫 `createJob`，失敗只寫 log，不影響上傳結果。新增 `@google-cloud/video-transcoder` 依賴 |
 | `src/graphql/models/Article.js` | `attachmentUrl` 改以 `${articleType}_${variant}` 查表（如同 #334）。`PREVIEW` 與 `THUMBNAIL` 的 GraphQL 描述改成涵蓋 VIDEO 與 AUDIO |
 | 同上 | **只在變體檔案存在時才回傳 URL，否則回傳 `null`。** 目前 resolver 不檢查檔案是否存在。VIDEO 與 AUDIO 的變體會晚於 original 才出現，簽出不存在的 URL 會得到 404 |
 | 檢查檔案存在的方式 | 用 DataLoader 批次，key 為 `attachmentHash + variant`，並快取結果（存在的結果可長快取，不存在的結果短快取）。GCS 的 metadata 讀取是 Class B 操作，US$0.0004 / 1,000 次。**這項是必要的。** 網站可以用 `<img onerror>` 退回 placeholder，但 LINE bot 的 Flex Message 沒有這種機制，URL 指向不存在的檔案時聊天室會出現破圖（§2.6）。壞檔永遠不會有變體，所以這不只是產生期間的短暫問題 |
@@ -505,8 +535,8 @@ script 的步驟 3 改為建立 Transcoder job（批次模式，併發上限 10�
 
 另外：
 
-- 容器與觸發器的程式與 IaC 放在哪個 repo（rumors-api 的子目錄或獨立 repo），**待確認**。
-- 如果 AV1 `libsvtav1` 不再使用，CI 不需要為它換 ffmpeg 建置版本（#334 當時改過）。rumors-api 本身不再需要 ffmpeg，單元測試以 mock 的 GCS 為主，端對端的產生流程在容器 repo 內測。
+- Transcoder job 設定、script 的排程執行環境，以及 Eventarc 函式（若採用）放在哪裡，**待確認**。
+- rumors-api 不需要 ffmpeg，CI 也不需要 #334 當時換過的 ffmpeg 建置版本。單元測試 mock GCS 與 Transcoder 的 client，端對端的產生流程在 PoC 與 staging 驗證。
 
 ## 11. 風險與待辦
 
@@ -514,27 +544,29 @@ script 的步驟 3 改為建立 Transcoder job（批次模式，併發上限 10�
 
 | # | 項目 | 為什麼重要 | 誰能回答 | 阻塞 |
 | --- | --- | --- | --- | --- |
-| 1 | **GCP 權限：** Cloud Run、Eventarc、Pub/Sub、Artifact Registry（及 Cloud Build，若要在 GCP 上建置映像）、GCS 的 IAM。若退回方案 A，另需啟用 Transcoder API 與 IAM 角色 | 方案 C 的前提。**尚未向 Johnson 確認，本文不假設已具備** | Johnson | 是 |
+| 1 | **GCP 權限：** 啟用 Transcoder API、建立 job 的 IAM 角色、Transcoder service agent 對 bucket 的讀寫權限。若用 Eventarc 觸發，另需 Eventarc 與 Cloud Run functions。若改採方案 C，另需 Cloud Run、Eventarc、Pub/Sub、Artifact Registry | 方案 A 的前提。**尚未向 Johnson 確認，本文不假設已具備** | Johnson | 是 |
 | 2 | bucket `cofacts-media-collection` 是否公開可讀 | **已查證（2026-11-13）：匿名請求一律 403**，R2 已成立（§6.3）。剩 allAuthenticatedUsers 需看 IAM | 有 GCP IAM 權限的人（Johnson） | 否 |
-| 3 | 審查者是否核定「在 Cloud Run 上跑 ffmpeg」 | 合約只排除 API server 內轉檔，沒有明文允許 Cloud Run | Johnson | 是 |
-| 4 | PoC：ffmpeg 在 Cloud Run 的實際處理時間、記憶體、輸出大小；Eventarc 路徑比對與重試行為 | 決定方案 C 能否採用（§4.5 驗收線），以及 §8、§9 的數字 | 實作者 | 是 |
-| 5 | bucket 所在的 region | 影響 Cloud Run、Eventarc 與 Transcoder（若退回 A）的區域選擇與跨區傳輸費 | 有 GCP 權限的人 | 否 |
-| 6 | 既有 VIDEO 與 AUDIO 的平均長度與 `original` 總容量（`gcloud storage du`） | H3 的實際值。只影響方案 B 的成本與 ffmpeg 處理時間 | 有 GCP 權限的人 | 否 |
+| 3 | 審查者是否核定「在 Cloud Run 上跑 ffmpeg」 | 只在改採方案 C 時需要。合約只排除 API server 內轉檔，沒有明文允許 Cloud Run | Johnson | 否 |
+| 4 | PoC：單張 JPEG 縮圖與輸出檔名、純音訊輸入、20 支真實影片的成功率與 job 處理時間、sprite 計費、job 狀態的保留期限、黑畫面縮圖比例 | 決定方案 A 能否採用（§4.5 驗收線），以及 §9 的時間 | 實作者 | 是 |
+| 5 | bucket 所在的 region | 影響 Transcoder（改採 C 時為 Cloud Run 與 Eventarc）的區域選擇與跨區傳輸費 | 有 GCP 權限的人 | 否 |
+| 6 | 既有 VIDEO 與 AUDIO 的平均長度與 `original` 總容量（`gcloud storage du`） | H3 的實際值。只影響方案 B 的成本與 job 處理時間 | 有 GCP 權限的人 | 否 |
 | 7 | 實際流量：列表頁曝光、訊息頁 preview 播放次數 | H7。目前只有單位成本 | GA4 或日誌的管理者 | 否 |
 | 8 | Penpot 沒有影片與聲音的專屬設計：播放控制、時長標示、聲音（波形或圖示）、preview 是否自動播放與靜音、載入中 placeholder | §5 的規格是依通用圖片位置推出的建議 | 設計師（Penpot 檔案維護者） | 否，但影響 AUDIO 規格 |
 | 9 | LINE bot 與其他非 WEBSITE client 取得 thumbnail 與 preview 是否合適 | **已釐清：** #326 原文即要求 thumbnail 給 LINE bot 列表，LINE bot 也已在查詢這兩個變體（§2.6、§2.7） | | 否 |
 | 10 | AV1 vs H.264 | **已決定用 H.264**：LIFF 在 LINE 內建瀏覽器以 `<video>` 播放 preview（§5.1）。#334 用 AV1 的理由與 CPU 量測數據沒有留下 | | 否 |
-| 15 | 合約驗收標準是否要求 AUDIO thumbnail 由檔案產生，或固定圖示即可 | #326 原文是「hopefully audio」，與 R4 的強度不同（§3） | Johnson | 否，但影響 §4 的方案比較 |
+| 15 | 合約驗收標準是否要求 AUDIO thumbnail 由檔案產生，或前端圖示即可 | #326 原文是「hopefully audio」，與 R4 的強度不同（§3）。若要求由檔案產生，方案 A 做不到，須改採 C | Johnson | 否，但可能改變 §4.5 的結論 |
+| 16 | 觸發方式：rumors-api 直接呼叫 `createJob`，或 Eventarc 加函式 | §4.5 的兩種做法，影響上傳流程是否要改與所需權限 | mrorz、Johnson | 否 |
 | 11 | `ListArticles` 的 `totalCount` 是否包含已封鎖或已刪除的文章 | §2.5 的檔案量可能略高估 | rumors-api 維護者 | 否 |
-| 12 | 若退回方案 A：sprite 與縮圖是否計費、單張 poster 的做法、job 失敗與重試行為 | 方案 A 的完整成本與可行性 | 實作者（PoC）或 Google 的計價 SKU 查詢 | 否 |
+| 12 | 若改採方案 C：ffmpeg 在 Cloud Run 的處理時間、記憶體、輸出大小；Eventarc 路徑比對與重試行為 | 方案 C 的可行性（§7.5 驗收線）與 §8 的數字 | 實作者 | 否 |
 | 13 | 方案 B 的 token 能否限縮成只能存取 thumbnail、是否支援純音訊、靜態縮圖是否計費 | 方案 B 的存取控制與成本 | 實作者（Cloudflare 文件或試用帳號） | 否 |
-| 14 | 容器與 IaC 放哪個 repo，部署與告警怎麼接 | 維運紀錄的內容 | Johnson 與實作者 | 否 |
+| 14 | job 設定、script 的排程執行環境、Eventarc 函式（若採用）放哪個 repo，部署與告警怎麼接 | 維運紀錄的內容 | Johnson 與實作者 | 否 |
 
 **已辨識的風險：**
 
-- **處理時間超出假設：** 若 PoC 的 p95 超過 180 秒，成本與補產時間都會放大。對策是 §4.5 的退場條件。
-- **壞檔：** LINE 與使用者上傳的影片格式不一。對策是失敗標記與告警（§7.3）。
-- **補產期間的花費尖峰：** 對策是限制 max instances、併發與小批次先驗證（§9.2）。
+- **處理時間或配額不足：** 補產時間會拉長（§9.2）。對策是批次模式分批送出，必要時申請提高配額。
+- **壞檔：** LINE 與使用者上傳的影片格式不一。對策是 job 失敗標記與告警（§7.3）。
+- **補產的花費：** Transcoder 依輸出分鐘計費，總額上限約 US$163 加上 sprite 費用（§8.3），沒有執行個體數量失控的問題。仍先用 `--limit 50` 驗證設定（§9.2）。
+- **黑畫面縮圖：** 固定時間點取幀可能取到片頭黑畫面。對策是在 PoC 與補產抽樣時統計比例，必要時調整取幀時間點。
 - **LINE bot 出現破圖：** resolver 若回傳不存在的檔案，Flex Message 無法退回預設圖。對策是 §10 的存在檢查。
 - **公開預覽的內容風險：** 未登入者與搜尋引擎都能取得 thumbnail 與 preview。30 秒的 preview 對多數短片而言接近全片，可能包含不當內容（§2.7 nonumpa 的顧慮）。IMAGE 的 thumbnail 與 preview 已有同樣情況，本文沿用現行做法，是否需要額外對策待審查者決定。
 
