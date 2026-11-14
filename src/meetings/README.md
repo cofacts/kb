@@ -1,6 +1,7 @@
 # Cofacts 會議記錄
 
 ## 2026
+- [1110 url-resolver登入牆清理方案、Hybrid search PR review、cofacts.ai Track 2 list、Session review與當輪日期脈絡、Widen the funnel、背景續跑設計、ADK接coding harness評估、大松檢討](./2026/20261110.md)
 - [1103 自動化驗證CI PR、url-resolver FB share登入牆、Hybrid search follow-up、cofacts.ai週review與S002出處調查、Track 0 PR review、背景續跑設計、ADK接coding harness評估、API申請過渡期](./2026/20261103.md)
 - [1027 Vector search前綴研究、Writer換Haiku與url-resolver全文toggle、cofacts.ai網站遷移分工、影片thumbnail、自動化驗證藍圖、MozFest準備、site-tw 1GB成本延遲週報](./2026/20261027.md)
 - [1020 url-resolver、Vector search待辦、cofacts.ai分工與Track 0、Writer換模型與ADK 2升級、url-resolver與ES網路隔離、維基來源評級出處過濾、MozFest與下次會議、Production週報](./2026/20261020.md)
