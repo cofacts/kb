@@ -1,0 +1,303 @@
+<!doctype html><html><head><meta name="robots" content="noindex, nofollow"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Widen the Funnel 工作項目</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: a hand-off brief. Scope first, then one table that places every work item on the funnel, then one card per workstream split into design / engineering, then dependencies. Brand yellow from the Cofacts guide. */
+:root{
+  --bg:#fbfaf6; --panel:#ffffff; --fg:#26241f; --muted:#6a6558; --line:#e4dfd2;
+  --brand:#ffb600; --brand-soft:#fff1c7; --brand-ink:#7a5300;
+  --design:#a23d78; --design-soft:#f8e6f0; --eng:#1f5f9a; --eng-soft:#e2eef9;
+  --core:#1f6f4f; --core-soft:#e3f2ea; --bonus:#5b5fa8; --bonus-soft:#ebecf7;
+  --sans:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#17160f; --panel:#201e17; --fg:#ece7da; --muted:#a59f8f; --line:#38352b;
+  --brand:#ffc840; --brand-soft:#3a2f10; --brand-ink:#ffd36b;
+  --design:#eb9cc8; --design-soft:#3a1f30; --eng:#8dc2f0; --eng-soft:#1b2c3d;
+  --core:#7fd3a9; --core-soft:#16302a; --bonus:#a9adf0; --bonus-soft:#23253f; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#17160f; --panel:#201e17; --fg:#ece7da; --muted:#a59f8f; --line:#38352b;
+  --brand:#ffc840; --brand-soft:#3a2f10; --brand-ink:#ffd36b;
+  --design:#eb9cc8; --design-soft:#3a1f30; --eng:#8dc2f0; --eng-soft:#1b2c3d;
+  --core:#7fd3a9; --core-soft:#16302a; --bonus:#a9adf0; --bonus-soft:#23253f; color-scheme:dark }
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.7}
+.wrap{max-width:1080px;margin:0 auto;padding-block:40px 72px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:48px}
+h1,h2,h3{text-wrap:balance;margin:0;line-height:1.3}
+h1{font-size:clamp(28px,5vw,40px);font-weight:900;letter-spacing:.01em}
+h2{font-size:22px;font-weight:900;display:flex;align-items:center;gap:10px}
+h2::before{content:"";width:12px;height:12px;background:var(--brand);border-radius:2px;flex:none}
+h3{font-size:17px;font-weight:700}
+p{margin:0}
+a{color:inherit;text-decoration-color:var(--brand);text-decoration-thickness:2px;text-underline-offset:3px}
+a:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+code{font-family:var(--mono);font-size:.9em;background:var(--brand-soft);color:var(--brand-ink);padding:0 4px;border-radius:3px;word-break:break-all}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lede{max-width:68ch;font-size:16px}
+header{display:flex;flex-direction:column;gap:12px}
+.meta{display:flex;flex-wrap:wrap;gap:8px 20px;color:var(--muted);font-size:13px}
+section{display:flex;flex-direction:column;gap:18px}
+.note{font-size:13px;color:var(--muted);max-width:80ch}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line)}
+tr:last-child td{border-bottom:none}
+thead th{font-size:12.5px;color:var(--muted);font-weight:500;background:var(--bg)}
+thead th b{color:var(--fg);font-size:13.5px}
+thead th small{display:block;font-weight:400;font-size:12px}
+.matrix{min-width:780px}
+.matrix th[scope=row]{width:190px;font-weight:700;font-size:14px}
+.matrix td{width:20%}
+.matrix td.empty{color:var(--line)}
+.matrix .col-core{background:var(--core-soft)}
+.matrix thead th.col-core{box-shadow:inset 0 -3px 0 var(--core)}
+.ws{font-family:var(--mono);font-weight:600;font-size:12px;background:var(--brand-soft);color:var(--brand-ink);border-radius:3px;padding:1px 6px;margin-right:6px}
+.pill{display:inline-block;font-size:12px;font-weight:700;border-radius:99px;padding:1px 9px;white-space:nowrap}
+.pill.core{background:var(--core-soft);color:var(--core)}
+.pill.bonus{background:var(--bonus-soft);color:var(--bonus)}
+.pill.design{background:var(--design-soft);color:var(--design)}
+.pill.eng{background:var(--eng-soft);color:var(--eng)}
+.scope{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.scope div{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.scope b{font-size:14px}
+.scope ul{margin:0;padding-left:1.1em;font-size:13.5px;color:var(--muted)}
+.cards{display:flex;flex-direction:column;gap:20px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:22px;display:flex;flex-direction:column;gap:16px;min-width:0}
+.card-head{display:flex;flex-direction:column;gap:6px}
+.card-head .tags{display:flex;flex-wrap:wrap;gap:6px}
+.stage{font-size:12px;border:1px solid var(--line);border-radius:3px;padding:0 6px;color:var(--muted)}
+.problem{font-size:14.5px;max-width:78ch}
+.split{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px}
+.split>div{border:1px solid var(--line);border-radius:6px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.split>div.d{border-top:3px solid var(--design)}
+.split>div.e{border-top:3px solid var(--eng)}
+.split ul{margin:0;padding-left:1.1em;font-size:14px}
+.split li+li{margin-top:4px}
+dl{margin:0;display:grid;grid-template-columns:5.5em 1fr;gap:8px 12px;font-size:14px}
+dt{color:var(--muted);font-size:13px;padding-top:1px}
+dd{margin:0;min-width:0}
+dd ul{margin:0;padding-left:1.1em}
+dd li+li{margin-top:2px}
+@media (max-width:480px){dl{grid-template-columns:1fr;gap:2px}dd{margin-bottom:8px}}
+.order{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.order div{border:1px solid var(--line);border-radius:6px;padding:12px 14px;background:var(--panel);display:flex;flex-direction:column;gap:4px}
+.order .when{font-family:var(--mono);font-size:12px;color:var(--muted)}
+ol.qs{margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:10px;max-width:80ch}
+footer{font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:16px;display:flex;flex-direction:column;gap:6px}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Cofacts WG · nDX · 給工程師與設計師</div>
+  <h1>Widen the Funnel 工作項目</h1>
+  <p class="lede">nDX 這次想做的，是用設計讓查詢訊息的人，變成回應訊息的人。三條核心工作線落在漏斗最後一段「產生貢獻」；第四條只做產品內的引導。每條工作線列出設計要交付什麼、工程要接什麼，以及它靠哪些現有工作。</p>
+  <div class="meta">
+    <span>漏斗出處：<a href="https://github.com/cofacts/kb/blob/main/src/research/ccprip.md">CCPRIP · Project WTF</a></span>
+    <span>平台：<a href="https://github.com/cofacts/kb/blob/main/src/technical-design/cofacts.ai/Phase%203%20%E7%B6%B2%E7%AB%99%E9%81%B7%E7%A7%BB%E8%88%87%E5%89%8D%E7%AB%AF%E6%9E%B6%E6%A7%8B.md">Phase 3 網站遷移與前端架構</a></span>
+  </div>
+</header>
+
+<section>
+  <h2>範圍</h2>
+  <div class="scope">
+    <div><b>這份包含</b><ul>
+      <li>cofacts.ai 對話介面的資訊整理（訪談後優化）</li>
+      <li><code>/report</code> 的導引與送出後的流程</li>
+      <li>讓查核協作者回來貢獻的機制與通知</li>
+      <li>AI agent 對使用者的導引（產品內的部分）</li>
+    </ul></div>
+    <div><b>這份不含</b><ul>
+      <li>網站遷移本身（Phase 3 Track 0–6，已有專案看板）</li>
+      <li>社群貼文、LINE 推播等行銷內容製作</li>
+      <li>AI 爬蟲放行與能見度（devops）</li>
+      <li>預算與科目配置</li>
+    </ul></div>
+  </div>
+  <p class="note">哪些項目放在這份、哪些移到別的專案，是我依對話整理的判斷。有放錯的請直接指出。</p>
+</section>
+
+<section>
+  <h2>漏斗 × 工作線</h2>
+  <p class="note">nDX 的 KR 集中在「產生貢獻」：KR 1-2（人機協作資料覆蓋 3,000 則訊息）、KR 2-1（累積 3,000 份正面評價）、KR 3-1（至少 10 位新協作者發布第一篇回應）。前三段只做加分項，不設指標。</p>
+  <div class="scroll">
+    <table class="matrix">
+      <thead><tr><th>工作線</th><th><b>1 認知問題</b><small>知道有假訊息，也知道 Cofacts</small></th><th><b>2 使用平台</b><small>開始用 LINE bot 或網站</small></th><th><b>3 參與培訓</b><small>工作坊、推播、教學</small></th><th class="col-core"><b>4 產生貢獻</b><small>寫出回應，而且會回來</small></th></tr></thead>
+      <tbody>
+        <tr><th scope="row"><span class="ws">A</span>對話介面資訊整理<br><span class="pill core">核心</span></th>
+          <td class="empty">—</td><td class="empty">—</td>
+          <td>工作坊直接用新版介面教學</td>
+          <td class="col-core">資訊分層，降低寫回應的負擔</td></tr>
+        <tr><th scope="row"><span class="ws">B</span>/report 導引與流程<br><span class="pill core">核心</span> <span class="pill bonus">前段加分</span></th>
+          <td>說明「遇到就來回報」</td>
+          <td>分享入口、預填與導流頁</td>
+          <td class="empty">—</td>
+          <td class="col-core">送出後接著引導到協助查核</td></tr>
+        <tr><th scope="row"><span class="ws">C</span>讓協作者回來<br><span class="pill core">核心</span></th>
+          <td class="empty">—</td><td class="empty">—</td><td class="empty">—</td>
+          <td class="col-core">low-hanging fruit、影響力通知、聯繫節奏</td></tr>
+        <tr><th scope="row"><span class="ws">D</span>AI agent 導引<br><span class="pill bonus">加分</span></th>
+          <td class="empty">—</td>
+          <td>agent 引導使用者到 <code>/report</code></td>
+          <td class="empty">—</td>
+          <td class="col-core">agent 引導使用者進行查核</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>工作項目</h2>
+  <div class="cards">
+
+    <article class="card">
+      <div class="card-head">
+        <div class="tags"><span class="pill core">核心</span><span class="stage">產生貢獻</span></div>
+        <h3><span class="ws">A</span>cofacts.ai 對話介面的資訊整理</h3>
+      </div>
+      <p class="problem">AI agent 的英文 thinking、「」包起來的 tool call 和說明文字全部一起出來，畫面太亂，使用者看不出哪裡是草稿、哪裡是佐證。先和資料建置小組訪談，再依結果最佳化。</p>
+      <div class="split">
+        <div class="d"><span class="pill design">設計</span><ul>
+          <li>訪談：問資料建置小組實際怎麼用、哪些內容會看、哪些直接略過。</li>
+          <li>重排資訊層次的 Penpot 稿：思考過程、工具呼叫、草稿、佐證各自的呈現與收合方式。</li>
+          <li>手機版與長對話的狀態。</li>
+        </ul></div>
+        <div class="e"><span class="pill eng">工程</span><ul>
+          <li>把串流事件分類：哪些是思考、工具呼叫、最終說明、草稿。</li>
+          <li>依新稿實作，元件放進 Storybook。</li>
+          <li>英文 thinking 的處理方式（隱藏、收合或翻譯）要工程評估可行性與成本。</li>
+        </ul></div>
+      </div>
+      <dl>
+        <dt>靠</dt><dd><ul>
+          <li>Phase 3 <b>Track 5　AI chat</b>：<code>/ai</code>、<code>/ai/session/:sessionId</code>、工具抽屜，Penpot 已有稿，這項是在它之上的優化。</li>
+          <li>Penpot 到程式的規則：token 名稱直接對應 class（<a href="https://github.com/cofacts/ai/pull/176">cofacts/ai#176</a>）。</li>
+        </ul></dd>
+        <dt>狀態</dt><dd>Track 5 尚未看到認領者。這項要等訪談結果，再決定是否與 Track 5 合併處理。</dd>
+        <dt>衡量</dt><dd>訪談前後的使用者回饋；對話中產出可送出回應的比例。間接支撐 KR 1-2、KR 2-1。</dd>
+      </dl>
+    </article>
+
+    <article class="card">
+      <div class="card-head">
+        <div class="tags"><span class="pill core">核心</span><span class="pill bonus">前段加分</span><span class="stage">認知問題</span><span class="stage">使用平台</span><span class="stage">產生貢獻</span></div>
+        <h3><span class="ws">B</span><code>/report</code> 的導引與流程</h3>
+      </div>
+      <p class="problem">新的 <code>/report</code> 已經在做。這一項是它之後的最佳化：讓使用者容易把訊息送進來，送出之後自然被引導去協助查核，而不是結束就離開。</p>
+      <div class="split">
+        <div class="d"><span class="pill design">設計</span><ul>
+          <li>送出完成後的畫面：下一步是什麼（看相似訊息的回應、協助補充線索、請求優先查核）。</li>
+          <li>導流頁與分享出去的預覽卡片視覺。</li>
+          <li>抓不到內文時，請使用者改傳截圖的流程。</li>
+          <li>「遇到就來回報」的說明文案與位置。</li>
+        </ul></div>
+        <div class="e"><span class="pill eng">工程</span><ul>
+          <li>手機分享選單的接收：<code>/report?url=&amp;text=&amp;title=</code> 已定義，Android 分享選單直達在 <a href="https://github.com/cofacts/ai/pull/139">#139</a>。</li>
+          <li>iOS 沒有 Web Share Target，需評估用「捷徑」的做法。</li>
+          <li>送出後的下一步，依賴相似訊息搜尋（見工作線 C 的依賴）。</li>
+        </ul></div>
+      </div>
+      <dl>
+        <dt>靠</dt><dd><ul>
+          <li>Phase 3 <b>Track 3　回報可疑訊息</b>：Penpot 的 <code>AI</code> 頁已有 6 個狀態板。</li>
+          <li><a href="https://github.com/cofacts/ai/pull/138">cofacts/ai#138</a>、<a href="https://github.com/cofacts/ai/pull/139">#139</a> review 中；<a href="https://github.com/cofacts/ai/issues/148">#148</a>（抓不到內文時改上傳截圖）。</li>
+          <li>設計上已決定：回報走獨立流程，不放進 AI 對話裡，避免回報者分心（<a href="https://github.com/cofacts/kb/blob/main/src/meetings/2026/20260910.md">20260910</a>）。</li>
+        </ul></dd>
+        <dt>衡量</dt><dd>從 <code>/report</code> 送出到有人寫出回應的轉換（KR 1-2）。前兩段的認知與使用屬加分。</dd>
+      </dl>
+    </article>
+
+    <article class="card">
+      <div class="card-head">
+        <div class="tags"><span class="pill core">核心</span><span class="stage">產生貢獻</span></div>
+        <h3><span class="ws">C</span>讓查核協作者回來貢獻</h3>
+      </div>
+      <p class="problem">人進來之後，要有理由回來。三個想法：定時挑出 low-hanging fruit 給他們；告訴他們「你寫的回應有 N 人覺得有幫助」（像 Google Maps 告訴評論者評論的影響力）；找出不讓人覺得煩的聯繫方式。訪談對象也在 nDX 專案裡，可以在專案期間直接驗證。</p>
+      <div class="split">
+        <div class="d"><span class="pill design">設計</span><ul>
+          <li>通知與任務的體驗：收到什麼、多久一次、點進去看到什麼。</li>
+          <li>「回應有幫助」訊息的文字與呈現，用訪談測試哪種說法有效。</li>
+          <li>任務清單頁（或任務卡片）的版型。</li>
+          <li>讓協作者控制頻率與關閉的設定。</li>
+        </ul></div>
+        <div class="e"><span class="pill eng">工程</span><ul>
+          <li>定時挑選候選訊息：已查過的相似訊息、尚未回應。</li>
+          <li>排除不適合的訊息：只有網址的文章（占文字文章 34%）、FB 分享連結只拿到登入牆的。</li>
+          <li>通知管道與排程；先手動或半自動產生清單給小組試用，再自動化。</li>
+          <li>正評數據的取得，供影響力通知使用。</li>
+        </ul></div>
+      </div>
+      <dl>
+        <dt>前例</dt><dd><ul>
+          <li>WTF 第 4 段：每週感謝、每半年再邀請來過的人。</li>
+          <li><a href="https://github.com/cofacts/kb/blob/main/src/meetings/2017/20171210.md">2017</a> 的 filter：只有一則回應、我沒回過。</li>
+          <li><a href="https://github.com/cofacts/kb/blob/main/src/meetings/2023/20230308.md">2023</a> ChatGPT 構想：標出哪些需要回應。</li>
+          <li>X 的 Request a Note：請求累積到門檻，推給高貢獻撰寫者。</li>
+        </ul></dd>
+        <dt>依賴</dt><dd><ul>
+          <li>vector search（相似訊息搜尋）：<a href="https://github.com/cofacts/rumors-api/pull/411">rumors-api#411</a> 在 staging 驗證中。</li>
+          <li>9.4% 的相似度查詢命中內容真的相似且已有回應的文章（<a href="https://github.com/cofacts/kb/blob/main/src/meetings/2026/20260922.md">20260922</a>），候選池夠不夠大要先量。</li>
+          <li>「我送出的訊息」filter 已有票（<a href="https://github.com/cofacts/rumors-site/issues/631">rumors-site#631</a>）。</li>
+        </ul></dd>
+        <dt>注意</dt><dd>資料建置小組是寫過 400 篇以上回應的資深協作者，這裡驗證的是「回鍋」；新手轉換（KR 3-1）要靠工作坊的參與者。</dd>
+        <dt>衡量</dt><dd>回鍋人數、回應數（KR 1-2）、正評數（KR 2-1）。</dd>
+      </dl>
+    </article>
+
+    <article class="card">
+      <div class="card-head">
+        <div class="tags"><span class="pill bonus">加分</span><span class="stage">使用平台</span><span class="stage">產生貢獻</span></div>
+        <h3><span class="ws">D</span>AI agent 的導引</h3>
+      </div>
+      <p class="problem">使用者自己的 AI agent 查 Cofacts 時，除了回答，也能告訴使用者「這則還沒有人回應，可以到 <code>/report</code> 回報，或自己來查核」。只做產品內與 MCP 的部分，不設指標。</p>
+      <div class="split">
+        <div class="d"><span class="pill design">設計</span><ul>
+          <li>導向 <code>/report</code> 與查核的落地頁文字，要讓 agent 容易轉述。</li>
+        </ul></div>
+        <div class="e"><span class="pill eng">工程</span><ul>
+          <li>MCP server 的 <code>instructions</code> 與 prompts：引導 agent 先查相似訊息，再導向 <code>/report</code> 或自行查證。</li>
+          <li>文章頁加給 AI 讀的說明（尚未回應時的行動指引）。</li>
+        </ul></div>
+      </div>
+      <dl>
+        <dt>靠</dt><dd><a href="https://github.com/cofacts/kb/blob/main/src/technical-design/cofacts-mcp.md">Cofacts MCP Server 設計文件</a>「待討論」已提到這個方向。</dd>
+        <dt>限制</dt><dd>MCP 的安裝門檻高，目標使用者是已有自己查核流程的人，覆蓋面有限。</dd>
+      </dl>
+    </article>
+
+  </div>
+</section>
+
+<section>
+  <h2>順序與依賴</h2>
+  <div class="order">
+    <div><span class="when">先做</span><b>A＋C 合併訪談</b><span class="note">訪談對象是資料建置小組。一次問兩件事：對話介面怎麼用、什麼情況下會回來。</span></div>
+    <div><span class="when">接著</span><b>C 的清單試跑</b><span class="note">先手動或半自動產生 low-hanging fruit 清單給小組，觀察有沒有人回來寫。</span></div>
+    <div><span class="when">並行</span><b>B 接在 /report 之後</b><span class="note">#138、#139 合併後，再排送出後的流程與導流視覺。</span></div>
+    <div><span class="when">有餘裕</span><b>D</b><span class="note">不設指標，用現有的 MCP 與文章頁小步試。</span></div>
+  </div>
+</section>
+
+<section>
+  <h2>需要設計師與工程師決定的事</h2>
+  <ol class="qs">
+    <li><b>A 要和 Track 5 合併，還是獨立做？</b>Track 5 還沒有人認領，訪談結果出來前不用急著決定。</li>
+    <li><b>英文 thinking 怎麼處理？</b>隱藏、收合或翻譯，各自的實作成本，請工程評估。</li>
+    <li><b>C 的任務清單放在哪？</b>獨立頁面、站內通知，還是 LINE 或 Discord 的推送。這決定設計要做多少頁，也決定工程要接哪些管道。</li>
+    <li><b>iOS 的分享入口要不要做？</b>Android 在 #139 已有做法，iOS 需要另外的方案。</li>
+    <li><b>B 送出後的「下一步」有哪些選項？</b>設計先列候選，工程確認哪些資料現在拿得到。</li>
+  </ol>
+</section>
+
+<footer>
+  <span>狀態與連結取自 2026-11-03 的會議記錄與 Phase 3 設計文件；之後有變動請以各 GitHub 票為準。</span>
+  <span>工作量與負責人尚未估計，請在認領時補上。</span>
+</footer>
+
+</div>
+
+</body></html>
