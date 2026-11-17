@@ -2,6 +2,7 @@
 
 ## 2026
 
+- [1117 cofacts.ai設計師協作、Session review與StaleSessionError、「需要你做的事」PR、url-resolver登入牆清理、Hybrid search圖片kNN評估、ExaSearchBot與Production週報、12月小聚](./2026/20261117.md)
 - [Cofacts Hackath75n 協作頁面](./2026/g0v-hackath75n.md)
 - [1110 url-resolver登入牆清理方案、Hybrid search PR review、cofacts.ai Track 2 list、Session review與當輪日期脈絡、Widen the funnel、背景續跑設計、ADK接coding harness評估、大松檢討](./2026/20261110.md)
 - [1103 自動化驗證CI PR、url-resolver FB share登入牆、Hybrid search follow-up、cofacts.ai週review與S002出處調查、Track 0 PR review、背景續跑設計、ADK接coding harness評估、API申請過渡期](./2026/20261103.md)

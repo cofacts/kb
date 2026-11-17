@@ -1,0 +1,239 @@
+<!doctype html><html><head><meta name="robots" content="noindex, nofollow"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>圖片 kNN 搜尋評估</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single reading column (~68ch), answer first, then why / how / results / next steps */
+:root{
+  --bg:#fbfbf9;--surface:#ffffff;--fg:#1c2120;--muted:#5c6663;--line:#dfe3e1;--soft:#f1f4f2;
+  --accent:#1f6f5c;--ok:#1f6f5c;--warn:#8a5a00;
+  --s-base:#2a78d6;--s-knn:#eb6834;--s-cap:#eb683440;
+  --sans:"Noto Sans TC",system-ui,-apple-system,"PingFang TC",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141716;--surface:#1a1a19;--fg:#e6ebe9;--muted:#9ba6a2;--line:#2e3432;--soft:#202523;
+  --accent:#5cc4a3;--ok:#5cc4a3;--warn:#e0a84a;--s-base:#3987e5;--s-knn:#d95926;--s-cap:#d9592650;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141716;--surface:#1a1a19;--fg:#e6ebe9;--muted:#9ba6a2;--line:#2e3432;--soft:#202523;
+  --accent:#5cc4a3;--ok:#5cc4a3;--warn:#e0a84a;--s-base:#3987e5;--s-knn:#d95926;--s-cap:#d9592650;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:16px;line-height:1.7}
+main{max-width:46rem;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:32px 64px;display:flex;flex-direction:column;gap:40px}
+h1{font-size:clamp(26px,5vw,34px);line-height:1.3;margin:0;text-wrap:balance}
+h2{font-size:21px;margin:0 0 12px;text-wrap:balance}
+h3{font-size:17px;margin:20px 0 6px}
+p{margin:0 0 12px}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;margin-bottom:8px}
+.answer{background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--ok);border-radius:10px;padding:20px}
+.answer .big{font-size:22px;font-weight:700;color:var(--ok);margin-bottom:6px}
+.answer ul{margin:8px 0 0;padding-left:1.2em}
+.answer li{margin:4px 0}
+.term{font-weight:700}
+.note{font-size:14px;color:var(--muted)}
+.steps{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px;counter-reset:s}
+.steps li{display:grid;grid-template-columns:2rem 1fr;gap:10px;counter-increment:s}
+.steps li::before{content:counter(s);font-family:var(--mono);font-weight:500;width:2rem;height:2rem;border-radius:50%;background:var(--soft);display:grid;place-items:center;font-size:14px}
+.groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:12px;margin-top:12px}
+.group{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;min-width:0}
+.group b{display:block;margin-bottom:4px}
+.group span{font-size:14px;color:var(--muted)}
+.finding{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:10px}
+.finding h3{margin:0}
+.verdict{font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.06em;color:var(--ok)}
+/* charts */
+.chart{display:flex;flex-direction:column;gap:14px;margin-top:4px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:6px}
+.metric{display:flex;flex-direction:column;gap:6px}
+.metric .lbl{font-size:14px;font-weight:500}
+.barrow{display:grid;grid-template-columns:4.5rem 1fr;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
+.track{position:relative;height:22px;background:var(--soft);border-radius:4px}
+.bar{position:absolute;inset:0 auto 0 0;border-radius:0 4px 4px 0;transition:filter .15s}
+.bar:hover{filter:brightness(1.12)}
+.val{position:absolute;top:50%;transform:translateY(-50%);font-family:var(--mono);font-size:12px;color:var(--fg);white-space:nowrap;padding-left:6px}
+.scale{display:grid;grid-template-columns:4.5rem 1fr;gap:8px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.scale div{display:flex;justify-content:space-between}
+table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+.tbl{overflow-x:auto}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-weight:500;color:var(--muted);font-size:13px}
+td.num{font-family:var(--mono)}
+tr.pick td{background:var(--soft);font-weight:500}
+.todo{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}
+.todo li{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.todo .tag{font-family:var(--mono);font-size:11px;letter-spacing:.06em;border:1px solid currentColor;border-radius:4px;padding:0 6px;margin-right:8px}
+.must{color:var(--warn)}.after{color:var(--accent)}
+details{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:14px}
+summary{cursor:pointer;font-weight:500}
+details ul{margin:8px 0 0;padding-left:1.2em}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.9em;background:var(--soft);padding:1px 5px;border-radius:4px}
+</style>
+
+<main>
+<header>
+  <div class="eyebrow">rumors-api PR #411 · backfill 前的評估 · 2026-11-17</div>
+  <h1>圖片 kNN 搜尋評估</h1>
+</header>
+
+<section class="answer" aria-label="結論">
+  <div class="big">文字和圖片可以開始 backfill；影片和聲音先等等。</div>
+  <ul>
+    <li><b>文字：效果最好。</b>PR 作者 Yutin 的評估中，前 10 名找得到同一則謠言的比例從 24% 升到 70%，幾乎沒有題目變差。文字的費用也最低。</li>
+    <li><b>圖片：有幫助，不會弄亂。</b>我們在 100 題實際的圖片查詢上模擬：原本找不到的，前 10 名找得到的從 25 題增加到約 35 題（共 50 題）；原本排第 1 的 50 題全部維持第 1。PR 現在的設定就好，不需要調整 kNN 權重。</li>
+    <li><b>影片和聲音：先不要跑。</b>超過約 3 分鐘的聲音一定會失敗，大約占 28%，要先修。影片可以算，但每支的費用是圖片的 6–20 倍，而且搜尋效果還沒評估過。</li>
+  </ul>
+  <p class="note" style="margin:10px 0 0">PR #411 已經部署到 production。圖片的數字是模擬的結果，backfill 完成後要在 production 上用同一批題目實際跑一次確認。開始前要先處理的事，見最後的「下一步」。</p>
+</section>
+
+<section>
+  <h2>為什麼要做這個實驗</h2>
+  <p>PR #411 讓搜尋可以額外用 embedding 找「意思或長相相近」的文章（kNN）。要用 kNN，得先把資料庫裡的文章都算出向量，也就是 backfill。目前 production 只有 1,644 筆有向量，幾乎所有文章都還沒有。backfill 要花錢、也要花時間，所以想先確認值得做。</p>
+  <p>文字的部分，Yutin 在 PR 上已經評估過（見下一節）。這次的實驗補上圖片，想回答三個問題：</p>
+  <ol>
+    <li>同一則謠言的另一張圖，如果現在搜不到，加上 kNN 能不能找回來？</li>
+    <li>原本就找得很準的題目，會不會被 kNN 弄亂？</li>
+    <li>上次擔心的狀況：有些圖逐字稿很像、其實是不同的訊息。kNN 能不能把它們分開？</li>
+  </ol>
+  <h3>先了解搜尋怎麼算分</h3>
+  <p>用圖片搜尋時，每篇文章的分數是下面三項加起來，分數高的排前面：</p>
+  <div class="chart" role="img" aria-label="三種分數的大小：hash 命中最多 100 分，逐字稿全文檢索常見約 186 分，kNN 最多 1 分">
+    <div class="metric">
+      <div class="barrow"><span>hash 命中</span><div class="track"><div class="bar" style="width:53.8%;background:var(--s-base)" title="hash 命中：100 × 相似度，最多 100 分"></div><span class="val" style="left:53.8%">最多 100</span></div></div>
+      <div class="barrow"><span>逐字稿</span><div class="track"><div class="bar" style="width:100%;background:var(--s-base)" title="逐字稿全文檢索：沒有上限，這次的中位數約 186 分"></div><span class="val" style="left:auto;right:6px;color:#fff">常見約 186</span></div></div>
+      <div class="barrow"><span>kNN</span><div class="track"><div class="bar" style="width:.6%;min-width:2px;background:var(--s-knn)" title="kNN：(1 + cosine) ÷ 2，最多 1 分"></div><span class="val" style="left:1%">最多 1</span></div></div>
+    </div>
+  </div>
+  <p class="note" style="margin-top:10px">kNN 最多只有 1 分，比另外兩項小很多。所以它<b>沒辦法改變已經被找到的文章的順序</b>，只能把原本沒找到、但長得很像的圖，接在結果的最後面。</p>
+</section>
+
+<section>
+  <h2>文字：PR 作者已經評估過，效果很好</h2>
+  <p>Yutin 在 PR 上留了<a href="https://github.com/cofacts/rumors-api/pull/411#issuecomment-6607007086" target="_blank" rel="noopener">本機評估報告</a>（11/3）。他用 10/25 的 production 資料（29.8 萬篇）在本機架了一個 ES，查詢都經過真正的 GraphQL API，隨機抽 300 篇文字文章當查詢：</p>
+  <div class="tbl"><table>
+    <thead><tr><th></th><th>第 1 名就對</th><th>前 10 名找得到</th><th>完全沒有結果</th></tr></thead>
+    <tbody>
+      <tr><td>現在的搜尋</td><td class="num">16.3%</td><td class="num">24.0%</td><td class="num">59.3%</td></tr>
+      <tr class="pick"><td>加上 kNN</td><td class="num">36.3%</td><td class="num">69.7%</td><td class="num">0.3%</td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li><b>幾乎不會變差：</b>138 題排名變好，2 題各掉 1 名，沒有任何一題掉出前 10。現在完全找不到的 178 題中，找回了 113 題。</li>
+    <li><b>實際準確率可能更高：</b>kNN 排第 1、但被判為答錯的結果，抽樣檢查後約一半到七成其實是同一則謠言，只是連到別的回應。他估計真正「第 1 名就對」的比例約 66–78%。</li>
+    <li><b>呼叫端要配合：</b>kNN 只在呼叫 API 時帶 <code>filter.embedding</code> 才會生效。rumors-site 和 cofacts/ai 的 <code>minimumShouldMatch</code> 設得很寬（<code>'1'</code>、<code>'0'</code>），開 kNN 前要先調嚴，否則第 1 名的準確率會下降。這不影響 backfill。</li>
+  </ul>
+  <p class="note">他也評估了圖片：前 10 名找得到的比例從 39.7% 升到 61.3%。不過他的本機環境只有一半圖片有向量，搶位置的無關圖片比 production 少。這次的實驗把這部分也估進去了，結論一致。</p>
+</section>
+
+<section>
+  <h2>圖片：這次的實驗怎麼做</h2>
+  <ol class="steps">
+    <li><div>從資料庫中挑出「至少有另一張圖共用同一則查核回應」的圖片，隨機抽 400 張。共用同一則回應，就代表兩張圖是同一則謠言，這是我們判斷「找對了沒」的標準答案。</div></li>
+    <li><div>用 public API 拿這 400 張圖去搜尋，記錄現在搜尋的結果和分數，當作「現況」。</div></li>
+    <li><div>從中挑出三組題目：
+      <div class="groups">
+        <div class="group"><b>漏網組（50 題）</b><span>同一則謠言的其他圖，現在用 hash 抓不到。看 kNN 能不能找回來。</span></div>
+        <div class="group"><b>穩定組（50 題）</b><span>現在第 1 名就是對的。看加了 kNN 會不會變差。</span></div>
+        <div class="group"><b>逐字稿很像組（50 對）</b><span>逐字稿分數很高、但沒有共用回應的兩張圖。先由 Claude 標註，再由人工逐對複核，判斷是不是同一則。</span></div>
+      </div>
+    </div></li>
+    <li><div>用和 rumors-api 相同的設定，直接呼叫 Vertex，算出約 1,770 張圖的向量，其中包括 1,000 張隨機的圖當作「無關的圖」對照組。過程中沒有寫入 production。</div></li>
+    <li><div>用 PR 的計分方式模擬加上 kNN 之後的排序，並把「無關但剛好很像的圖會擠進來」也算進去。</div></li>
+  </ol>
+</section>
+
+<section>
+  <h2>圖片：結果</h2>
+
+  <div class="finding">
+    <div class="verdict">問題 1 ・ 找得回來</div>
+    <h3>漏網組：加上 kNN 後，多找回約 10 題</h3>
+    <div class="chart" aria-label="漏網組 50 題的結果長條圖">
+      <div class="legend"><span><i style="background:var(--s-base)"></i>現況</span><span><i style="background:var(--s-knn)"></i>加上 kNN（估計）</span><span><i style="background:var(--s-cap)"></i>最樂觀的情況</span></div>
+      <div class="metric">
+        <div class="lbl">前 10 名找得到同一則謠言的題數</div>
+        <div class="barrow"><span>現況</span><div class="track"><div class="bar" style="width:50%;background:var(--s-base)" title="現況：25 / 50 題"></div><span class="val" style="left:50%">25</span></div></div>
+        <div class="barrow"><span>加 kNN</span><div class="track"><div class="bar" style="width:90%;background:var(--s-cap)" title="最樂觀：45 / 50 題（假設沒有無關的圖擠進來）"></div><div class="bar" style="width:70%;background:var(--s-knn)" title="加上 kNN（估計）：35 / 50 題"></div><span class="val" style="left:90%">35～45</span></div></div>
+      </div>
+      <div class="metric">
+        <div class="lbl">第 1 名就是同一則謠言的題數</div>
+        <div class="barrow"><span>現況</span><div class="track"><div class="bar" style="width:28%;background:var(--s-base)" title="現況：14 / 50 題"></div><span class="val" style="left:28%">14</span></div></div>
+        <div class="barrow"><span>加 kNN</span><div class="track"><div class="bar" style="width:58%;background:var(--s-cap)" title="最樂觀：29 / 50 題"></div><div class="bar" style="width:48%;background:var(--s-knn)" title="加上 kNN（估計）：24 / 50 題"></div><span class="val" style="left:58%">24～29</span></div></div>
+      </div>
+      <div class="scale"><span></span><div><span>0</span><span>25</span><span>50 題</span></div></div>
+    </div>
+    <p class="note" style="margin:0">「估計」已扣掉無關的圖擠進來的影響，「最樂觀」則假設沒有無關的圖擠進來。真實結果應該落在兩者之間。</p>
+  </div>
+
+  <div class="finding">
+    <div class="verdict">問題 2 ・ 不會弄亂</div>
+    <h3>穩定組：50 題全部維持第 1 名</h3>
+    <p style="margin:0">因為 kNN 最多只有 1 分，不會超過原本靠 hash 或逐字稿排第 1 的文章。</p>
+  </div>
+
+  <div class="finding">
+    <div class="verdict">問題 3 ・ 不需要分開</div>
+    <h3>逐字稿很像的圖，50 對裡有 47 對其實是同一則</h3>
+    <p style="margin:0">剩下 3 對中，有 2 對是同一個詐騙模板的不同個案。人工複核的判斷是「不同但高度相關，收到其中一張的人看到另一張也能察覺被騙，列在一起很有用」。所以這批資料沒有「需要把它們拆開」的問題，排在一起反而是對的。</p>
+    <p class="note" style="margin:0">另一個發現：很多其實是同一則謠言的圖，沒有被連到同一則回應。所以上面的數字都偏保守，實際表現應該更好。</p>
+  </div>
+
+  <h3>要不要提高 kNN 的權重？不用</h3>
+  <p>我也試了把 kNN 分數放大 50 倍、200 倍，讓它跟逐字稿分數一樣大：</p>
+  <div class="tbl"><table>
+    <thead><tr><th>kNN 分數放大</th><th>漏網組：前 10 名找到</th><th>穩定組：第 1 名掉下來</th></tr></thead>
+    <tbody>
+      <tr class="pick"><td>1 倍（PR 現在的設定）</td><td class="num">35 / 50</td><td class="num">0 題</td></tr>
+      <tr><td>50 倍</td><td class="num">36 / 50</td><td class="num">1 題</td></tr>
+      <tr><td>200 倍</td><td class="num">36 / 50</td><td class="num">3 題</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">放大之後，漏網組最多只多找回 1 題，穩定組反而開始有題目掉下來。維持 1 倍最好。相似度門檻用 0.6 到 0.8 結果都差不多，維持 PR 用的 0.7 即可。</p>
+</section>
+
+<section>
+  <h2>影片與聲音：還不能跑</h2>
+  <h3>聲音：超過約 3 分鐘就會失敗</h3>
+  <ul>
+    <li>先前以為錯誤是因為聲音多帶了「只取前 80 秒」的設定（<code>videoMetadata</code>）。實測後發現不是：有沒有帶，結果都一樣。</li>
+    <li>真正的問題是：只取前 80 秒的設定<b>對聲音沒有作用</b>，Vertex 會把整段音檔送進模型。154 秒以下的音檔都成功，228 秒以上的都回 <code>400 INVALID_ARGUMENT</code>，上限大約 3 分鐘。</li>
+    <li>production 有約 1,170 個聲音檔。隨機量了 60 個，中位數 94 秒，有 17 個（約 28%）超過 180 秒，這些都會失敗。目前 production 沒有任何錯誤紀錄，是因為長音檔還沒送進來過。</li>
+    <li><b>修法：</b>送 embedding 前先把聲音截成 80 秒，和影片一致。rumors-api 目前沒有 ffmpeg，要在 Docker image 裡加上，或請 media-manager 產生截短的版本。退路是長音檔先不算向量，它們仍然可以靠逐字稿搜尋到。</li>
+  </ul>
+  <h3>影片：可以算，但貴，效果也還沒評估</h3>
+  <ul>
+    <li>測了 2 支影片（5.8MB、29.5MB）都成功，只取前 80 秒的設定對影片有作用。</li>
+    <li>每支約 1,600–5,300 tokens，是圖片（約 258）的 6–20 倍。production 有約 2.1 萬篇影片文章。</li>
+    <li>目前沒有人評估過影片的搜尋效果，PR 作者的評估也沒有涵蓋影片和聲音。</li>
+  </ul>
+</section>
+
+<section>
+  <h2>下一步</h2>
+  <ul class="todo">
+    <li><span class="tag after">已完成</span>PR #411 已隨 <code>release/20261115</code> 部署到 production（api 容器 11/15 啟動，已確認是新版程式）。</li>
+    <li><span class="tag must">先做</span>backfill 腳本加上「只跑指定類型」的選項（例如 <code>--types</code>），才能只跑文字和圖片。</li>
+    <li><span class="tag must">先做</span>backfill 文字（約 23 萬篇）和圖片（約 4.3 萬張）。</li>
+    <li><span class="tag after">backfill 後</span>跑完要做 <code>_forcemerge</code>，否則搜尋會變慢。</li>
+    <li><span class="tag after">backfill 後</span>用這次同一批 100 題圖片，在 production 上帶 <code>filter.embedding: 0.7</code> 實際搜尋一次，對照模擬結果。</li>
+    <li><span class="tag after">要確認</span>沒有登入的搜尋只能讀已經算好的向量。要確認 LINE bot 搜尋時有帶使用者，使用者新傳的圖才會有 kNN。</li>
+    <li><span class="tag after">要確認</span>rumors-site 和 cofacts/ai 開啟文字 kNN 前，先調嚴 <code>minimumShouldMatch</code>。</li>
+    <li><span class="tag after">之後</span>修聲音超過 3 分鐘會失敗的問題（開 PR）。</li>
+    <li><span class="tag after">之後</span>影片、聲音各隨機抽 50 支試算，量失敗率和每支的費用；再評估影片的搜尋效果，決定值不值得 backfill。</li>
+  </ul>
+  <p class="note" style="margin-top:12px">費用參考：這次算了約 1,770 張圖，用了 45.6 萬 tokens，每張約 258 tokens。全部 4.3 萬張圖片約 1,100 萬 tokens。文字每篇只有幾十到幾百個 tokens。實際金額請對照 Vertex 的價目表。</p>
+</section>
+
+<details>
+  <summary>這個評估的限制</summary>
+  <ul>
+    <li>搜尋時用的是網站上的縮圖（600px），不是原圖，所以有 13% 的題目連自己那張都沒用 hash 找到。</li>
+    <li>這次的實驗只評估了圖片，沒有評估影片、聲音，也沒有評估「用圖片找文字文章」。文字的數字來自 PR 作者的評估。</li>
+    <li>kNN 是在本機用精確計算模擬的，ES 實際用的是近似搜尋，結果可能有些微差異。</li>
+    <li>「無關的圖會擠進來多少」是用 1,000 張隨機圖推估的。</li>
+  </ul>
+  <p class="note" style="margin:8px 0 0">完整數字與腳本：<code>devops/workspace/pr411-image-eval/</code>（RESULTS.md）。A 組標註頁：<a href="https://claude.ai/artifact/5G5F8M88jvam54hiX1iAPF" target="_blank" rel="noopener">A 組圖片配對複核</a>。</p>
+</details>
+</main>
+
+</body></html>
