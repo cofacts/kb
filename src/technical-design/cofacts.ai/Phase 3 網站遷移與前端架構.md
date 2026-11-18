@@ -958,17 +958,17 @@ sequenceDiagram
 | 指南規則 | 擋在哪一層 | 做法 |
 |---|---|---|
 | **R1** 狀態要有文字，不能只用顏色 | 元件 | 四種查核結果用「文字 + 形狀不同的圖示 + 顏色」三層表達（含有不實訊息／八角叉、含有正確訊息／圓勾、含有個人意見／方三點、不在查證範圍／三角驚嘆號）。圖示 `aria-hidden`，文字是內容。用詞一律「含有不實訊息」。`text-status-*` / `bg-status-*` 只允許出現在白名單元件：`ReplyTypeLabel`、`VerdictPicker`（AI 草稿選分類）、帶狀態圖示的 `ArticleStatusBadge`，由 lint 擋 |
-| **R2** 品牌黃只當底色 | 建構 | 不存在 `text-accent` 這個 utility；品牌黃前景只剩 `border-accent`（輸入框作用中，輔助用）與 logo 用的 `text-icon-brand`；`bg-accent` 上面只能放 `text-on-accent` |
+| **R2** 品牌黃只當底色 | 建構 | 不存在 `text-accent` 這個 utility；品牌黃前景只剩 `border-accent`（輔助用）與 `text-icon-brand`（logo，以及讚／倒讚／收藏選取時的實心圖示）；`bg-accent` 上面只能放 `text-on-accent` |
 | **R3** 只用語意名 | 建構 + lint | `--color-*: initial`，原始色不產生 utility；`eslint-plugin-better-tailwindcss` 開啟 `no-unregistered-classes`（不存在的 class 會被**靜默忽略**，必須靠 lint 抓）以及禁止 arbitrary color（`[#…]`、`[rgb(…)]`）。例外只有 UI system 色票牆（不實作） |
 | **R4** 會翻轉的配會翻轉的，固定的配固定的 | 命名 + 測試 | class 名稱對得上才對（`bg-dark` 配 `text-on-dark`、`bg-secondary` 配 `text-on-secondary`）；狀態徽章上的符號用會翻轉的 `text-on-status`；Storybook **dark 主題的 axe 對比測試**抓漏網之魚 |
 | **R5** 停用 = 預設配色 + 50% 透明度 | 元件 | 所有 primitives 一律 `disabled:opacity-50` / `aria-disabled:opacity-50`，不換灰色；同時輸出 `disabled` 或 `aria-disabled="true"`。`text-disabled` token 只留給非互動的弱化文字 |
 | 字體 token | 建構 + lint | 只註冊 17 個字體 class（`text-heading-*`、`text-body-*`、`text-caption`、`text-ui-*`），字級、行高、字重一起帶入；`text-16`、`text-15`、`leading-*`、`font-semibold` 由 lint 擋。會換行的文字不可用 `text-ui-*` |
 | 中文在按鈕裡偏低 1px | `styles/base.css` | `.btn, .badge, .tab`（實作上是 `ui/button`、`ui/badge`、`ui/tabs` 的根元素）加 `text-box-trim: trim-both; text-box-edge: ideographic ideographic;`，不支援的瀏覽器不受影響 |
-| 焦點樣式是**一條全域規則** | `styles/focus.css` | 見下方程式碼；刪除 primitives 裡所有 `focus-visible:ring-*`。深色區塊（Footer、Intro 頁首、ActionPanel、手機選單）加 `data-surface="dark"`，內圈改用 `--border-on-dark-strong` |
-| 輸入框 | `ui/input` | 白底 `bg-base border-control`；作用中（focus-within）改 `border-accent`，不換底色，焦點環照常顯示；placeholder 用 `text-tertiary`。Invalid：`aria-invalid="true"`，紅框用 `status-incorrect`，另有文字說明以 `aria-describedby` 連結 |
+| 焦點樣式是**一條全域規則** | `styles/focus.css` | 見下方程式碼；刪除 primitives 裡所有 `focus-visible:ring-*`。深色區塊（Footer、Intro 頁首、ActionPanel、手機選單）加 `data-surface="dark"`，內圈改用 `--border-on-dark-strong`。例外：文字輸入框（見下一列）與 Select／DropdownMenu 的選項（黃底取代焦點環，避免被捲動容器裁切） |
+| 輸入框 | `ui/input` | 白底 `bg-base border-control`；作用中改為框內 2px `border-strong` 外框（outline 往內縮，不位移），不換底色，**不顯示全域焦點環**（設計師認為每個欄位輸入時都出現焦點環太搶眼；`border-strong` 對白底 15+，單獨就符合 3:1）；Invalid 時外框為紅色；placeholder 用 `text-tertiary`。Invalid：`aria-invalid="true"`，紅框用 `status-incorrect`，另有文字說明以 `aria-describedby` 連結 |
 | 錯誤與破壞性操作色 | token | 沿用 `status-incorrect`，不另設 danger token |
 | 不用 placeholder 當說明（[20260910 會議](../../meetings/2026/20260910.md)） | `ui/field` | 表單一律有 `<label>` 與 description；placeholder 只放範例 |
-| 可點區域 | 元件 | Button 四種高度：Large 44、Medium 36、Small 28、Icon-Touch 32（手機頂列漢堡、關閉）。例外：桌機導覽列「回報可疑訊息」40（撐滿導覽列）、手機選單滿版按鈕 44。小於 44 的可用透明 padding 或 `::after` 擴大點擊範圍，外觀不變 |
+| 可點區域 | 元件 | Button 四種高度：Large 44、Medium 36、Small 28、Icon-Touch 32（手機頂列漢堡、關閉）。桌機導覽列按鈕（回報可疑訊息、LINE、登入）也是 Medium 36（依 Penpot 留言 36，原本的 40 例外已取消）。例外：手機選單滿版按鈕 44。小於 44 的可用透明 padding 或 `::after` 擴大點擊範圍，外觀不變 |
 | 只有圖示的按鈕 | 元件 | Button `Icon = Only` 時 `aria-label` 為必填 prop（型別擋） |
 | 已知例外 | 不擋 | LINE 綠底白字（2.26）、GOV 標誌紅色、品牌標誌、圖表品牌黃線、Flag 摺角，照指南 07 記錄在案 |
 
