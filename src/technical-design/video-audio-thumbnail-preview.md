@@ -133,6 +133,8 @@ Penpot 中所有圖片位置填的都是同一張示意照片（600 × 815），
 
 `totalCount` 是否包含已封鎖或已刪除的文章，**待確認**。平均長度與 original 總容量，我沒有權限查，**待確認**（§11）。
 
+**GCS 原檔數與文章數不一致（2026-11-21 以 `gcloud storage ls` 列出）：** `production/audio/` 有 1,169 個 `original`，AUDIO 文章數是 324。VIDEO 只列了部分雜湊前綴（5,558 個），依雜湊分布推估整個 bucket 約 4 萬個，文章數是 21,598。每月新增速度也有同樣的差距（AUDIO 約 60 到 80 對 4 到 16）。目錄名稱是檔案內容的 SHA-256（media-manager 的 `getFileIDHash`），所以不會有位元組完全相同的重複檔。多出來的檔案推測是沒有變成文章的上傳，例如 `ListArticles` 的 `mediaUrl` 查詢會經 `getOrUploadMedia` 先上傳檔案，但這是推測，尚未比對。§8 與 §9 的檔案量以文章數估算，若補產範圍是整個 bucket，VIDEO 的補產費用約為 US$300（上限），見 §11 #18。
+
 ### 2.6 LINE bot 的現況
 
 程式碼：[cofacts/rumors-line-bot](https://github.com/cofacts/rumors-line-bot) master（2026-11-13 讀取）。
@@ -642,6 +644,7 @@ rumors-api 一開始回傳 VIDEO 與 AUDIO 的 URL，LINE bot 的聊天室與 LI
 | 15 | 合約驗收標準是否要求 AUDIO thumbnail 由檔案產生，或前端圖示即可 | #326 原文是「hopefully audio」，與 R4 的強度不同（§3）。若要求由檔案產生，方案 A 做不到，須改採 C | Johnson | 否，但可能改變 §4.5 的結論 |
 | 16 | 觸發方式：rumors-api 直接呼叫 `createJob`，或 Eventarc 加函式 | §4.5 的兩種做法，影響上傳流程是否要改與所需權限 | mrorz、Johnson | 否 |
 | 17 | 封鎖或刪除的文章是否仍能經由 API 查到 `attachmentUrl`；VIDEO preview 是否需要比 IMAGE 更嚴的下架處理。同一個 `attachmentHash` 可被多篇文章引用，已由程式碼註解確認（§6.5） | 決定 §6.5 沿用 IMAGE 做法是否足夠 | rumors-api 維護者（mrorz） | 否 |
+| 18 | 補產範圍：只補有對應文章的檔案，或 bucket 裡所有 `original`。GCS 原檔數約為文章數的 2 到 4 倍（§2.5）。要確認多出來的檔案是否沒有對應文章，需把 GCS 的 hash 清單與資料庫的 `articles.attachmentHash` 做交集 | 決定 §8 的補產費用（VIDEO 約 US$163 對 US$300 左右）與 §9 的處理時間。決定前，§8 與 §9 以文章數估算 | 審查者決定範圍。有資料庫權限的人可以做交集 | 否 |
 
 **已辨識的風險：**
 
