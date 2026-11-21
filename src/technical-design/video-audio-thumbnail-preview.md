@@ -15,7 +15,7 @@ timestamp: "2026-11-13T20:00:00+08:00"
 - **存取：** 與 IMAGE 相同。未登入者可以取得 thumbnail 與 preview，不能取得 original。resolver 只在變體檔案存在時回傳 URL（§6、§10）。
 - **成本：** 既有檔案補產約 US$163，之後每月幾美元（§8）。
 - **上線：** rumors-api 一回傳 URL，LINE bot 的呈現就會改變，所以 resolver 加上預設關閉的開關，變體產生並驗證後才開啟（§9.5）。
-- **阻塞實作的項目：** GCP 權限（§11 #1）與方案 A 的 PoC（§11 #4）。
+- **阻塞實作的項目：** 方案 A 的 PoC 已完成大部分驗證（§4.6），只剩 sprite 計費要等帳單確認（§11 #4）。GCP 權限已具備（§11 #1）。
 - **需要審查者決定：** 合約是否要求 AUDIO thumbnail 由檔案產生（§11 #15，可能改變建議），以及觸發方式（§11 #16）。
 
 ## 1. 背景與目標
@@ -181,12 +181,12 @@ R4 的強度與 #326 原文不同：#326 寫的是「hopefully audio」（§2.7�
 - **做法：** 上傳完成後建立一個 Transcoder job。輸入是 `gs://…/video/<hash>/original`，輸出寫回同一個 GCS 目錄。preview 用 job 的剪輯功能輸出 30 秒 SD mp4（計價頁範例 2 說明剪輯後只計輸出長度）。縮圖用 `spriteSheets`。
 - **觸發方式有兩種：** rumors-api 在 `onUploadStop` 後直接呼叫 `createJob`（一次 API 呼叫，不吃 CPU，不需要 Cloud Run）；或 GCS 事件經 Eventarc 觸發小函式再呼叫 `createJob`。後者就是 mrorz 在 #326 提出的方向（§2.7）。
 - **已知缺口：**
-  - 官方 sprite 文件只描述「均勻分佈張數」與「每 n 秒一張」兩種模式，沒有說明單張指定時間點的靜態圖。要拿 poster frame 可能得用 `totalCount = 1` 的 sprite，行為**待確認**（需 PoC）。
+  - 官方 sprite 文件只描述「均勻分佈張數」與「每 n 秒一張」兩種模式。PoC 確認 `totalCount = 1` 搭配 1 秒到 2 秒的取幀區間可以產出單張 JPEG（§4.6）。
   - sprite 依固定時間點取幀，不能像 ffmpeg 的 `thumbnail` 濾鏡那樣挑出代表幀。片頭是黑畫面時，縮圖會是黑的。
-  - 輸出檔名由 mux stream 的 `fileName` 與 sprite 的 `filePrefix` 決定，sprite 會在前綴後加上流水號與副檔名。能否產出 media-manager 慣用的無副檔名變體名稱，**待確認**（§5.4）。
-  - 官方文件說明可以輸出純音訊，但是否接受純音訊的輸入檔（例如 LINE 上傳的 m4a），**待確認**。不支援時，AUDIO 的 preview 也做不出來。
-  - 計價頁沒有說明 sprite 與縮圖是否另外計費（**待確認**）。
-  - 輸入影片沒有音軌時，job 設了音訊串流會成功、失敗，還是輸出無聲檔案，文件沒有說明（**待確認**）。
+  - 輸出檔名由 mux stream 的 `fileName` 與 sprite 的 `filePrefix` 決定，sprite 會在前綴後加上流水號與副檔名。PoC 確認檔名無法完全對齊慣用名稱，需要在 resolver 做對照表（§4.6、§5.4）。
+  - 官方文件說明可以輸出純音訊，PoC 確認接受純音訊輸入，可以輸出前 30 秒的 AAC（§4.6）。
+  - 計價頁沒有說明 sprite 與縮圖是否另外計費，**仍待確認**，要等 PoC 的帳單出現（§11 #4）。
+  - 輸入影片沒有音軌時，job 設了音訊串流會失敗（PoC 實測，§4.6）。建立 job 前必須先知道有沒有音軌。
   - 沒有把聲音畫成波形圖的功能。AUDIO 的 thumbnail 改為回傳 `null`（§5.2）。
 
 ### 4.2 方案 B：Cloudflare Stream
@@ -253,6 +253,34 @@ R4 的強度與 #326 原文不同：#326 寫的是「hopefully audio」（§2.7�
 
 兩種方式都由 §9 的 ensure-variants script 補漏，差別只在新上傳的檔案多快能拿到變體。
 
+### 4.6 PoC 結果（2026-11-21）
+
+**環境：** 在 `industrious-eye-145611`、`asia-east1` 以開發用 service account 建立 job。輸入是 production 的 `original`，輸出一律寫到 `poc-transcoder/` 前綴，沒有寫入 `production/`。
+
+**樣本：** 37 支 VIDEO 與 5 支 AUDIO，全部成功。VIDEO 涵蓋直式、橫式、無聲、10 秒到 300 秒，其中 4 支大於 60 MB。樣本從部分雜湊前綴抽出，大於 130 MB 的檔案沒有測。另外用 ffprobe 掃過 254 支 production VIDEO，沒有找到旋轉過、輸入沒有 faststart 或非 H.264 的檔案，所以這三類沒有測試，也推測在資料中很少見。
+
+| 驗收項目 | 結果 |
+| --- | --- |
+| `spriteSheets` 產生單張高 240 的 JPEG | 通過。縮圖約 5 到 15 KB，抽查 10 張沒有黑畫面，所有 37 支樣本的縮圖平均亮度皆大於 48（0 到 255） |
+| 真實 AUDIO 產生前 30 秒 m4a | 通過。5 支輸出皆為 30 秒，約 247 KB。樣本中沒有短於 30 秒的音訊 |
+| VIDEO 完整流程 | 通過。預覽為 H.264 加 AAC 單聲道 64 kbps，中位數約 2.5 MB，最大 2.6 MB，moov 在檔頭，長寬比與原片一致 |
+| sprite 是否另外計費 | **尚未確認**，等帳單 |
+
+**效能：** 82 個 job 的處理時間中位數 1.7 秒，第 95 百分位 3.6 秒，最長 5 秒，與輸入長度（到 5 分鐘）無明顯關係。同時送出 40 個 job 全部成功，其中 38 個在 2 秒內開始，2 個約 2 分鐘後才開始。超過 40 個並發時的配額行為沒有測。
+
+**使用 Transcoder 時要注意的事：**
+
+1. **剪輯終點不能超過片長。** `editList` 的 `endTimeOffset` 大於輸入長度時 job 會失敗。必須先取得片長，並設為 min(30, 向下取整的片長)。
+2. **無音軌的輸入不能宣告音訊串流。** 否則 job 失敗，錯誤是 atom 沒有音軌。必須先知道有沒有音軌。
+3. **sprite 的寬高都必填。** 欄位是 `spriteWidthPixels` 與 `spriteHeightPixels`，寬度要依長寬比自己算。
+4. **單聲道要指定 `channelLayout`。** `channelCount = 1` 要搭配 `["fc"]`。
+5. **輸出檔名固定規則：** sprite 是 `<filePrefix>0000000000.jpeg`，影片是 `<mux key>.mp4`。純音訊的 mp4 容器副檔名也是 `.mp4`，不是 `.m4a`。
+6. **API 啟用後的第一個 job 失敗過一次**，錯誤是 Cloud Storage 權限不足，重送後成功。推測是 service agent 剛啟用，尚未確認。
+
+**對流程的影響：** 上述 1 與 2 代表建立 job 前需要探測片長與音軌，這一步要放進 §7。
+
+**尚未驗證：** sprite 計費、job 狀態保留多久、損毀檔案的行為、短於 30 秒的音訊、超過 40 個並發 job 的配額。
+
 ## 5. thumbnail 與 preview 規格
 
 以下是依 §2.4 的 Penpot 尺寸提出的**建議值**，不是設計稿已定案的值。與設計稿有落差的地方標為待確認。
@@ -270,14 +298,14 @@ R4 的強度與 #326 原文不同：#326 寫的是「hopefully audio」（§2.7�
 
 編碼選 H.264 而不是 #334 的 AV1。LIFF 文章頁會用 `<video>` 直接播放 `PREVIEW`（§2.6），執行環境是 LINE 的內建瀏覽器（iOS 為 WKWebView）。H.264 加 AAC 的 mp4 在 iOS 與 Android 都能直接播放。AV1 在舊裝置上不一定能硬體解碼，實際的裝置分布**待確認**。H.264 檔案較大，但在 §8 的假設下儲存與傳輸成本可以忽略。
 
-編碼參數（rate control 模式、位元率或 CRF 值）在 PoC 中調整。Transcoder 輸出的 mp4 是否預設把 moov 放在檔頭，**待確認**（PoC）。
+編碼參數（rate control 模式、位元率或 CRF 值）在 PoC 中調整。Transcoder 輸出的 mp4 的 moov 在檔頭（PoC 已確認，§4.6）。
 
 ### 5.2 AUDIO
 
 | 變體 | 型態 | 規格 |
 | --- | --- | --- |
 | THUMBNAIL | 不產生，resolver 回傳 `null` | 網站顯示聲音圖示。若 §11 #15 確認合約要求由檔案產生，改用方案 C 的 `showwavespic` 波形圖 |
-| `m4a-30s`（PREVIEW） | m4a（AAC） | 取前 30 秒，64 kbps 單聲道，由 Transcoder 輸出純音訊。純音訊輸入是否支援，待 PoC（§4.1） |
+| `m4a-30s`（PREVIEW） | m4a（AAC） | 取前 30 秒，64 kbps 單聲道，由 Transcoder 輸出純音訊。純音訊輸入已由 PoC 確認支援（§4.6）。輸出副檔名是 `.mp4` |
 
 Penpot 沒有聲音的專屬設計。列表卡 120 × 120 的聲音圖示樣式（圖示加時長，或只用「語音訊息」badge）由設計師決定，不需要後端產生檔案。
 
@@ -307,7 +335,7 @@ production/audio/<hash>/original
 production/audio/<hash>/m4a-30s
 ```
 
-Transcoder 的實際輸出檔名能否與上列一致，**待確認**（PoC）。sprite 一定會在前綴後加上流水號與副檔名。若檔名無法控制，就讓 resolver 以對照表把變體名稱對應到實際檔名（§10），不必另外搬移檔案。
+PoC 確認 Transcoder 的輸出檔名無法與上列完全一致（§4.6）：縮圖是 `jpg240h0000000000.jpeg`，影片預覽是 `mp4-600w30s.mp4`，音訊預覽是 `m4a-30s.mp4`。因此由 resolver 以對照表把變體名稱對應到實際檔名（§10），不必另外搬移檔案。
 
 ## 6. 存取範圍
 
@@ -391,7 +419,7 @@ rumors-api 的 `.env.sample` 寫「Make data public」，與 API 回傳 signed U
 
 幾個細節：
 
-- **job 設定：** VIDEO 是一個 H.264 視訊串流加一個 AAC 音訊串流，mux 成 mp4，以 `editList` 只取前 30 秒，另加一個 `totalCount = 1`、高 240 的 JPEG sprite。AUDIO 只有 AAC 音訊串流，沒有 sprite。實際欄位在 PoC 確定。
+- **job 設定：** VIDEO 是一個 H.264 視訊串流加一個 AAC 音訊串流，mux 成 mp4，以 `editList` 只取前 30 秒，另加一個 `totalCount = 1`、高 240 的 JPEG sprite。AUDIO 只有 AAC 音訊串流，沒有 sprite。實際欄位與限制見 §4.6。建立 job 前要先探測片長與有無音軌，剪輯終點取 min(30, 片長)，沒有音軌就不宣告音訊串流。探測的做法（在哪裡執行、是否由 media-manager 存下中繼資料）尚未決定。
 - **Transcoder 直接讀寫 `gs://`，不經過我們的機器。** 方案 C 要處理的記憶體、暫存檔與逾時問題在這裡都不存在。Transcoder 的 service agent 需要該 bucket 的讀寫權限（§11 #1）。
 - **若採 Eventarc 觸發，事件過濾必須排除 `temp/`。** media-manager 先把檔案寫在 `temp/`，`move` 後才在正式路徑出現。觸發器只比對 `production/(video|audio)/*/original`。Eventarc 路徑比對的語法與支援情況**待確認**。
 
@@ -597,10 +625,10 @@ rumors-api 一開始回傳 VIDEO 與 AUDIO 的 URL，LINE bot 的聊天室與 LI
 
 | # | 項目 | 為什麼重要 | 誰能回答 | 阻塞 |
 | --- | --- | --- | --- | --- |
-| 1 | **GCP 權限：** 啟用 Transcoder API、建立 job 的 IAM 角色、Transcoder service agent 對 bucket 的讀寫權限。若用 Eventarc 觸發，另需 Eventarc 與 Cloud Run functions。若改採方案 C，另需 Cloud Run、Eventarc、Pub/Sub、Artifact Registry | 方案 A 的前提。**尚未向 Johnson 確認，本文不假設已具備** | Johnson | 是 |
+| 1 | **GCP 權限：** 啟用 Transcoder API、建立 job 的 IAM 角色、Transcoder service agent 對 bucket 的讀寫權限。若用 Eventarc 觸發，另需 Eventarc 與 Cloud Run functions。若改採方案 C，另需 Cloud Run、Eventarc、Pub/Sub、Artifact Registry | 方案 A 的前提。**已完成（2026-11-21）：** Transcoder API 已啟用，PoC 用 service account 可建立 job 並讀取 bucket。service agent 可寫入同 project 的 bucket。正式環境的 service account 與 Eventarc 等權限仍依 §11 #16 的觸發方式另行確認 | Johnson | 否 |
 | 2 | bucket `cofacts-media-collection` 是否公開可讀 | **已查證（2026-11-13）：匿名請求一律 403**，R2 已成立（§6.3）。剩 allAuthenticatedUsers 與 uniform bucket-level access 需看 IAM 與 bucket 設定（§6.3） | 有 GCP IAM 權限的人（Johnson） | 否 |
 | 3 | 審查者是否核定「在 Cloud Run 上跑 ffmpeg」 | 只在改採方案 C 時需要。合約只排除 API server 內轉檔，沒有明文允許 Cloud Run | Johnson | 否 |
-| 4 | PoC 結果：能否輸出單張 JPEG 縮圖並控制檔名、是否接受純音訊輸入、20 支真實影片的成功率與 job 處理時間、sprite 是否計費、job 狀態保留多久、黑畫面縮圖的比例 | 決定方案 A 能否採用（§4.5 驗收線），以及 §9 的時間 | 方案 A 的 PoC | 是 |
+| 4 | PoC 結果。**大部分已完成（§4.6）：** 單張 JPEG 縮圖、純音訊輸入、37 支影片與 5 支音訊的成功率、處理時間與黑畫面比例都已驗證。**尚未確認：** sprite 是否計費、job 狀態保留多久、損毀檔案行為、超過 40 個並發的配額 | 決定方案 A 能否採用（§4.5 驗收線），以及 §9 的時間 | 方案 A 的 PoC | 否，但 sprite 計費要在實作前確認 |
 | 5 | bucket 所在的 region | 影響 Transcoder（改採 C 時為 Cloud Run 與 Eventarc）的區域選擇與跨區傳輸費 | 有 GCP 權限的人 | 否 |
 | 6 | 既有 VIDEO 與 AUDIO 的平均長度與 `original` 總容量（`gcloud storage du`） | H3 的實際值。只影響方案 B 的成本與 job 處理時間 | 有 GCP 權限的人 | 否 |
 | 7 | 實際流量：列表頁曝光、訊息頁 preview 播放次數 | H7。目前只有單位成本 | GA4 或日誌的管理者 | 否 |
