@@ -295,7 +295,7 @@ PoC 結果見 §4.6：前三項通過，抽查沒有黑畫面，sprite 計費等
 
 編碼選 H.264 而不是 #334 的 AV1。LIFF 文章頁會用 `<video>` 直接播放 `PREVIEW`（§2.6），執行環境是 LINE 的內建瀏覽器（iOS 為 WKWebView）。H.264 加 AAC 的 mp4 在 iOS 與 Android 都能直接播放。AV1 在舊裝置上不一定能硬體解碼，實際的裝置分布**待確認**。H.264 檔案較大，但在 §8 的假設下儲存與傳輸成本可以忽略。
 
-編碼參數（rate control 模式、位元率或 CRF 值）在 PoC 中調整。Transcoder 輸出的 mp4 的 moov 在檔頭（PoC 已確認，§4.6）。
+PoC 使用的編碼參數：影片為 H.264 main profile、600 kbps、24 fps，rate control 沿用 Transcoder 的預設值（VBR）。聲音為 AAC 64 kbps 單聲道。縮圖為 JPEG，quality 80。600 kbps 加 64 kbps 播 30 秒約 2.5 MB，與實測大小一致。Transcoder 輸出的 mp4 的 moov 在檔頭（PoC 已確認，§4.6）。
 
 ### 5.2 AUDIO
 
