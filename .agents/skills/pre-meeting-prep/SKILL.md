@@ -1,108 +1,57 @@
 ---
 name: pre-meeting-prep
-description: 準備 Cofacts 每週開會前的摘要：從本地 wiki 找到上次開會日期，抓取 Discord 頻道的訊息與 GitHub 活動， 整理成 Markdown 摘要供貼入會議記錄。Use whenever the user says "幫我準備會議"、"prepare for meeting"、 "整理上週發生的事"，或在會議開始前要彙整近況時請務必使用此 skill。
+description: 準備 Cofacts 每週開會前的議程：讀當週 HackMD 會議記錄，彙整上次開會後的 Discord、GitHub 與（若有）使用者的 Claude session，依 HackMD 既有章節排好，確認後寫回 HackMD。Use whenever the user says "幫我準備會議"、"準備今天的會議"、"prepare for meeting"、"整理上週發生的事"，或在會議開始前要彙整近況時請務必使用此 skill。
 ---
 
 # Pre-Meeting Prep
 
-從上次開會至今，整理 Cofacts 的重要活動，輸出可直接貼入 HackMD 會議記錄的 Markdown 摘要。
+目標：產出一份「照當週 HackMD 章節排好」的議程，讓使用者直接貼上或由你寫回 HackMD。來源越多越好，但最後要收斂成會議上要講、要決定的事，不是活動流水帳。
 
-## 環境設定
+## 環境
 
-需要的環境變數：`DISCORD_TOKEN`（存放在 repo 根目錄 `.env`，可 `source .env` 取得；若無則略過 Discord 段落）。
+需要 `DISCORD_TOKEN`、`HACKMD_API_TOKEN`、`HACKMD_API_URL`、`MEETING_NOTE_ID`。先看環境變數（雲端 session 通常已設好），沒有的再從 repo 根目錄的 `.env` 載入（`[ -f .env ] && set -a && . ./.env && set +a`）。缺哪個就略過對應來源，最後說明略過了什麼。
 
 ## 步驟
 
-### 1. 找到上次開會日期
+### 1. 讀當週 HackMD 與上次會議
 
-先 `git pull` 確保本地 repo 是最新（會議記錄由 CI 自動 merge，本地容易落後），再列出 `src/meetings/` 目錄下所有 `.md` 檔，取最新日期：
+- `GET $HACKMD_API_URL/notes/$MEETING_NOTE_ID`，記下 `content` 與 `lastChangedAt`。章節（上週待辦、General、cofacts.ai…）就是輸出骨架。
+- 上次會議：`git fetch origin main` 後 `git ls-tree --name-only origin/main src/meetings/YYYY/ | grep -E '/[0-9]{8}\.md$' | sort | tail -1`（本地分支常落後；檔名有非日期的如 `g0v-hackath*.md`，要濾掉）。讀它的 TODO 與待辦，用來對照「上週待辦」的進度、回答「某人上週有哪些 task」。
 
-```bash
-ls src/meetings/**/*.md | sort | tail -2
-# 取倒數第二個（最新的才是「上次」），若正在當週開會則取倒數第一個
-```
+### 2. 收集來源（上次會議日之後）
 
-從檔名取出日期（格式 `YYYYMMDD`），換算成 ISO 8601：`YYYY-MM-DD`。
+**Discord**（`Authorization: Bot $DISCORD_TOKEN`，用 snowflake `after=` 篩日期）：
 
-### 2. 抓取 Discord 訊息（主要來源）
+| 頻道 ID | 名稱 |
+|---------|------|
+| `1060178087947542563` | general |
+| `1164454086243012608` | alerts |
+| `1062999869314322473` | 程式開發（GitHub bot embed） |
+| `1473244731487158566` | dev |
+| `1488774855141752932` | collab |
 
-使用 Discord REST API，以下頻道各抓最多 100 則：
+- 每次最多 100 則；程式開發一週常超過，要用 `after=<最後一則 id>` 翻頁到底。
+- 人類訊息取 `content`；GitHub embed 取 `title`、`url`、`author.name`（PR 作者，用來把 PR 分給負責人）。略過 `discussion_r` review comment 與 bot review。
+- 同一個 PR 有 opened 又 closed 就視為已處理；開了又關的 issue（已搬走）跳過。
 
-| 頻道 ID | 頻道名稱 | 用途 |
-|---------|----------|------|
-| `1060178087947542563` | general | 一般討論 |
-| `1164454086243012608` | alerts | Server 通知 |
-| `1062999869314322473` | 程式開發 | GitHub bot embed + 技術討論 |
-| `1473244731487158566` | dev | 開發討論 |
-| `1488774855141752932` | collab | cofacts.ai 協作討論 |
+**GitHub**：Discord 沒涵蓋的 repo 才補查。
 
-**計算 Discord snowflake**（用來篩選上次開會之後的訊息）：
+**使用者的 Claude session**（有 `mcp__claude-code-remote__list_sessions` 才做；使用者有 Dash 等儀表板也可參考，但以即時 list 為準）：
+- `list_sessions(mine: true)`，取上次會議後有更新的；依 `parent_session_id` 把子 session 併到父 session 底下，一棵樹＝一個議題。
+- 看 `post_turn_summary` 的 `needs_action`／`recent_action`；需要細節時 `list_events(kinds: ["result"])` 只讀結論文字（事件夾帶大量統計，別整包讀）。`get_session` 的 `external_metadata.artifacts` 有該 session 發布的 artifact 連結。
+- 只接受受信任裝置的 session 讀不到，在輸出中註明，不要猜內容。
 
-```python
-import datetime
-dt = datetime.datetime(YYYY, MM, DD, tzinfo=datetime.timezone.utc)
-snowflake = int((dt.timestamp() * 1000 - 1420070400000)) << 22
-print(snowflake)
-```
+### 3. 依 HackMD 章節編排
 
-```bash
-curl -s -H "Authorization: Bot $DISCORD_TOKEN" \
-  "https://discord.com/api/v10/channels/CHANNEL_ID/messages?limit=100&after=SNOWFLAKE"
-```
+- **上週待辦**：不改原文，只在項目下補 `- --> 進度` 一行；細節多的寫「細節下收（章節名）」再放到對應章節。
+- 各章節用 h3 分議題。每個議題：一句現況 → 相關 PR／artifact 連結 → **要決定的事**（列選項與建議）。
+- 有人負責一串 PR 時（例如 Lance、Yutin），拉成「### 人名：主題」，會議上會留時間給他們報告。
+- 個人小待辦、self-review 的細節、純通知類訊息省略；只出現在個人信箱、儀表板的私人事項不放。
+- **會議記錄是公開的**：資安事項不寫漏洞類型、受影響 API、回報者、修法，只寫「收到新回報，會後私下討論」加 private repo（如 cofacts/devops）的連結。
 
-**解析訊息時，兩類都要處理：**
+### 4. 確認後寫回
 
-1. **人類訊息**（`author.bot != true`）：取 `content` 欄位，略過純表情符號或空白訊息
-2. **GitHub bot embed**（`author.username == "GitHub"`）：取 `embeds[].title` + `embeds[].url`，保留關鍵事件（PR opened/closed/merged、release published），略過純 review comment（URL 包含 `discussion_r`）及 gemini-code-assist bot 訊息
-
-### 3. GitHub 補充（選用）
-
-若有頻道沒接 Discord webhook 的 repo，用 GitHub MCP tool 補查：
-
-```
-mcp__github__search_pull_requests: org:cofacts is:pr merged:>=YYYY-MM-DD
-```
-
-與 Discord embed 去重（同一 PR 不重複列出）。
-
-### 4. 整理摘要
-
-產出格式如下（Traditional Chinese），最後包在 Markdown code block 裡方便複製：
-
-````
-```markdown
-## 上週重點整理（YYYY-MM-DD ～ YYYY-MM-DD）
-
-### GitHub 活動
-
-**cofacts/ai**
-- [PR 標題](PR URL)（opened / merged YYYY-MM-DD）
-- [release/YYYYMMDD](release URL)（released YYYY-MM-DD）
-
-**cofacts/url-resolver**
-- [PR 標題](PR URL)
-
-### Discord 重點討論
-
-**general**
-> @作者名：訊息內容（僅保留有資訊量的部分）
-
-**alerts**
-> @作者名：訊息內容
-
-**程式開發**
-> @作者名：訊息內容
-
-**dev**
-> @作者名：訊息內容
-
-**collab**
-> @作者名：訊息內容
-```
-````
-
-**整理原則：**
-- GitHub 活動：按 repo 分組，每個 PR/release 一行，附標題與連結；標註 opened/merged 與日期
-- Discord 人類訊息：以引言（`>`）格式呈現，略去閒聊、純表情，保留技術討論或重要通知
-- 若某頻道沒有任何新訊息（包括 bot embed），整個段落省略
-- 摘要語言用繁體中文（標題、小節說明），引言保留原文
+先把完整草稿給使用者看，依回饋修改。使用者同意後：
+1. 再 GET 一次，`lastChangedAt` 有變就先合併別人的修改，不要直接覆蓋。
+2. `PATCH $HACKMD_API_URL/teams/cofacts/notes/$MEETING_NOTE_ID`，body `{"content": ...}`（team note，個人 endpoint 會 403）。
+3. 讀回來比對確認。
