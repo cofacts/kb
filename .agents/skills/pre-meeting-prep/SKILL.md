@@ -9,7 +9,7 @@ description: 準備 Cofacts 每週開會前的議程：讀當週 HackMD 會議�
 
 ## 環境
 
-`.env`（repo 根目錄）可能有：`DISCORD_TOKEN`、`HACKMD_API_TOKEN`、`HACKMD_API_URL`、`MEETING_NOTE_ID`。缺哪個就略過對應來源，最後說明略過了什麼。
+需要 `DISCORD_TOKEN`、`HACKMD_API_TOKEN`、`HACKMD_API_URL`、`MEETING_NOTE_ID`。先看環境變數（雲端 session 通常已設好），沒有的再從 repo 根目錄的 `.env` 載入（`[ -f .env ] && set -a && . ./.env && set +a`）。缺哪個就略過對應來源，最後說明略過了什麼。
 
 ## 步驟
 
