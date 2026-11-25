@@ -2,6 +2,7 @@
 
 ## 2026
 
+- [1124 外送茶廣告竄改逐字稿、GHSA與漏洞回報、StaleSessionError與背景續跑、List元件、Track 2 /article/:id、url-resolver止血、影片embedding實驗、Embedding backfill盤點、12月小聚](./2026/20261124.md)
 - [1117 cofacts.ai設計師協作、Session review與StaleSessionError、「需要你做的事」PR、url-resolver登入牆清理、Hybrid search圖片kNN評估、ExaSearchBot與Production週報、12月小聚](./2026/20261117.md)
 - [Cofacts Hackath75n 協作頁面](./2026/g0v-hackath75n.md)
 - [1110 url-resolver登入牆清理方案、Hybrid search PR review、cofacts.ai Track 2 list、Session review與當輪日期脈絡、Widen the funnel、背景續跑設計、ADK接coding harness評估、大松檢討](./2026/20261110.md)
