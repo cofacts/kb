@@ -16,7 +16,8 @@ timestamp: "2026-11-24T20:00:00+08:00"
 - **成本：** 既有檔案補產約 US$163，之後每月幾美元（§8）。
 - **上線：** rumors-api 一回傳 URL，LINE bot 的呈現就會改變，所以 resolver 加上預設關閉的開關，變體產生並驗證後才開啟（§9.5）。
 - **阻塞實作的項目：** 建立 job 前要先取得片長與有無音軌，做法尚未決定（§7.1、§11 #19）。sprite 是否另外計費，要等帳單確認（§11 #4）。GCP 權限已具備（§11 #1）。
-- **需要審查者決定：** 補產範圍以文章為準，或以 bucket 裡的所有原檔為準（§11 #18）。探測片長與音軌的做法（§11 #19）。
+- **需要討論：** 探測片長與音軌的做法，以及 preview 是否改用 spritesheet。文章詳情頁的呈現要與設計師討論（§11 #19）。
+- **已決定：** 補產只處理有對應文章的檔案，約 2.2 萬個（§11 #18）。
 
 ## 1. 背景與目標
 
@@ -133,7 +134,7 @@ Penpot 中所有圖片位置填的都是同一張示意照片（600 × 815），
 
 文章只有 `NORMAL` 與 `BLOCKED` 兩種狀態，沒有「刪除」（[`ArticleStatusEnum`](https://github.com/cofacts/rumors-api/blob/master/src/graphql/models/ArticleStatusEnum.js)）。`ListArticles` 沒有指定 `filter.statuses` 時只列 `NORMAL`，所以上表的數字不含 BLOCKED。BLOCKED 的 VIDEO 與 AUDIO 目前是 0 篇（`filter:{articleTypes:[VIDEO,AUDIO], statuses:[BLOCKED]}`），所以上表沒有低估。平均長度與 original 總容量，我沒有權限查，**待確認**（§11 #6）。
 
-**GCS 原檔數與文章數不一致（2026-11-21 以 `gcloud storage ls` 列出）：** `production/audio/` 有 1,169 個 `original`，AUDIO 文章數是 324。VIDEO 只列了部分雜湊前綴（5,558 個），依雜湊分布推估整個 bucket 約 4 萬個，文章數是 21,598。每月新增速度也有同樣的差距（AUDIO 約 60 到 80 對 4 到 16）。目錄名稱是檔案內容的 SHA-256（media-manager 的 `getFileIDHash`），所以不會有位元組完全相同的重複檔。多出來的檔案推測是沒有變成文章的上傳，例如 `ListArticles` 的 `mediaUrl` 查詢會經 `getOrUploadMedia` 先上傳檔案，但這是推測，尚未比對。§8 與 §9 的檔案量以文章數估算，若補產範圍是整個 bucket，VIDEO 的補產費用約為 US$300（上限），見 §11 #18。
+**GCS 原檔數與文章數不一致（2026-11-21 以 `gcloud storage ls` 列出）：** `production/audio/` 有 1,169 個 `original`，AUDIO 文章數是 324。VIDEO 只列了部分雜湊前綴（5,558 個），依雜湊分布推估整個 bucket 約 4 萬個，文章數是 21,598。每月新增速度也有同樣的差距（AUDIO 約 60 到 80 對 4 到 16）。目錄名稱是檔案內容的 SHA-256（media-manager 的 `getFileIDHash`），所以不會有位元組完全相同的重複檔。多出來的檔案是查詢時存下的上傳：登入的使用者以 `ListArticles` 的 `mediaUrl` 查詢時，尚未存過的檔案會經 `getOrUploadMedia` 永久存檔，但查詢不一定會變成文章。補產只處理有對應文章的檔案，所以 §8 與 §9 以文章數估算（§11 #18）。
 
 ### 2.6 LINE bot 的現況
 
@@ -172,7 +173,7 @@ LINE bot 不是 `WEBSITE` client，所以 LIFF 文章頁本來就拿不到 origi
 | R6 | 新上傳的檔案要自動產生 | 合約 |
 | R7 | 成本要落在審查核定的範圍 | 合約 |
 
-R4 的強度與 #326 原文不同：#326 寫的是「hopefully audio」（§2.7）。審查者已確認 AUDIO 的 THUMBNAIL 回傳 `null`、由前端顯示圖示即可，不必由檔案產生（§11 #15）。R3 之外，thumbnail 也要符合 LINE Flex Message 的限制（§2.6）。
+R4 的強度與 #326 原文不同：#326 寫的是「hopefully audio」（§2.7）。已確認 AUDIO 的 THUMBNAIL 回傳 `null`、由前端顯示圖示即可，不必由檔案產生（§11 #15）。R3 之外，thumbnail 也要符合 LINE Flex Message 的限制（§2.6）。
 
 ## 4. 方案比較
 
@@ -181,7 +182,7 @@ R4 的強度與 #326 原文不同：#326 寫的是「hopefully audio」（§2.7�
 ### 4.1 方案 A：Google Transcoder API
 
 - **做法：** 上傳完成後建立一個 Transcoder job。輸入是 `gs://…/video/<hash>/original`，輸出寫回同一個 GCS 目錄。preview 用 job 的剪輯功能輸出 30 秒 SD mp4（計價頁範例 2 說明剪輯後只計輸出長度）。縮圖用 `spriteSheets`。
-- **觸發方式：** rumors-api 在 `onUploadStop` 後直接呼叫 `createJob`（一次 API 呼叫，不吃 CPU，不需要 Cloud Run）。mrorz 在 #326 原本提議以 GCS 事件經函式觸發（§2.7），審查時改為直接呼叫（§4.5）。
+- **觸發方式：** rumors-api 在 `onUploadStop` 後直接呼叫 `createJob`（一次 API 呼叫，不吃 CPU，不需要 Cloud Run）。mrorz 在 #326 原本提議以 GCS 事件經函式觸發（§2.7），後來改為直接呼叫（§4.5）。
 - **已知缺口：**
   - 官方 sprite 文件只描述「均勻分佈張數」與「每 n 秒一張」兩種模式。PoC 確認 `totalCount = 1` 搭配 1 秒到 2 秒的取幀區間可以產出單張 JPEG（§4.6）。
   - sprite 依固定時間點取幀，不能像 ffmpeg 的 `thumbnail` 濾鏡那樣挑出代表幀。片頭是黑畫面時，縮圖會是黑的。
@@ -220,7 +221,7 @@ R4 的強度與 #326 原文不同：#326 寫的是「hopefully audio」（§2.7�
 | **失敗與重試** | job 有狀態（含失敗）可查。重試要自己重新建立 job。失敗行為文件未詳述（待確認）。API 配額：mutation 100 次每分鐘 | 轉碼失敗狀態可由 API 查。重試要重新上傳或重新抓取。細節待確認 | Eventarc 對非 2xx 回應自動重試（細節待確認）。處理程式要冪等，並對壞檔寫失敗標記以停止重試（§7.3） |
 | **R1 的根本顧慮（自行維運轉檔）** | 不涉及 | 不涉及 | 仍在，只是移出 API server |
 | **所需權限** | Transcoder API 與 IAM | Cloudflare 帳號與 API token | Cloud Run、Eventarc、Pub/Sub、Artifact Registry |
-| **能否滿足 R4** | 可以。VIDEO 與 AUDIO 的 preview 已由 PoC 確認。AUDIO 的 thumbnail 無波形，回傳 `null` 由前端顯示圖示，審查者已確認可接受（§11 #15） | 待確認（是否支援純音訊） | 是（`showwavespic`） |
+| **能否滿足 R4** | 可以。VIDEO 與 AUDIO 的 preview 已由 PoC 確認。AUDIO 的 thumbnail 無波形，回傳 `null` 由前端顯示圖示，已確認可接受（§11 #15） | 待確認（是否支援純音訊） | 是（`showwavespic`） |
 | **規格彈性（R3）** | 受 job 設定欄位限制。單張 poster 已由 PoC 確認可行。取固定時間點，無法避開黑畫面 | 受 Stream 的固定 URL 參數限制 | 完全可控 |
 
 ### 4.5 建議
@@ -230,7 +231,7 @@ R4 的強度與 #326 原文不同：#326 寫的是「hopefully audio」（§2.7�
 理由：
 
 1. **它直接處理 #334 的根本顧慮。** #334 的問題不只是拖慢 API server，而是吃 CPU 的轉檔工作要由我們自己扛。方案 C 把 ffmpeg 搬到 Cloud Run，隔離了影響範圍，但機器規格、記憶體、逾時、OOM 與壞檔重試仍由我們維運。mrorz 在 #326 面對同一個顧慮時，提的是改用代管的 Transcoder，而不是把 ffmpeg 搬到另一個服務（§2.7）。
-2. **需要的權限最少，也不必另外核定。** 由 rumors-api 直接呼叫 `createJob` 時，只需啟用 Transcoder API 並設定 IAM。方案 C 需要 Cloud Run、Eventarc、Pub/Sub、Artifact Registry，而且「在 Cloud Run 上跑 ffmpeg」是否符合 R1 需要審查者確認（§11）。
+2. **需要的權限最少，也不必另外核定。** 由 rumors-api 直接呼叫 `createJob` 時，只需啟用 Transcoder API 並設定 IAM。方案 C 需要 Cloud Run、Eventarc、Pub/Sub、Artifact Registry，而且「在 Cloud Run 上跑 ffmpeg」是否符合 R1 也需要確認（§11）。
 3. **成本差距可以忽略。** 補產方案 A 約 US$163，方案 C 約 US$34 到 206。之後兩者每月都只有幾美元（§8.6）。
 4. **方案 C 的規格優勢對使用者影響小。** C 能做、A 做不到的有兩項：
    - AUDIO 的波形縮圖。120 × 120 的語音波形彼此幾乎一樣，傳達的資訊有限。改為 THUMBNAIL 回傳 `null`，網站顯示聲音圖示，LINE bot 維持純文字（§5.2）。
@@ -301,7 +302,7 @@ PoC 使用的編碼參數：影片為 H.264 main profile、600 kbps、24 fps，r
 
 | 變體 | 型態 | 規格 |
 | --- | --- | --- |
-| THUMBNAIL | 不產生，resolver 回傳 `null` | 網站顯示聲音圖示。審查者已確認不需要由檔案產生波形圖（§11 #15） |
+| THUMBNAIL | 不產生，resolver 回傳 `null` | 網站顯示聲音圖示。已確認不需要由檔案產生波形圖（§11 #15） |
 | `m4a-30s.mp4`（PREVIEW） | m4a（AAC） | 取前 30 秒，64 kbps 單聲道，由 Transcoder 輸出純音訊。純音訊輸入已由 PoC 確認支援（§4.6）。輸出副檔名是 `.mp4` |
 
 Penpot 沒有聲音的專屬設計。列表卡 120 × 120 的聲音圖示樣式（圖示加時長，或只用「語音訊息」badge）由設計師決定，不需要後端產生檔案。
@@ -552,7 +553,7 @@ signed URL 每天換一次簽名，瀏覽器與 CDN 的快取命中會受影響�
 - **不指定順序。** production 的開關在補產完成並驗收後才開啟（§9.5），補產期間使用者看不到變體，所以先補哪些不影響結果。`getAllDocs` 也不支援排序，沿用即可。
 - **用批次模式，分批送出。** 批次模式每個 region 同時執行上限 10 個 job，排隊上限 10,000 個（§4.4）。script 依排隊量分批建立 job，不要一次送出 21,922 個。日常上傳若用互動模式，兩者不會互相搶配額（此行為待確認）。
 - **先用 `--limit 50` 小批次驗證**設定與輸出，再放大。
-- **預估時間：** PoC 實測每個 job 的處理時間中位數 1.7 秒、最長 5 秒（§4.6）。同時 10 個 job，即使每個都要 5 秒，每分鐘也能處理 120 個，所以瓶頸是建立 job 的 API 配額（mutation 每分鐘 100 次，§4.4）。以文章為準的 21,922 項約 3.7 小時；以 bucket 為準的約 4 萬項約 7 小時（§11 #18）。排隊時間會再拉長一些，PoC 中最長約 2 分鐘。配額能否提高待確認。
+- **預估時間：** PoC 實測每個 job 的處理時間中位數 1.7 秒、最長 5 秒（§4.6）。同時 10 個 job，即使每個都要 5 秒，每分鐘也能處理 120 個，所以瓶頸是建立 job 的 API 配額（mutation 每分鐘 100 次，§4.4）。21,922 項約 3.7 小時。排隊時間會再拉長一些，PoC 中最長約 2 分鐘。配額能否提高待確認。
 
 ### 9.3 驗收
 
@@ -575,7 +576,7 @@ rumors-api 一開始回傳 VIDEO 與 AUDIO 的 URL，LINE bot 的聊天室與 LI
 4. **跑完整補產**，完成後依 §9.3 驗收。補產期間新上傳的檔案照常由觸發方式處理。
 5. **在 production 開啟開關。** 此時既有檔案都已有變體，使用者不會看到部分文章有縮圖、部分沒有的過渡狀態。
 
-存在檢查讓補產完成前就開啟開關也是安全的（沒有變體的文章回傳 `null`，維持現狀）。第一版選擇等補產完成，代價是功能晚幾個小時上線（§9.2 的估算約 4 到 7 小時）。
+存在檢查讓補產完成前就開啟開關也是安全的（沒有變體的文章回傳 `null`，維持現狀）。第一版選擇等補產完成，代價是功能晚幾個小時上線（§9.2 的估算約 4 小時）。
 
 關閉方式：
 
@@ -611,7 +612,7 @@ rumors-api 一開始回傳 VIDEO 與 AUDIO 的 URL，LINE bot 的聊天室與 LI
 | --- | --- | --- | --- | --- |
 | 1 | **GCP 權限：** 啟用 Transcoder API、建立 job 的 IAM 角色、Transcoder service agent 對 bucket 的讀寫權限 | 方案 A 的前提。**已完成（2026-11-21）：** Transcoder API 已啟用，PoC 用 service account 有 `roles/transcoder.admin` 與 bucket 的 `roles/storage.objectViewer`。service agent 預設就能讀寫同 project 的 bucket。觸發方式不用 Eventarc（#16），所以不需要其他權限 | mrorz | 否 |
 | 2 | bucket `cofacts-media-collection` 是否公開可讀 | **已查證：** 匿名請求一律 403（2026-11-13），且已啟用 uniform bucket-level access，IAM 中沒有 allUsers 與 allAuthenticatedUsers（2026-11-20）。R2 成立（§6.3） | | 否 |
-| 3 | 審查者是否核定「在 Cloud Run 上跑 ffmpeg」 | 只在改採方案 C 時需要。合約只排除 API server 內轉檔，沒有明文允許 Cloud Run | Johnson | 否 |
+| 3 | 是否核定「在 Cloud Run 上跑 ffmpeg」 | 只在改採方案 C 時需要。合約只排除 API server 內轉檔，沒有明文允許 Cloud Run | Johnson | 否 |
 | 4 | PoC 結果。**大部分已完成（§4.6）：** 單張 JPEG 縮圖、純音訊輸入、37 支影片與 5 支音訊的成功率、處理時間與黑畫面比例都已驗證。**尚未確認：** sprite 是否計費、job 狀態保留多久、損毀檔案行為、超過 40 個並發的配額 | 決定方案 A 能否採用（§4.5 驗收線），以及 §9 的時間 | 方案 A 的 PoC | 否，但 sprite 計費要在實作前確認 |
 | 5 | bucket 所在的 region | **已查證：** asia-east1。Transcoder job 也建在 asia-east1，沒有跨區傳輸（§4.6） | | 否 |
 | 6 | 既有 VIDEO 與 AUDIO 的平均長度與 `original` 總容量（`gcloud storage du`） | H3 的實際值。只影響方案 B 的成本。PoC 顯示方案 A 的 job 處理時間與片長沒有明顯關係（§4.6） | 有 GCP 權限的人 | 否 |
@@ -626,8 +627,8 @@ rumors-api 一開始回傳 VIDEO 與 AUDIO 的 URL，LINE bot 的聊天室與 LI
 | 15 | 合約驗收標準是否要求 AUDIO thumbnail 由檔案產生，或前端圖示即可 | **已決定：** 回傳 `null`、由前端顯示圖示即可，不需要波形圖。§4.5 維持方案 A | | 否 |
 | 16 | 觸發方式：rumors-api 直接呼叫 `createJob`，或 Eventarc 加函式 | **已決定：** rumors-api 在上傳完成後直接呼叫 `createJob`，漏掉的由 ensure-variants script 補上（§4.5） | | 否 |
 | 17 | 封鎖的文章是否仍能經由 API 查到 `attachmentUrl`；VIDEO preview 是否需要比 IMAGE 更嚴的下架處理 | **已釐清：** 查得到，與 IMAGE 現況相同，§6.5 沿用 IMAGE 的做法。BLOCKED 的文章不補產 | | 否 |
-| 18 | 補產範圍：只補有對應文章的檔案，或 bucket 裡所有 `original`。GCS 原檔數約為文章數的 2 到 4 倍（§2.5）。要確認多出來的檔案是否沒有對應文章，需把 GCS 的 hash 清單與資料庫的 `articles.attachmentHash` 做交集 | 決定 §8 的補產費用（VIDEO 約 US$163 對 US$300 左右）與 §9 的處理時間。決定前，§8 與 §9 以文章數估算 | 審查者決定範圍。有資料庫權限的人可以做交集 | 否 |
-| 19 | 建立 job 前如何取得片長與有無音軌 | PoC 發現剪輯終點超過片長，或沒有音軌卻宣告音訊串流時，job 會失敗（§4.6）。rumors-api 目前沒有 ffmpeg 或 ffprobe（§2.2）。可能的做法有三種：在 rumors-api 以 JS 函式庫解析檔案的中繼資料（容器格式不一，可行性待確認）；不探測，job 失敗後依錯誤調整設定重送；在 API server 之外執行 ffprobe。選擇會影響 #16 的觸發方式是否仍然最簡單 | 實作者提出做法，審查者決定 | 是 |
+| 18 | 補產範圍：只補有對應文章的檔案，或 bucket 裡所有 `original`。GCS 原檔數約為文章數的 2 到 4 倍（§2.5） | **已決定（2026-11-24）：** 只補有對應文章的檔案，約 2.2 萬個，VIDEO 約 US$163。多出來的原檔是查詢時存下的上傳（§2.5） | | 否 |
+| 19 | 建立 job 前如何取得片長與有無音軌 | PoC 發現剪輯終點超過片長，或沒有音軌卻宣告音訊串流時，job 會失敗（§4.6）。rumors-api 目前沒有 ffmpeg 或 ffprobe（§2.2）。可能的做法有三種：在 rumors-api 以 JS 函式庫解析檔案的中繼資料（容器格式不一，可行性待確認）；不探測，job 失敗後依錯誤調整設定重送（錯誤訊息不是正式介面，無法解析時要有退路，例如不剪輯、不帶音訊串流再送一次）；在 API server 之外執行 ffprobe。選擇會影響 #16 的觸發方式是否仍然最簡單。**另一個提議（2026-11-24）：** preview 改用 [spritesheet](https://docs.cloud.google.com/transcoder/docs/how-to/generate-spritesheet)。sprite 依片長取幀，不需要剪輯與聲音，可以避開這兩種失敗。文章詳情頁可能要能在 spritesheet 與原檔之間切換，需要與設計師討論（Discord）。這個做法的考量：spritesheet 沒有聲音，未登入者與 LINE bot 都聽不到影片內容；AUDIO 沒有畫面，preview 仍要剪 30 秒，短語音仍會失敗，所以 AUDIO 仍要從上述三種做法中選一種；LINE bot 的 LIFF 文章頁以 `<video controls>` 播放 VIDEO 的 `PREVIEW`（§2.6），PREVIEW 改成 JPEG 就無法播放，LINE bot 要跟著改；官方文件寫明 spritesheet 需要至少一個 `VideoStream`，不剪輯時可能依全片長度計費，可與 #4 一起實測 | mrorz、設計師 | 是 |
 
 **已辨識的風險：**
 
@@ -636,7 +637,7 @@ rumors-api 一開始回傳 VIDEO 與 AUDIO 的 URL，LINE bot 的聊天室與 LI
 - **補產的花費：** Transcoder 依輸出分鐘計費，總額上限約 US$163 加上 sprite 費用（§8.3），沒有執行個體數量失控的問題。仍先用 `--limit 50` 驗證設定（§9.2）。
 - **黑畫面縮圖：** 固定時間點取幀可能取到片頭黑畫面。PoC 抽查沒有黑畫面（§4.6）。補產時仍抽樣統計比例，必要時調整取幀時間點。
 - **LINE bot 出現破圖：** resolver 若回傳不存在的檔案，Flex Message 無法退回預設圖。對策是 §10 的存在檢查。
-- **公開預覽的內容風險：** 未登入者與搜尋引擎都能取得 thumbnail 與 preview。30 秒的 preview 對多數短片而言接近全片，可能包含不當內容（§2.7 nonumpa 的顧慮）。IMAGE 的 thumbnail 與 preview 已有同樣情況，本文沿用現行做法，是否需要額外對策待審查者決定。文章封鎖後的處理見 §6.5。
+- **公開預覽的內容風險：** 未登入者與搜尋引擎都能取得 thumbnail 與 preview。30 秒的 preview 對多數短片而言接近全片，可能包含不當內容（§2.7 nonumpa 的顧慮）。IMAGE 的 thumbnail 與 preview 已有同樣情況，本文沿用現行做法，是否需要額外對策待決定。文章封鎖後的處理見 §6.5。
 
 ## 12. 參考資料
 
