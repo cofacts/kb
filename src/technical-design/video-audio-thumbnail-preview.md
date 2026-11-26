@@ -16,7 +16,7 @@ timestamp: "2026-11-24T20:00:00+08:00"
 - **成本：** 既有檔案補產約 US$163，之後每月幾美元（§8）。
 - **上線：** rumors-api 一回傳 URL，LINE bot 的呈現就會改變，所以 resolver 加上預設關閉的開關，變體產生並驗證後才開啟（§9.5）。
 - **阻塞實作的項目：** 建立 job 前要先取得片長與有無音軌，做法尚未決定（§7.1、§11 #19）。sprite 是否另外計費，要等帳單確認（§11 #4）。GCP 權限已具備（§11 #1）。
-- **需要討論：** 探測片長與音軌的做法，以及 preview 是否改用 spritesheet。文章詳情頁的呈現要與設計師討論（§11 #19）。
+- **討論中：** VIDEO 的 preview 改為整支影片的 spritesheet，AUDIO 不放 preview（§5.5、§11 #19）。這個方向不需要探測片長與音軌，但補產費用會變為約 US$636。文章詳情頁的呈現要與設計師討論。
 - **已決定：** 補產只處理有對應文章的檔案，約 2.2 萬個（§11 #18）。
 
 ## 1. 背景與目標
@@ -132,7 +132,7 @@ Penpot 中所有圖片位置填的都是同一張示意照片（600 × 815），
 
 新增速度約每月 200 到 330 支影片、4 到 16 個音訊。2024 年研究文件寫「9214 video / audio」（[multimedia-support](../research/multimedia-support.md)），現在已是 21,922。
 
-文章只有 `NORMAL` 與 `BLOCKED` 兩種狀態，沒有「刪除」（[`ArticleStatusEnum`](https://github.com/cofacts/rumors-api/blob/master/src/graphql/models/ArticleStatusEnum.js)）。`ListArticles` 沒有指定 `filter.statuses` 時只列 `NORMAL`，所以上表的數字不含 BLOCKED。BLOCKED 的 VIDEO 與 AUDIO 目前是 0 篇（`filter:{articleTypes:[VIDEO,AUDIO], statuses:[BLOCKED]}`），所以上表沒有低估。平均長度與 original 總容量，我沒有權限查，**待確認**（§11 #6）。
+文章只有 `NORMAL` 與 `BLOCKED` 兩種狀態，沒有「刪除」（[`ArticleStatusEnum`](https://github.com/cofacts/rumors-api/blob/master/src/graphql/models/ArticleStatusEnum.js)）。`ListArticles` 沒有指定 `filter.statuses` 時只列 `NORMAL`，所以上表的數字不含 BLOCKED。BLOCKED 的 VIDEO 與 AUDIO 目前是 0 篇（`filter:{articleTypes:[VIDEO,AUDIO], statuses:[BLOCKED]}`），所以上表沒有低估。VIDEO 的片長以隨機抽樣量測（2026-11-26）：從 21,663 篇 VIDEO 文章隨機抽 300 支，以 ffprobe 讀取檔頭，平均 117 秒，中位數 89 秒，第 25 與 75 百分位為 53 與 174 秒，30 秒以下的占 8%，原檔平均約 17 MB。AUDIO 的長度與 original 總容量仍**待確認**（§11 #6）。
 
 **GCS 原檔數與文章數不一致（2026-11-21 以 `gcloud storage ls` 列出）：** `production/audio/` 有 1,169 個 `original`，AUDIO 文章數是 324。VIDEO 只列了部分雜湊前綴（5,558 個），依雜湊分布推估整個 bucket 約 4 萬個，文章數是 21,598。每月新增速度也有同樣的差距（AUDIO 約 60 到 80 對 4 到 16）。目錄名稱是檔案內容的 SHA-256（media-manager 的 `getFileIDHash`），所以不會有位元組完全相同的重複檔。多出來的檔案是查詢時存下的上傳：登入的使用者以 `ListArticles` 的 `mediaUrl` 查詢時，尚未存過的檔案會經 `getOrUploadMedia` 永久存檔，但查詢不一定會變成文章。補產只處理有對應文章的檔案，所以 §8 與 §9 以文章數估算（§11 #18）。
 
@@ -270,7 +270,7 @@ PoC 結果見 §4.6：前三項通過，抽查沒有黑畫面，sprite 計費等
 
 1. **剪輯終點不能超過片長。** `editList` 的 `endTimeOffset` 大於輸入長度時 job 會失敗。必須先取得片長，並設為 min(30, 向下取整的片長)。
 2. **無音軌的輸入不能宣告音訊串流。** 否則 job 失敗，錯誤是 atom 沒有音軌。必須先知道有沒有音軌。
-3. **sprite 的寬高都必填。** 欄位是 `spriteWidthPixels` 與 `spriteHeightPixels`，寬度要依長寬比自己算。
+3. **sprite 的尺寸欄位是 `spriteWidthPixels` 與 `spriteHeightPixels`。** PoC 當時記為兩者都必填，但實際遇到的錯誤是欄位名稱寫錯，沒有驗證只填一邊的情況。[JobConfig 文件](https://docs.cloud.google.com/transcoder/docs/reference/rest/v1/JobConfig)寫明只需填寫寬或高，另一邊由 API 依長寬比計算。若兩者都必填，建立 job 前就要先知道影片的長寬比（**待確認**）。
 4. **單聲道要指定 `channelLayout`。** `channelCount = 1` 要搭配 `["fc"]`。
 5. **輸出檔名固定規則：** sprite 是 `<filePrefix>0000000000.jpeg`，影片是 `<mux key>.mp4`。純音訊的 mp4 容器副檔名也是 `.mp4`，不是 `.m4a`。
 6. **API 啟用後的第一個 job 失敗過一次**，錯誤是 Cloud Storage 權限不足，重送後成功。推測是 service agent 剛啟用，尚未確認。
@@ -316,7 +316,7 @@ LINE 聊天室的候選訊息維持現狀：AUDIO 的 `THUMBNAIL` 是 `null`，�
 | 型態 | 第一版不做的理由 |
 | --- | --- |
 | 動態 GIF | LINE bot 的 `THUMBNAIL` 只能是 JPEG 或 PNG（§5.1），所以不能放在 THUMBNAIL 下，要另開變體。檔案大小也未知（研究文件的筆記提到 Cloudflare 的 GIF 可能十幾 MB，未實測，**待確認**） |
-| sprite sheet（多張圖拼成一張） | #326 與合約沒有要求。前端要依時間軸切圖才有用 |
+| sprite sheet（多張圖拼成一張） | #326 與合約沒有要求。前端要依時間軸切圖才有用。改作 PREVIEW 的提議見 §5.5 |
 | 5 秒 2 倍速短片當 thumbnail（#334 做法） | 同樣不符合 LINE 的 `THUMBNAIL` 限制。短片比靜態圖多載入與解碼的負擔，也需要另開變體 |
 
 第一版只做靜態 JPEG，是因為它是 LINE bot 唯一能用的 `THUMBNAIL` 型態。列表卡是否要動態效果，由設計師決定（§11 #8）。決定後再於 preview 之外新增變體，不影響本文其他部分。
@@ -334,6 +334,28 @@ production/audio/<hash>/m4a-30s.mp4
 ```
 
 PoC 確認 Transcoder 無法輸出不帶流水號或副檔名的檔名（§4.6），所以無法沿用 IMAGE 的 `jpg240h`、`webp600w` 這類名稱。media-manager 的 `parseFilename()` 以路徑最後一段作為變體名稱，含副檔名也能正常 `get()` 與 `getFile()`，所以不必改名或搬移檔案，resolver 也不需要對照表。
+
+### 5.5 討論中：整支影片的 spritesheet（2026-11-25）
+
+mrorz 在 PR 討論中提議以下方向，尚未定案（§11 #19）：
+
+- **VIDEO 的 PREVIEW 改為整支影片的 spritesheet。** 從整支影片平均取出多張畫面拼成一張 JPEG，沒有聲音，可以對整支影片一目瞭然。
+- **AUDIO 不放 PREVIEW。** 語音通常有逐字稿，未登入者可以先看逐字稿，要聽原檔就登入。AUDIO 的 THUMBNAIL 與 PREVIEW 都回傳 `null`，所以 AUDIO 不需要建立 Transcoder job。
+- **LIFF 改為載入原檔。** LIFF 的使用者已經由 LINE 識別身分。
+
+規格草案，格數與尺寸待設計師確認：
+
+| 變體 | 規格 |
+| --- | --- |
+| THUMBNAIL | 不變，同 §5.1 |
+| PREVIEW | 一張 JPEG spritesheet，`totalCount = 12`、`columnCount = 4`（4 × 3），每格高 180 px，quality 80。不設 `editList`，由 Transcoder 在整支輸出的時間軸上平均取幀 |
+
+影響：
+
+- **不需要探測片長與音軌。** 不剪輯就不會發生剪輯終點超過片長的失敗。job 只產生 sprite，不宣告音訊串流，所以沒有音軌的影片也不會失敗。前提是 sprite 只填高度即可（§4.6 第 3 點）。
+- **費用依片長計算。** JobConfig 寫明 sprite 的 `startTimeOffset`、`endTimeOffset` 與 `totalCount` 都以輸出的時間軸為準，所以 sprite 要涵蓋整支影片，輸出就必須是整支影片，無法靠剪短影片串流壓低費用。補產約 US$636，每月約 US$10（§8.3）。
+- **LINE bot 要修改。** LIFF 文章頁以 `<video controls>` 播放 VIDEO 的 `PREVIEW`（§2.6），PREVIEW 改為 JPEG 後無法播放。若 LIFF 改為載入原檔，rumors-api 的 `attachmentUrl` 要對 LINE bot 的 `appId` 回傳 ORIGINAL（目前只對 `WEBSITE` 回傳）。LIFF 經 LINE bot server 以 `x-app-secret` 呼叫 rumors-api，所以 rumors-api 看到的是 LINE bot 的 `appId`。原檔平均約 17 MB，每 1,000 次播放的傳輸費約 US$2。
+- **文章詳情頁的呈現**（spritesheet 的顯示方式、與原檔的切換、無聲的提示、語音訊息未登入時的畫面）由設計師決定（Discord）。
 
 ## 6. 存取範圍
 
@@ -457,7 +479,7 @@ PoC 未達標時，產生端換成 Cloud Run 上的 ffmpeg，其他部分（變�
 | --- | --- | --- |
 | H1 | 既有 VIDEO 21,598、AUDIO 324 | §2.5 |
 | H2 | 每月新增約 330 支 VIDEO、16 個 AUDIO（取近 365 天的平均，偏保守） | §2.5 |
-| H3 | 平均影片長度未知，以 1／3／5 分鐘三種情境表示。只有方案 B 的儲存費與長度有關 | 假設，**待確認**。1 分鐘取自 2024 研究文件的估算，5 分鐘取自 [OCR 設計文件](ocr-and-ai-transcripts.md) 的上限假設 |
+| H3 | VIDEO 平均長度 117 秒（約 1.96 分鐘）。剪取 30 秒時只影響方案 B 的儲存費；改為整支影片的 spritesheet 時也影響方案 A 的轉檔費（§8.3） | 隨機抽樣 300 支實測（§2.5）。方案 B 的表格仍以 1／3／5 分鐘三種情境表示 |
 | H4 | VIDEO preview 約 2.5 MB、thumbnail 約 15 KB（取上限）、AUDIO preview 約 250 KB | PoC 實測（§4.6） |
 | H5 | 方案 C 每支處理 30／60／180 秒，2 vCPU、2 GiB | 假設，待 PoC 驗證 |
 | H6 | 傳輸以 US$0.12 / GiB 估算 | 官方 Premium Tier 網際網路傳出，到亞洲（韓國與印尼除外），1 GiB 到 1,024 GiB 區間 |
@@ -489,12 +511,14 @@ Cloud Run 這裡取依請求計費的單價（比 Job 與依實例計費的 US$0
 | A：Transcoder | 21,598 × 0.5 分鐘 × US$0.015 = US$161.99；AUDIO 324 × 0.5 × US$0.005 = US$0.81 | **約 US$163**（sprite 若另計費則更高，待確認）。短於 30 秒的影片計費較少，所以是上限 |
 | B：Cloudflare Stream | 無轉檔費（ingest 與 encoding 免費）。儲存費見下 | 儲存費另計 |
 | C：Cloud Run | 每支成本 = 秒數 × (2 × 0.000024 + 2 × 0.0000025) = 秒數 × US$0.000053。21,598 支 | 30 秒 US$34；60 秒 US$69；180 秒 US$206。未扣免費額度約 US$5.2 |
+| A，整支影片的 spritesheet（§5.5） | 21,663 × 1.96 分鐘 × US$0.015。AUDIO 不產生 | **約 US$636**（以抽樣平均的 95% 信賴區間計算為 US$587 到 687）。sprite 若另計費則更高 |
 
 **每月新增（約 330 VIDEO 加 16 AUDIO）：**
 
 | 方案 | 金額 |
 | --- | --- |
 | A | 330 × US$0.0075 + 16 × US$0.0025 = **約 US$2.5** |
+| A，整支影片的 spritesheet（§5.5） | 330 × 1.96 分鐘 × US$0.015 = **約 US$10**，AUDIO 不產生 |
 | C | 346 × 每支成本 = 30／60／180 秒情境分別約 **US$0.55／1.1／3.3** |
 
 ### 8.4 方案 B 的儲存費
@@ -615,7 +639,7 @@ rumors-api 一開始回傳 VIDEO 與 AUDIO 的 URL，LINE bot 的聊天室與 LI
 | 3 | 是否核定「在 Cloud Run 上跑 ffmpeg」 | 只在改採方案 C 時需要。合約只排除 API server 內轉檔，沒有明文允許 Cloud Run | Johnson | 否 |
 | 4 | PoC 結果。**大部分已完成（§4.6）：** 單張 JPEG 縮圖、純音訊輸入、37 支影片與 5 支音訊的成功率、處理時間與黑畫面比例都已驗證。**尚未確認：** sprite 是否計費、job 狀態保留多久、損毀檔案行為、超過 40 個並發的配額 | 決定方案 A 能否採用（§4.5 驗收線），以及 §9 的時間 | 方案 A 的 PoC | 否，但 sprite 計費要在實作前確認 |
 | 5 | bucket 所在的 region | **已查證：** asia-east1。Transcoder job 也建在 asia-east1，沒有跨區傳輸（§4.6） | | 否 |
-| 6 | 既有 VIDEO 與 AUDIO 的平均長度與 `original` 總容量（`gcloud storage du`） | H3 的實際值。只影響方案 B 的成本。PoC 顯示方案 A 的 job 處理時間與片長沒有明顯關係（§4.6） | 有 GCP 權限的人 | 否 |
+| 6 | 既有 VIDEO 與 AUDIO 的平均長度與 `original` 總容量（`gcloud storage du`） | **VIDEO 已量測（2026-11-26）：** 平均 117 秒，中位數 89 秒（§2.5）。AUDIO 的長度與總容量仍待確認。PoC 顯示方案 A 的 job 處理時間與片長沒有明顯關係（§4.6） | 有 GCP 權限的人 | 否 |
 | 7 | 實際流量：列表頁曝光、訊息頁 preview 播放次數 | H7。目前只有單位成本 | GA4 或日誌的管理者 | 否 |
 | 8 | Penpot 沒有影片與聲音的專屬設計：播放控制、時長標示、聲音（波形或圖示）、preview 是否自動播放與靜音、載入中 placeholder、列表卡是否要動態效果 | §5 的規格是依通用圖片位置推出的建議 | 設計師（Penpot 檔案維護者） | 否，但影響 AUDIO 規格 |
 | 9 | LINE bot 與其他非 WEBSITE client 取得 thumbnail 與 preview 是否合適 | **已釐清：** #326 原文即要求 thumbnail 給 LINE bot 列表，LINE bot 也已在查詢這兩個變體（§2.6、§2.7） | | 否 |
@@ -628,7 +652,7 @@ rumors-api 一開始回傳 VIDEO 與 AUDIO 的 URL，LINE bot 的聊天室與 LI
 | 16 | 觸發方式：rumors-api 直接呼叫 `createJob`，或 Eventarc 加函式 | **已決定：** rumors-api 在上傳完成後直接呼叫 `createJob`，漏掉的由 ensure-variants script 補上（§4.5） | | 否 |
 | 17 | 封鎖的文章是否仍能經由 API 查到 `attachmentUrl`；VIDEO preview 是否需要比 IMAGE 更嚴的下架處理 | **已釐清：** 查得到，與 IMAGE 現況相同，§6.5 沿用 IMAGE 的做法。BLOCKED 的文章不補產 | | 否 |
 | 18 | 補產範圍：只補有對應文章的檔案，或 bucket 裡所有 `original`。GCS 原檔數約為文章數的 2 到 4 倍（§2.5） | **已決定（2026-11-24）：** 只補有對應文章的檔案，約 2.2 萬個，VIDEO 約 US$163。多出來的原檔是查詢時存下的上傳（§2.5） | | 否 |
-| 19 | 建立 job 前如何取得片長與有無音軌 | PoC 發現剪輯終點超過片長，或沒有音軌卻宣告音訊串流時，job 會失敗（§4.6）。rumors-api 目前沒有 ffmpeg 或 ffprobe（§2.2）。可能的做法有三種：在 rumors-api 以 JS 函式庫解析檔案的中繼資料（容器格式不一，可行性待確認）；不探測，job 失敗後依錯誤調整設定重送（錯誤訊息不是正式介面，無法解析時要有退路，例如不剪輯、不帶音訊串流再送一次）；在 API server 之外執行 ffprobe。選擇會影響 #16 的觸發方式是否仍然最簡單。**另一個提議（2026-11-24）：** preview 改用 [spritesheet](https://docs.cloud.google.com/transcoder/docs/how-to/generate-spritesheet)。sprite 依片長取幀，不需要剪輯與聲音，可以避開這兩種失敗。文章詳情頁可能要能在 spritesheet 與原檔之間切換，需要與設計師討論（Discord）。這個做法的考量：spritesheet 沒有聲音，未登入者與 LINE bot 都聽不到影片內容；AUDIO 沒有畫面，preview 仍要剪 30 秒，短語音仍會失敗，所以 AUDIO 仍要從上述三種做法中選一種；LINE bot 的 LIFF 文章頁以 `<video controls>` 播放 VIDEO 的 `PREVIEW`（§2.6），PREVIEW 改成 JPEG 就無法播放，LINE bot 要跟著改；官方文件寫明 spritesheet 需要至少一個 `VideoStream`，不剪輯時可能依全片長度計費，可與 #4 一起實測 | mrorz、設計師 | 是 |
+| 19 | 建立 job 前如何取得片長與有無音軌 | PoC 發現剪輯終點超過片長，或沒有音軌卻宣告音訊串流時，job 會失敗（§4.6）。rumors-api 目前沒有 ffmpeg 或 ffprobe（§2.2）。**討論中（2026-11-25）：** VIDEO 的 PREVIEW 改為整支影片的 spritesheet，AUDIO 不放 PREVIEW（§5.5）。這個方向不剪輯、不宣告音訊串流，所以不需要探測。尚待確認：方向本身、sprite 只填高度是否可行（§4.6 第 3 點）、sprite 是否另外計費（#4）、是否讓 LINE bot 取得 ORIGINAL，以及詳情頁的呈現（設計師）。若不採用這個方向，探測的做法有三種：在 rumors-api 以 JS 函式庫解析中繼資料；不探測，job 失敗後依錯誤調整設定重送（錯誤訊息不是正式介面，無法解析時退回不剪輯、不含音訊串流再送一次）；在 API server 之外執行 ffprobe | mrorz、設計師 | 是 |
 
 **已辨識的風險：**
 
